@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:genzebet/app/providers.dart';
-import 'package:genzebet/features/transactions/domain/models/categories.dart';
-import 'package:genzebet/features/transactions/domain/models/transaction_models.dart';
+import 'package:genzeb/app/providers.dart';
+import 'package:genzeb/features/transactions/domain/models/categories.dart';
+import 'package:genzeb/features/transactions/domain/models/transaction_models.dart';
 
 Future<void> showAddTransactionSheet(BuildContext context, WidgetRef ref) {
   return showModalBottomSheet<void>(

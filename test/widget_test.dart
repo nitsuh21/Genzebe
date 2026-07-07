@@ -9,14 +9,19 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import 'package:genzebet/app/app.dart';
-import 'package:genzebet/app/providers.dart';
-import 'package:genzebet/features/budget/data/in_memory_budget_repository.dart';
-import 'package:genzebet/features/transactions/data/in_memory_ledger_repository.dart';
+import 'package:genzeb/app/app.dart';
+import 'package:genzeb/app/providers.dart';
+import 'package:genzeb/features/budget/data/in_memory_budget_repository.dart';
+import 'package:genzeb/features/sms_ingestion/data/in_memory_sms_message_repository.dart';
+import 'package:genzeb/features/transactions/data/in_memory_ledger_repository.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
-  SharedPreferences.setMockInitialValues({});
+  // Skip onboarding: offline mode already chosen, SMS setup done.
+  SharedPreferences.setMockInitialValues({
+    'sms_setup_done': true,
+    'account_local_mode': true,
+  });
 
   testWidgets('app loads dashboard', (WidgetTester tester) async {
     // The real app uses on-device SQLite; in tests we swap in in-memory
@@ -27,12 +32,14 @@ void main() {
           ledgerRepositoryProvider.overrideWithValue(InMemoryLedgerRepository()),
           budgetRepositoryProvider
               .overrideWithValue(InMemoryBudgetRepository()),
+          smsMessageRepositoryProvider
+              .overrideWithValue(InMemorySmsMessageRepository()),
         ],
-        child: const GenzeBetApp(),
+        child: const GenzebApp(),
       ),
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('GenzeBet'), findsOneWidget);
+    expect(find.text('Genzeb'), findsOneWidget);
   });
 }

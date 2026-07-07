@@ -1,6 +1,6 @@
 {
-    "name": "genzebet",
-    "short_name": "genzebet",
+    "name": "genzeb",
+    "short_name": "genzeb",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",

@@ -1,4 +1,4 @@
-import 'package:genzebet/features/sms_ingestion/domain/models/sms_models.dart';
+import 'package:genzeb/features/sms_ingestion/domain/models/sms_models.dart';
 
 abstract class SmsParserTemplate {
   bool canParse(SmsMessage sms);
@@ -271,8 +271,12 @@ bool isExpenseMessage(String lowered) {
     'deposit',
     'salary',
     'refund',
+    'refunded',
+    'reversal',
+    'transferred to your',
     'ገቢ',
     'ተቀብለዋል',
+    'ተመላሽ',
   ];
   for (final word in incomeWords) {
     if (lowered.contains(word)) return false;

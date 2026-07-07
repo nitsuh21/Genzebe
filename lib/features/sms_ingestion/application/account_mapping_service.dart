@@ -1,8 +1,8 @@
 import 'dart:convert';
 
-import 'package:genzebet/features/sms_ingestion/domain/models/sms_models.dart';
-import 'package:genzebet/features/transactions/domain/models/transaction_models.dart';
-import 'package:genzebet/features/transactions/domain/repositories/ledger_repository.dart';
+import 'package:genzeb/features/sms_ingestion/domain/models/sms_models.dart';
+import 'package:genzeb/features/transactions/domain/models/transaction_models.dart';
+import 'package:genzeb/features/transactions/domain/repositories/ledger_repository.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class AccountMapping {

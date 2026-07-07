@@ -1,13 +1,12 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:genzebet/features/sms_ingestion/application/account_mapping_service.dart';
-import 'package:genzebet/features/sms_ingestion/application/sms_ingestion_service.dart';
-import 'package:genzebet/features/sms_ingestion/data/in_memory_sms_message_repository.dart';
-import 'package:genzebet/features/sms_ingestion/domain/models/sms_models.dart';
-import 'package:genzebet/features/sms_ingestion/domain/repositories/device_sms_source.dart';
-import 'package:genzebet/features/sms_ingestion/domain/services/sms_parser.dart';
-import 'package:genzebet/features/sync/application/sync_service.dart';
-import 'package:genzebet/features/sync/data/in_memory_cloud_sync_repository.dart';
-import 'package:genzebet/features/transactions/data/in_memory_ledger_repository.dart';
+import 'package:genzeb/features/sms_ingestion/application/account_mapping_service.dart';
+import 'package:genzeb/features/sms_ingestion/application/sms_ingestion_service.dart';
+import 'package:genzeb/features/sms_ingestion/data/in_memory_sms_message_repository.dart';
+import 'package:genzeb/features/sms_ingestion/domain/models/sms_models.dart';
+import 'package:genzeb/features/sms_ingestion/domain/repositories/device_sms_source.dart';
+import 'package:genzeb/features/sms_ingestion/domain/services/sms_parser.dart';
+import 'package:genzeb/features/sync/application/sync_service.dart';
+import 'package:genzeb/features/transactions/data/in_memory_ledger_repository.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 /// Test-only fake; the app itself reads real device SMS on Android.
@@ -74,8 +73,6 @@ void main() {
       accountMappingService: accountMapping,
     );
     final sync = SyncService(
-      ledgerRepository: ledger,
-      cloudSyncRepository: InMemoryCloudSyncRepository(),
       smsMessageRepository: smsStore,
       smsIngestionService: ingestion,
       deviceSmsSource: _FakeDeviceSmsSource(),

@@ -1,12 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:genzebet/app/providers.dart';
-import 'package:genzebet/core/logging/app_logger.dart';
-import 'package:genzebet/core/utils/formatters.dart';
-import 'package:genzebet/features/sms_ingestion/application/account_mapping_service.dart';
-import 'package:genzebet/features/sms_ingestion/domain/models/sms_models.dart';
-import 'package:genzebet/features/sms_ingestion/domain/repositories/device_sms_source.dart';
-import 'package:genzebet/features/transactions/domain/models/categories.dart';
+import 'package:genzeb/app/providers.dart';
+import 'package:genzeb/core/logging/app_logger.dart';
+import 'package:genzeb/core/utils/formatters.dart';
+import 'package:genzeb/features/ai/presentation/ai_cleanup_sheet.dart';
+import 'package:genzeb/features/sms_ingestion/application/account_mapping_service.dart';
+import 'package:genzeb/features/sms_ingestion/domain/models/sms_models.dart';
+import 'package:genzeb/features/sms_ingestion/domain/repositories/device_sms_source.dart';
+import 'package:genzeb/features/transactions/domain/models/categories.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 class ReviewQueueScreen extends ConsumerStatefulWidget {
@@ -66,7 +67,7 @@ class _ReviewQueueScreenState extends ConsumerState<ReviewQueueScreen> {
         return AlertDialog(
           title: const Text('SMS permission required'),
           content: const Text(
-            'GenzeBet needs SMS permission to read your device inbox for '
+            'Genzeb needs SMS permission to read your device inbox for '
             'mapping and force sync. Please allow SMS access in Settings.',
           ),
           actions: [
@@ -137,6 +138,8 @@ class _ReviewQueueScreenState extends ConsumerState<ReviewQueueScreen> {
             pending: reviewCount,
             total: stored.length,
           ),
+          const SizedBox(height: 14),
+          _AiCleanupCard(onTap: () => showAiCleanupSheet(context)),
           const SizedBox(height: 16),
           _CollapsibleCard(
             icon: Icons.account_tree_outlined,
@@ -477,6 +480,72 @@ class _SyncCard extends StatelessWidget {
   }
 }
 
+class _AiCleanupCard extends StatelessWidget {
+  const _AiCleanupCard({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(20),
+        child: Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+              color: theme.colorScheme.primary.withValues(alpha: 0.4),
+            ),
+            color: theme.colorScheme.primary.withValues(alpha: 0.06),
+          ),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(9),
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.primary.withValues(alpha: 0.14),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(
+                  Icons.auto_fix_high_rounded,
+                  color: theme.colorScheme.primary,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'AI category cleanup',
+                      style: theme.textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      'Let Genzeb AI fix wrong categories and income/expense '
+                      'mix-ups. You approve every change.',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const Icon(Icons.chevron_right_rounded),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _MappingManager extends ConsumerStatefulWidget {
   const _MappingManager();
 
@@ -545,7 +614,7 @@ class _MappingManagerState extends ConsumerState<_MappingManager> {
         return AlertDialog(
           title: const Text('SMS permission required'),
           content: const Text(
-            'GenzeBet needs SMS permission to read your device inbox for '
+            'Genzeb needs SMS permission to read your device inbox for '
             'mapping and force sync. Please allow SMS access in Settings.',
           ),
           actions: [
@@ -832,6 +901,28 @@ class _ReviewTile extends StatelessWidget {
                 ),
               ),
               const Spacer(),
+              Container(
+                margin: const EdgeInsets.only(right: 8),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                decoration: BoxDecoration(
+                  color: (item.parsed.detectedAmountMinor < 0
+                          ? const Color(0xFFEF6C5A)
+                          : const Color(0xFF2E9E6B))
+                      .withValues(alpha: 0.14),
+                  borderRadius: BorderRadius.circular(999),
+                ),
+                child: Text(
+                  item.parsed.detectedAmountMinor < 0 ? 'Expense' : 'Income',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    color: item.parsed.detectedAmountMinor < 0
+                        ? const Color(0xFFEF6C5A)
+                        : const Color(0xFF2E9E6B),
+                  ),
+                ),
+              ),
               Text(
                 formatMinorEtb(amount),
                 style: theme.textTheme.titleSmall

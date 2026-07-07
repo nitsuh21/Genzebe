@@ -1,4 +1,4 @@
-import 'package:genzebet/features/sms_ingestion/domain/models/sms_models.dart';
+import 'package:genzeb/features/sms_ingestion/domain/models/sms_models.dart';
 
 enum SmsPermissionState {
   granted,

@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:genzebet/app/providers.dart';
-import 'package:genzebet/core/utils/formatters.dart';
-import 'package:genzebet/features/ai/application/ai_assistant_service.dart';
-import 'package:genzebet/features/budget/domain/models/budget.dart';
-import 'package:genzebet/features/reports/application/report_service.dart';
-import 'package:genzebet/features/transactions/domain/models/categories.dart';
-import 'package:genzebet/features/transactions/presentation/add_transaction_sheet.dart';
-import 'package:genzebet/features/transactions/presentation/transaction_tile.dart';
+import 'package:genzeb/app/providers.dart';
+import 'package:genzeb/core/utils/formatters.dart';
+import 'package:genzeb/features/ai/application/ai_assistant_service.dart';
+import 'package:genzeb/features/budget/domain/models/budget.dart';
+import 'package:genzeb/features/reports/application/report_service.dart';
+import 'package:genzeb/features/transactions/domain/models/categories.dart';
+import 'package:genzeb/features/transactions/presentation/add_transaction_sheet.dart';
+import 'package:genzeb/features/transactions/presentation/transaction_tile.dart';
 
 class BudgetScreen extends ConsumerStatefulWidget {
   const BudgetScreen({super.key});
@@ -730,7 +730,7 @@ class _AiBudgetCardState extends State<_AiBudgetCard> {
             Text(_insight!, style: theme.textTheme.bodyMedium?.copyWith(height: 1.4)),
           ] else
             Text(
-              'Let Genze AI flag at-risk budgets and suggest adjustments.',
+              'Let Genzeb AI flag at-risk budgets and suggest adjustments.',
               style: theme.textTheme.bodySmall?.copyWith(
                 color: theme.colorScheme.onSurfaceVariant,
               ),

@@ -1,8 +1,8 @@
-import 'package:genzebet/features/budget/domain/models/budget.dart';
-import 'package:genzebet/features/budget/domain/repositories/budget_repository.dart';
-import 'package:genzebet/features/reports/application/report_service.dart';
-import 'package:genzebet/features/transactions/domain/models/transaction_models.dart';
-import 'package:genzebet/features/transactions/domain/repositories/ledger_repository.dart';
+import 'package:genzeb/features/budget/domain/models/budget.dart';
+import 'package:genzeb/features/budget/domain/repositories/budget_repository.dart';
+import 'package:genzeb/features/reports/application/report_service.dart';
+import 'package:genzeb/features/transactions/domain/models/transaction_models.dart';
+import 'package:genzeb/features/transactions/domain/repositories/ledger_repository.dart';
 
 class BudgetService {
   BudgetService({

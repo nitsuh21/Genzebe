@@ -1,6 +1,6 @@
-import 'package:genzebet/features/transactions/domain/models/money.dart';
-import 'package:genzebet/features/transactions/domain/models/transaction_models.dart';
-import 'package:genzebet/features/transactions/domain/repositories/ledger_repository.dart';
+import 'package:genzeb/features/transactions/domain/models/money.dart';
+import 'package:genzeb/features/transactions/domain/models/transaction_models.dart';
+import 'package:genzeb/features/transactions/domain/repositories/ledger_repository.dart';
 
 class TransactionService {
   TransactionService(this._ledgerRepository);

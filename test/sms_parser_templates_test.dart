@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:genzebet/features/sms_ingestion/domain/models/sms_models.dart';
-import 'package:genzebet/features/sms_ingestion/domain/services/sms_parser.dart';
+import 'package:genzeb/features/sms_ingestion/domain/models/sms_models.dart';
+import 'package:genzeb/features/sms_ingestion/domain/services/sms_parser.dart';
 
 void main() {
   final parser = SmsParserEngine(

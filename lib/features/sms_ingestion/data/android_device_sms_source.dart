@@ -3,9 +3,9 @@ import 'dart:convert';
 
 import 'package:android_sms_reader/android_sms_reader.dart';
 import 'package:crypto/crypto.dart';
-import 'package:genzebet/core/logging/app_logger.dart';
-import 'package:genzebet/features/sms_ingestion/domain/models/sms_models.dart';
-import 'package:genzebet/features/sms_ingestion/domain/repositories/device_sms_source.dart';
+import 'package:genzeb/core/logging/app_logger.dart';
+import 'package:genzeb/features/sms_ingestion/domain/models/sms_models.dart';
+import 'package:genzeb/features/sms_ingestion/domain/repositories/device_sms_source.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 /// Android implementation that reads actual inbox SMS.

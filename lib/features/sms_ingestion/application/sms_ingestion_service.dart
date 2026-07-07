@@ -1,14 +1,14 @@
 import 'dart:convert';
 
 import 'package:crypto/crypto.dart';
-import 'package:genzebet/core/logging/app_logger.dart';
-import 'package:genzebet/features/sms_ingestion/application/account_mapping_service.dart';
-import 'package:genzebet/features/sms_ingestion/domain/models/sms_models.dart';
-import 'package:genzebet/features/sms_ingestion/domain/repositories/sms_message_repository.dart';
-import 'package:genzebet/features/sms_ingestion/domain/services/sms_parser.dart';
-import 'package:genzebet/features/transactions/domain/models/money.dart';
-import 'package:genzebet/features/transactions/domain/models/transaction_models.dart';
-import 'package:genzebet/features/transactions/domain/repositories/ledger_repository.dart';
+import 'package:genzeb/core/logging/app_logger.dart';
+import 'package:genzeb/features/sms_ingestion/application/account_mapping_service.dart';
+import 'package:genzeb/features/sms_ingestion/domain/models/sms_models.dart';
+import 'package:genzeb/features/sms_ingestion/domain/repositories/sms_message_repository.dart';
+import 'package:genzeb/features/sms_ingestion/domain/services/sms_parser.dart';
+import 'package:genzeb/features/transactions/domain/models/money.dart';
+import 'package:genzeb/features/transactions/domain/models/transaction_models.dart';
+import 'package:genzeb/features/transactions/domain/repositories/ledger_repository.dart';
 
 class SmsIngestionService {
   SmsIngestionService({
@@ -31,6 +31,16 @@ class SmsIngestionService {
     String? accountIdOverride,
   }) async {
     final hash = _hashSms(sms);
+
+    // Never re-process a message that already has a decision (parsed,
+    // rejected, pending review, ...). Re-ingesting would clobber review
+    // outcomes, e.g. resurrect a rejected SMS after an app restart.
+    final existingById = await _smsMessageRepository.getById(sms.id);
+    if (existingById != null &&
+        existingById.status != SmsIngestionStatus.pending) {
+      return;
+    }
+
     final existingByHash = await _smsMessageRepository.getByHash(hash);
     if (existingByHash != null && existingByHash.sms.id != sms.id) {
       await _smsMessageRepository.save(
@@ -87,7 +97,11 @@ class SmsIngestionService {
       smsSender: sms.sender,
       smsSnippet: sms.body,
       parserConfidence: parsed.confidence,
-      reviewStatus: parsed.confidence < 0.8
+      // Any successful parse scores >= 0.82 (a currency token is required to
+      // parse and alone yields 0.82), so a 0.8 threshold made the review
+      // queue unreachable. 0.85 routes unknown-sender/terse matches (0.82) to
+      // human review while branded bank formats (>= 0.90) auto-accept.
+      reviewStatus: parsed.confidence < 0.85
           ? TransactionReviewStatus.pendingReview
           : TransactionReviewStatus.autoAccepted,
       statementBalanceMinor: parsed.balanceMinor,
@@ -170,6 +184,9 @@ class SmsIngestionService {
   }
 
   Future<void> rejectReviewItem(SmsReviewItem item, {String? reason}) async {
+    // Ingestion optimistically created a transaction for this SMS; a reject
+    // must remove it (and any ledger entry) or it lingers in reports forever.
+    await _ledgerRepository.deleteTransaction('sms-${item.smsMessage.id}');
     final hash = _hashSms(item.smsMessage);
     await _smsMessageRepository.save(
       StoredSmsMessage(

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:genzebet/app/providers.dart';
-import 'package:genzebet/features/ai/application/ai_assistant_service.dart';
+import 'package:genzeb/app/providers.dart';
+import 'package:genzeb/features/ai/application/ai_assistant_service.dart';
 
 Future<void> showAiAssistant(BuildContext context) {
   return showModalBottomSheet<void>(
@@ -223,7 +223,7 @@ class _Header extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Genze AI',
+                  'Genzeb AI',
                   style: theme.textTheme.titleMedium?.copyWith(
                     fontWeight: FontWeight.w800,
                   ),
@@ -476,7 +476,7 @@ class _Composer extends StatelessWidget {
               textInputAction: TextInputAction.send,
               onSubmitted: onSend,
               decoration: InputDecoration(
-                hintText: 'Ask Genze AI…',
+                hintText: 'Ask Genzeb AI…',
                 filled: true,
                 fillColor: theme.colorScheme.surfaceContainerHighest,
                 contentPadding:
@@ -522,7 +522,7 @@ class _UnavailableView extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           Text(
-            'Genze AI isn\'t reachable right now. Check your connection and '
+            'Genzeb AI isn\'t reachable right now. Check your connection and '
             'try again in a moment.',
             textAlign: TextAlign.center,
             style: theme.textTheme.bodyMedium?.copyWith(

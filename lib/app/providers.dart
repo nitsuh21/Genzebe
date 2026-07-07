@@ -1,43 +1,38 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:genzebet/core/db/app_database.dart';
-import 'package:genzebet/features/ai/ai_config.dart';
-import 'package:genzebet/features/ai/application/ai_assistant_service.dart';
-import 'package:genzebet/features/ai/application/ai_summary_service.dart';
-import 'package:genzebet/features/ai/data/gemini_client.dart';
-import 'package:genzebet/features/budget/application/budget_service.dart';
-import 'package:genzebet/features/budget/data/sqflite_budget_repository.dart';
-import 'package:genzebet/features/budget/domain/models/budget.dart';
-import 'package:genzebet/features/budget/domain/repositories/budget_repository.dart';
-import 'package:genzebet/features/ai/application/summary_boundary_impl.dart';
-import 'package:genzebet/features/ai/domain/boundaries/summary_boundary.dart';
-import 'package:genzebet/features/profile/application/admin_audit_service.dart';
-import 'package:genzebet/features/profile/application/auth_service.dart';
-import 'package:genzebet/features/profile/application/entitlement_service.dart';
-import 'package:genzebet/features/profile/application/payment_claim_service.dart';
-import 'package:genzebet/features/profile/application/reminder_service.dart';
-import 'package:genzebet/features/profile/application/risk_service.dart';
-import 'package:genzebet/features/profile/domain/models/auth_models.dart';
-import 'package:genzebet/features/profile/data/in_memory_admin_repository.dart';
-import 'package:genzebet/features/profile/data/in_memory_subscription_repository.dart';
-import 'package:genzebet/features/profile/domain/repositories/admin_repository.dart';
-import 'package:genzebet/features/profile/domain/repositories/subscription_repository.dart';
-import 'package:genzebet/features/reports/application/report_service.dart';
-import 'package:genzebet/features/sms_ingestion/application/account_mapping_service.dart';
-import 'package:genzebet/features/sms_ingestion/application/sms_ingestion_service.dart';
-import 'package:genzebet/features/sms_ingestion/data/android_device_sms_source.dart';
-import 'package:genzebet/features/sms_ingestion/data/in_memory_sms_message_repository.dart';
-import 'package:genzebet/features/sms_ingestion/domain/repositories/device_sms_source.dart';
-import 'package:genzebet/features/sms_ingestion/domain/repositories/sms_message_repository.dart';
-import 'package:genzebet/features/sms_ingestion/domain/models/sms_models.dart';
-import 'package:genzebet/features/sms_ingestion/domain/services/sms_parser.dart';
-import 'package:genzebet/features/sync/application/sync_service.dart';
-import 'package:genzebet/features/sync/data/in_memory_cloud_sync_repository.dart';
-import 'package:genzebet/features/sync/domain/repositories/cloud_sync_repository.dart';
-import 'package:genzebet/features/transactions/application/transaction_service.dart';
-import 'package:genzebet/features/transactions/data/sqflite_ledger_repository.dart';
-import 'package:genzebet/features/transactions/domain/models/transaction_models.dart';
-import 'package:genzebet/features/transactions/domain/repositories/ledger_repository.dart';
+import 'dart:ui' as ui;
+
+import 'package:genzeb/core/config/app_config.dart';
+import 'package:genzeb/core/db/app_database.dart';
+import 'package:genzeb/core/demo/demo_data_service.dart';
+import 'package:genzeb/core/l10n/app_strings.dart';
+import 'package:genzeb/features/account/application/account_controller.dart';
+import 'package:genzeb/features/account/data/supabase_account_repository.dart';
+import 'package:genzeb/features/account/domain/models/account_models.dart';
+import 'package:genzeb/features/account/domain/repositories/account_repository.dart';
+import 'package:genzeb/features/ai/ai_config.dart';
+import 'package:genzeb/features/ai/application/ai_assistant_service.dart';
+import 'package:genzeb/features/ai/application/ai_categorization_service.dart';
+import 'package:genzeb/features/ai/data/gemini_client.dart';
+import 'package:genzeb/features/budget/application/budget_service.dart';
+import 'package:genzeb/features/budget/data/sqflite_budget_repository.dart';
+import 'package:genzeb/features/budget/domain/models/budget.dart';
+import 'package:genzeb/features/budget/domain/repositories/budget_repository.dart';
+import 'package:genzeb/features/reports/application/report_service.dart';
+import 'package:genzeb/features/sms_ingestion/application/account_mapping_service.dart';
+import 'package:genzeb/features/sms_ingestion/application/sms_ingestion_service.dart';
+import 'package:genzeb/features/sms_ingestion/data/android_device_sms_source.dart';
+import 'package:genzeb/features/sms_ingestion/data/sqflite_sms_message_repository.dart';
+import 'package:genzeb/features/sms_ingestion/domain/repositories/device_sms_source.dart';
+import 'package:genzeb/features/sms_ingestion/domain/repositories/sms_message_repository.dart';
+import 'package:genzeb/features/sms_ingestion/domain/models/sms_models.dart';
+import 'package:genzeb/features/sms_ingestion/domain/services/sms_parser.dart';
+import 'package:genzeb/features/sync/application/sync_service.dart';
+import 'package:genzeb/features/transactions/application/transaction_service.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:genzeb/features/transactions/data/sqflite_ledger_repository.dart';
+import 'package:genzeb/features/transactions/domain/models/transaction_models.dart';
+import 'package:genzeb/features/transactions/domain/repositories/ledger_repository.dart';
 
 class InstitutionFilterOption {
   const InstitutionFilterOption({
@@ -51,6 +46,42 @@ class InstitutionFilterOption {
 
 final appDatabaseProvider = Provider<AppDatabase>((ref) {
   return AppDatabase.instance;
+});
+
+final accountRepositoryProvider = Provider<AccountRepository?>((ref) {
+  if (!AppConfig.isBackendConfigured) return null;
+  return SupabaseAccountRepository();
+});
+
+final accountControllerProvider =
+    StateNotifierProvider<AccountController, AccountState>((ref) {
+  return AccountController(repository: ref.watch(accountRepositoryProvider));
+});
+
+/// Whether the one-time SMS setup step of onboarding has been completed
+/// (null while loading from disk).
+class OnboardingFlagController extends StateNotifier<bool?> {
+  OnboardingFlagController() : super(null) {
+    _load();
+  }
+
+  static const _prefKey = 'sms_setup_done';
+
+  Future<void> _load() async {
+    final prefs = await SharedPreferences.getInstance();
+    state = prefs.getBool(_prefKey) ?? false;
+  }
+
+  Future<void> markDone() async {
+    state = true;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_prefKey, true);
+  }
+}
+
+final smsSetupDoneProvider =
+    StateNotifierProvider<OnboardingFlagController, bool?>((ref) {
+  return OnboardingFlagController();
 });
 
 final ledgerRepositoryProvider = Provider<LedgerRepository>((ref) {
@@ -81,6 +112,15 @@ final aiAssistantServiceProvider = Provider<AiAssistantService>((ref) {
   );
 });
 
+final aiCategorizationServiceProvider =
+    Provider<AiCategorizationService>((ref) {
+  return AiCategorizationService(
+    geminiClient: ref.watch(geminiClientProvider),
+    assistantService: ref.watch(aiAssistantServiceProvider),
+    ledgerRepository: ref.watch(ledgerRepositoryProvider),
+  );
+});
+
 final aiAvailableProvider = FutureProvider<bool>((ref) {
   ref.watch(dataVersionProvider);
   return ref.watch(aiAssistantServiceProvider).isAvailable();
@@ -91,16 +131,8 @@ final budgetOverviewProvider = FutureProvider<BudgetOverview>((ref) {
   return ref.watch(budgetServiceProvider).buildOverview();
 });
 
-final subscriptionRepositoryProvider = Provider<SubscriptionRepository>((ref) {
-  return InMemorySubscriptionRepository();
-});
-
-final adminRepositoryProvider = Provider<AdminRepository>((ref) {
-  return InMemoryAdminRepository();
-});
-
 final smsMessageRepositoryProvider = Provider<SmsMessageRepository>((ref) {
-  return InMemorySmsMessageRepository();
+  return SqfliteSmsMessageRepository(ref.watch(appDatabaseProvider));
 });
 
 final deviceSmsSourceProvider = Provider<DeviceSmsSource>((ref) {
@@ -134,18 +166,20 @@ final smsIngestionServiceProvider = Provider<SmsIngestionService>((ref) {
   );
 });
 
-final cloudSyncRepositoryProvider = Provider<CloudSyncRepository>((ref) {
-  return InMemoryCloudSyncRepository();
-});
-
 final syncServiceProvider = Provider<SyncService>((ref) {
   return SyncService(
-    ledgerRepository: ref.watch(ledgerRepositoryProvider),
-    cloudSyncRepository: ref.watch(cloudSyncRepositoryProvider),
     smsMessageRepository: ref.watch(smsMessageRepositoryProvider),
     smsIngestionService: ref.watch(smsIngestionServiceProvider),
     deviceSmsSource: ref.watch(deviceSmsSourceProvider),
     accountMappingService: ref.watch(accountMappingServiceProvider),
+  );
+});
+
+final demoDataServiceProvider = Provider<DemoDataService>((ref) {
+  return DemoDataService(
+    ledgerRepository: ref.watch(ledgerRepositoryProvider),
+    budgetRepository: ref.watch(budgetRepositoryProvider),
+    smsIngestionService: ref.watch(smsIngestionServiceProvider),
   );
 });
 
@@ -160,53 +194,70 @@ final reportServiceProvider = Provider<ReportService>((ref) {
   );
 });
 
-final entitlementServiceProvider = Provider<EntitlementService>((ref) {
-  return EntitlementService(ref.watch(subscriptionRepositoryProvider));
+/// Theme choice, persisted so it survives app restarts.
+class ThemeModeController extends StateNotifier<ThemeMode> {
+  ThemeModeController() : super(ThemeMode.system) {
+    _load();
+  }
+
+  static const _prefKey = 'theme_mode';
+
+  Future<void> _load() async {
+    final prefs = await SharedPreferences.getInstance();
+    final stored = prefs.getString(_prefKey);
+    if (stored == null) return;
+    state = ThemeMode.values.firstWhere(
+      (mode) => mode.name == stored,
+      orElse: () => ThemeMode.system,
+    );
+  }
+
+  Future<void> setMode(ThemeMode mode) async {
+    state = mode;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_prefKey, mode.name);
+  }
+}
+
+final themeModeProvider =
+    StateNotifierProvider<ThemeModeController, ThemeMode>((ref) {
+  return ThemeModeController();
 });
 
-final paymentClaimServiceProvider = Provider<PaymentClaimService>((ref) {
-  return PaymentClaimService(
-    repository: ref.watch(subscriptionRepositoryProvider),
-    entitlementService: ref.watch(entitlementServiceProvider),
-  );
+/// App language: 'system' follows the device locale; 'en'/'am' force one.
+class AppLanguageController extends StateNotifier<String> {
+  AppLanguageController() : super('system') {
+    _load();
+  }
+
+  static const _prefKey = 'app_language';
+
+  Future<void> _load() async {
+    final prefs = await SharedPreferences.getInstance();
+    final stored = prefs.getString(_prefKey);
+    if (stored == 'en' || stored == 'am' || stored == 'system') {
+      state = stored!;
+    }
+  }
+
+  Future<void> setLanguage(String value) async {
+    state = value;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_prefKey, value);
+  }
+}
+
+final appLanguageProvider =
+    StateNotifierProvider<AppLanguageController, String>((ref) {
+  return AppLanguageController();
 });
 
-final reminderServiceProvider = Provider<ReminderService>((ref) {
-  return const ReminderService();
-});
-
-final adminAuditServiceProvider = Provider<AdminAuditService>((ref) {
-  return AdminAuditService(ref.watch(adminRepositoryProvider));
-});
-
-final riskServiceProvider = Provider<RiskService>((ref) {
-  return RiskService(
-    subscriptionRepository: ref.watch(subscriptionRepositoryProvider),
-    adminRepository: ref.watch(adminRepositoryProvider),
-  );
-});
-
-final aiSummaryServiceProvider = Provider<AiSummaryService>((ref) {
-  return AiSummaryService(
-    subscriptionRepository: ref.watch(subscriptionRepositoryProvider),
-    reportService: ref.watch(reportServiceProvider),
-  );
-});
-
-final authControllerProvider =
-    StateNotifierProvider<AuthController, AuthSession>((ref) {
-  return AuthController();
-});
-
-final summaryBoundaryProvider = Provider<SummaryBoundary>((ref) {
-  return SummaryBoundaryImpl(
-    reportService: ref.watch(reportServiceProvider),
-    aiSummaryService: ref.watch(aiSummaryServiceProvider),
-  );
-});
-
-final themeModeProvider = StateProvider<ThemeMode>((ref) {
-  return ThemeMode.system;
+final stringsProvider = Provider<AppStrings>((ref) {
+  final language = ref.watch(appLanguageProvider);
+  final resolved = language == 'system'
+      ? ui.PlatformDispatcher.instance.locale.languageCode
+      : language;
+  return resolved == 'am' ? amStrings : enStrings;
 });
 
 /// Bumping this version invalidates all derived data providers so the UI

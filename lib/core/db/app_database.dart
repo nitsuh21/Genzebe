@@ -9,7 +9,7 @@ class AppDatabase {
   static final AppDatabase instance = AppDatabase._();
 
   static const _databaseName = 'genzebet.db';
-  static const _databaseVersion = 4;
+  static const _databaseVersion = 5;
 
   Database? _db;
   Future<Database>? _opening;
@@ -86,6 +86,30 @@ class AppDatabase {
         createdAt TEXT NOT NULL
       )
     ''');
+
+    await _createSmsMessagesTable(db);
+  }
+
+  Future<void> _createSmsMessagesTable(Database db) async {
+    await db.execute('''
+      CREATE TABLE sms_messages (
+        id TEXT PRIMARY KEY,
+        sender TEXT NOT NULL,
+        body TEXT NOT NULL,
+        receivedAt TEXT NOT NULL,
+        messageHash TEXT NOT NULL,
+        status TEXT NOT NULL,
+        parsedTransactionId TEXT,
+        failureReason TEXT,
+        ingestedAt TEXT
+      )
+    ''');
+    await db.execute(
+      'CREATE INDEX idx_sms_messages_hash ON sms_messages(messageHash)',
+    );
+    await db.execute(
+      'CREATE INDEX idx_sms_messages_status ON sms_messages(status)',
+    );
   }
 
   Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
@@ -107,6 +131,9 @@ class AppDatabase {
       await db.execute(
         "ALTER TABLE budgets ADD COLUMN institutionCodes TEXT",
       );
+    }
+    if (oldVersion < 5) {
+      await _createSmsMessagesTable(db);
     }
   }
 }

@@ -1,4 +1,4 @@
-import 'package:genzebet/features/transactions/domain/models/money.dart';
+import 'package:genzeb/features/transactions/domain/models/money.dart';
 
 enum TransactionType { income, expense, transferIn, transferOut }
 

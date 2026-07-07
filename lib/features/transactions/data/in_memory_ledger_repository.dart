@@ -1,5 +1,5 @@
-import 'package:genzebet/features/transactions/domain/models/transaction_models.dart';
-import 'package:genzebet/features/transactions/domain/repositories/ledger_repository.dart';
+import 'package:genzeb/features/transactions/domain/models/transaction_models.dart';
+import 'package:genzeb/features/transactions/domain/repositories/ledger_repository.dart';
 
 class InMemoryLedgerRepository implements LedgerRepository {
   final Map<String, Account> _accounts = {};
@@ -13,6 +13,14 @@ class InMemoryLedgerRepository implements LedgerRepository {
     );
     if (exists) return;
     _ledgerEntries.add(ledgerEntry);
+  }
+
+  @override
+  Future<void> deleteTransaction(String transactionId) async {
+    _transactions.remove(transactionId);
+    _ledgerEntries.removeWhere(
+      (entry) => entry.transactionId == transactionId,
+    );
   }
 
   @override

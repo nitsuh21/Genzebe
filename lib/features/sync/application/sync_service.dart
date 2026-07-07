@@ -1,12 +1,9 @@
-import 'package:genzebet/core/logging/app_logger.dart';
-import 'package:genzebet/features/sms_ingestion/application/sms_ingestion_service.dart';
-import 'package:genzebet/features/sms_ingestion/application/account_mapping_service.dart';
-import 'package:genzebet/features/sms_ingestion/domain/models/sms_models.dart';
-import 'package:genzebet/features/sms_ingestion/domain/repositories/device_sms_source.dart';
-import 'package:genzebet/features/sms_ingestion/domain/repositories/sms_message_repository.dart';
-import 'package:genzebet/features/sync/domain/repositories/cloud_sync_repository.dart';
-import 'package:genzebet/features/sync/domain/services/conflict_resolver.dart';
-import 'package:genzebet/features/transactions/domain/repositories/ledger_repository.dart';
+import 'package:genzeb/core/logging/app_logger.dart';
+import 'package:genzeb/features/sms_ingestion/application/sms_ingestion_service.dart';
+import 'package:genzeb/features/sms_ingestion/application/account_mapping_service.dart';
+import 'package:genzeb/features/sms_ingestion/domain/models/sms_models.dart';
+import 'package:genzeb/features/sms_ingestion/domain/repositories/device_sms_source.dart';
+import 'package:genzeb/features/sms_ingestion/domain/repositories/sms_message_repository.dart';
 
 class ForceSyncResult {
   const ForceSyncResult({
@@ -36,63 +33,19 @@ class ForceSyncResult {
 
 class SyncService {
   SyncService({
-    required LedgerRepository ledgerRepository,
-    required CloudSyncRepository cloudSyncRepository,
     required SmsMessageRepository smsMessageRepository,
     required SmsIngestionService smsIngestionService,
     required DeviceSmsSource deviceSmsSource,
     required AccountMappingService accountMappingService,
-  })  : _ledgerRepository = ledgerRepository,
-        _cloudSyncRepository = cloudSyncRepository,
-        _smsMessageRepository = smsMessageRepository,
+  })  : _smsMessageRepository = smsMessageRepository,
         _smsIngestionService = smsIngestionService,
         _deviceSmsSource = deviceSmsSource,
         _accountMappingService = accountMappingService;
 
-  final LedgerRepository _ledgerRepository;
-  final CloudSyncRepository _cloudSyncRepository;
   final SmsMessageRepository _smsMessageRepository;
   final SmsIngestionService _smsIngestionService;
   final DeviceSmsSource _deviceSmsSource;
   final AccountMappingService _accountMappingService;
-  final SyncConflictResolver _resolver = const SyncConflictResolver();
-  final Map<String, bool> _syncEnabled = {};
-
-  Future<void> setSyncEnabled({
-    required String userId,
-    required bool enabled,
-  }) async {
-    _syncEnabled[userId] = enabled;
-  }
-
-  bool isSyncEnabled(String userId) {
-    return _syncEnabled[userId] ?? false;
-  }
-
-  Future<void> sync(String userId) async {
-    if (!isSyncEnabled(userId)) return;
-    final local = await _ledgerRepository.getTransactions();
-    await _cloudSyncRepository.saveTransactions(userId: userId, records: local);
-  }
-
-  Future<void> restoreFromCloud(String userId) async {
-    if (!isSyncEnabled(userId)) return;
-    final remote = await _cloudSyncRepository.fetchTransactions(userId);
-    final local = await _ledgerRepository.getTransactions();
-    final localMap = {for (final tx in local) tx.id: tx};
-    for (final record in remote) {
-      final localRecord = localMap[record.id];
-      await _ledgerRepository.saveTransaction(
-        localRecord == null
-            ? record
-            : _resolver.resolveTransaction(localRecord, record),
-      );
-    }
-  }
-
-  Future<DateTime?> getLastSyncAt(String userId) {
-    return _cloudSyncRepository.getLastSyncAt(userId);
-  }
 
   Future<ForceSyncResult> forceSyncFromSms({
     String? importedRawPayload,

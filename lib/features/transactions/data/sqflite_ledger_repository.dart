@@ -1,7 +1,7 @@
-import 'package:genzebet/core/db/app_database.dart';
-import 'package:genzebet/features/transactions/domain/models/money.dart';
-import 'package:genzebet/features/transactions/domain/models/transaction_models.dart';
-import 'package:genzebet/features/transactions/domain/repositories/ledger_repository.dart';
+import 'package:genzeb/core/db/app_database.dart';
+import 'package:genzeb/features/transactions/domain/models/money.dart';
+import 'package:genzeb/features/transactions/domain/models/transaction_models.dart';
+import 'package:genzeb/features/transactions/domain/repositories/ledger_repository.dart';
 import 'package:sqflite/sqflite.dart';
 
 /// Persistent [LedgerRepository] backed by on-device SQLite.
@@ -74,6 +74,21 @@ class SqfliteLedgerRepository implements LedgerRepository {
         'source': ledgerEntry.source.name,
       },
       conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+  }
+
+  @override
+  Future<void> deleteTransaction(String transactionId) async {
+    final db = await _db;
+    await db.delete(
+      'transactions',
+      where: 'id = ?',
+      whereArgs: [transactionId],
+    );
+    await db.delete(
+      'ledger_entries',
+      where: 'transactionId = ?',
+      whereArgs: [transactionId],
     );
   }
 

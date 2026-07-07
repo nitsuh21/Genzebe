@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:genzebet/app/providers.dart';
-import 'package:genzebet/core/utils/formatters.dart';
-import 'package:genzebet/design_system/widgets.dart';
-import 'package:genzebet/features/ai/application/ai_assistant_service.dart';
-import 'package:genzebet/features/reports/application/report_service.dart';
-import 'package:genzebet/features/transactions/domain/models/categories.dart';
+import 'package:genzeb/app/providers.dart';
+import 'package:genzeb/core/utils/formatters.dart';
+import 'package:genzeb/design_system/widgets.dart';
+import 'package:genzeb/features/ai/application/ai_assistant_service.dart';
+import 'package:genzeb/features/reports/application/report_service.dart';
+import 'package:genzeb/features/transactions/domain/models/categories.dart';
 
 enum _ReportPeriod {
   today,
@@ -321,7 +321,7 @@ class _AiReportCardState extends State<_AiReportCard> {
             ),
           ] else
             Text(
-              'Let Genze AI summarise the biggest changes and suggest one action.',
+              'Let Genzeb AI summarise the biggest changes and suggest one action.',
               style: theme.textTheme.bodySmall?.copyWith(
                 color: theme.colorScheme.onSurfaceVariant,
               ),

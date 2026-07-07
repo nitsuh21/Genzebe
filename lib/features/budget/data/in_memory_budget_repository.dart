@@ -1,5 +1,5 @@
-import 'package:genzebet/features/budget/domain/models/budget.dart';
-import 'package:genzebet/features/budget/domain/repositories/budget_repository.dart';
+import 'package:genzeb/features/budget/domain/models/budget.dart';
+import 'package:genzeb/features/budget/domain/repositories/budget_repository.dart';
 
 class InMemoryBudgetRepository implements BudgetRepository {
   final Map<String, Budget> _budgets = {};

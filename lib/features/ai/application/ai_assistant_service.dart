@@ -1,11 +1,11 @@
-import 'package:genzebet/core/utils/formatters.dart';
-import 'package:genzebet/features/ai/ai_config.dart';
-import 'package:genzebet/features/ai/data/gemini_client.dart';
-import 'package:genzebet/features/budget/application/budget_service.dart';
-import 'package:genzebet/features/reports/application/report_service.dart';
-import 'package:genzebet/features/transactions/domain/models/categories.dart';
-import 'package:genzebet/features/transactions/domain/models/transaction_models.dart';
-import 'package:genzebet/features/transactions/domain/repositories/ledger_repository.dart';
+import 'package:genzeb/core/utils/formatters.dart';
+import 'package:genzeb/features/ai/ai_config.dart';
+import 'package:genzeb/features/ai/data/gemini_client.dart';
+import 'package:genzeb/features/budget/application/budget_service.dart';
+import 'package:genzeb/features/reports/application/report_service.dart';
+import 'package:genzeb/features/transactions/domain/models/categories.dart';
+import 'package:genzeb/features/transactions/domain/models/transaction_models.dart';
+import 'package:genzeb/features/transactions/domain/repositories/ledger_repository.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class AiChatMessage {
@@ -115,7 +115,7 @@ class AiAssistantService {
   }
 
   String _systemPrompt(String context) {
-    return 'You are Genze AI, a friendly, sharp personal-finance assistant '
+    return 'You are Genzeb AI, a friendly, sharp personal-finance assistant '
         'inside an Ethiopian money-tracking app. All amounts are in ETB. '
         'Answer only from the financial snapshot provided; if the data is '
         'insufficient, say so plainly. Be concise, concrete and encouraging. '

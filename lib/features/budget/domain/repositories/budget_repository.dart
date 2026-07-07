@@ -1,4 +1,4 @@
-import 'package:genzebet/features/budget/domain/models/budget.dart';
+import 'package:genzeb/features/budget/domain/models/budget.dart';
 
 abstract class BudgetRepository {
   Future<List<Budget>> getBudgets();

@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:genzebet/app/providers.dart';
-import 'package:genzebet/core/utils/formatters.dart';
-import 'package:genzebet/design_system/widgets.dart';
-import 'package:genzebet/features/reports/application/report_service.dart';
-import 'package:genzebet/features/transactions/domain/models/categories.dart';
-import 'package:genzebet/features/transactions/presentation/add_transaction_sheet.dart';
-import 'package:genzebet/features/transactions/presentation/transaction_tile.dart';
+import 'package:genzeb/app/providers.dart';
+import 'package:genzeb/core/utils/formatters.dart';
+import 'package:genzeb/design_system/widgets.dart';
+import 'package:genzeb/features/reports/application/report_service.dart';
+import 'package:genzeb/features/transactions/domain/models/categories.dart';
+import 'package:genzeb/features/transactions/presentation/add_transaction_sheet.dart';
+import 'package:genzeb/features/transactions/presentation/transaction_tile.dart';
 
 class DashboardScreen extends ConsumerStatefulWidget {
   const DashboardScreen({super.key});
@@ -38,6 +38,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final strings = ref.watch(stringsProvider);
     final insightsAsync = ref.watch(dashboardInsightsProvider);
     final transactionsAsync = ref.watch(ledgerTransactionsProvider);
     final seriesAsync = ref.watch(monthlySeriesProvider);
@@ -58,6 +59,12 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
             padding: EdgeInsets.fromLTRB(16, 8, 16, 28 + safeBottom + 84),
             children: [
               _Header(
+                displayName: ref
+                    .watch(accountControllerProvider)
+                    .profile
+                    ?.displayName
+                    ?.split(' ')
+                    .first,
                 themeMode: themeMode,
                 onCycleTheme: () {
                   final next = switch (themeMode) {
@@ -65,7 +72,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                     ThemeMode.light => ThemeMode.dark,
                     ThemeMode.dark => ThemeMode.system,
                   };
-                  ref.read(themeModeProvider.notifier).state = next;
+                  ref.read(themeModeProvider.notifier).setMode(next);
                 },
               ),
               const SizedBox(height: 16),
@@ -84,7 +91,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                           child: FilterChip(
                             selected: selectedInstitutionCodes.isEmpty,
                             showCheckmark: false,
-                            label: const Text('All institutions'),
+                            label: Text(strings.allInstitutions),
                             onSelected: (_) => clearInstitutionFilters(ref),
                           ),
                         ),
@@ -120,7 +127,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
               ),
               if (insights.accountCards.isNotEmpty) ...[
                 const SizedBox(height: 20),
-                const SectionHeader(title: 'Accounts'),
+                SectionHeader(title: strings.accounts),
                 SizedBox(
                   height: 120,
                   child: ListView.separated(
@@ -136,14 +143,14 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                 ),
               ],
               const SizedBox(height: 20),
-              const SectionHeader(title: 'Cash flow'),
+              SectionHeader(title: strings.cashFlow),
               _CashflowCard(series: series),
               const SizedBox(height: 20),
-              const SectionHeader(title: 'Insights'),
+              SectionHeader(title: strings.insights),
               _InsightsGrid(insights: insights),
               const SizedBox(height: 20),
               SectionHeader(
-                title: 'Recent activity',
+                title: strings.recentActivity,
                 action: Text(
                   '${insights.transactionCount} total',
                   style: theme.textTheme.bodySmall?.copyWith(
@@ -168,21 +175,27 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   }
 }
 
-class _Header extends StatelessWidget {
-  const _Header({required this.themeMode, required this.onCycleTheme});
+class _Header extends ConsumerWidget {
+  const _Header({
+    required this.themeMode,
+    required this.onCycleTheme,
+    this.displayName,
+  });
 
   final ThemeMode themeMode;
   final VoidCallback onCycleTheme;
+  final String? displayName;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
+    final strings = ref.watch(stringsProvider);
     final hour = DateTime.now().hour;
     final greeting = hour < 12
-        ? 'Good morning'
+        ? strings.goodMorning
         : hour < 18
-            ? 'Good afternoon'
-            : 'Good evening';
+            ? strings.goodAfternoon
+            : strings.goodEvening;
     final icon = switch (themeMode) {
       ThemeMode.system => Icons.brightness_auto_rounded,
       ThemeMode.light => Icons.light_mode_rounded,
@@ -201,7 +214,7 @@ class _Header extends StatelessWidget {
                 ),
               ),
               Text(
-                'GenzeBet',
+                displayName ?? 'Genzeb',
                 style: theme.textTheme.headlineSmall?.copyWith(
                   fontWeight: FontWeight.w800,
                 ),
@@ -219,7 +232,7 @@ class _Header extends StatelessWidget {
   }
 }
 
-class _BalanceHero extends StatelessWidget {
+class _BalanceHero extends ConsumerWidget {
   const _BalanceHero({
     required this.insights,
     required this.showAmounts,
@@ -231,17 +244,20 @@ class _BalanceHero extends StatelessWidget {
   final VoidCallback onToggleAmounts;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
+    final strings = ref.watch(stringsProvider);
     return Container(
       padding: const EdgeInsets.all(22),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(26),
-        gradient: LinearGradient(
+        // Fixed stops: colorScheme.secondary washes out to near-white in dark
+        // mode, killing the contrast of the white text on this card.
+        gradient: const LinearGradient(
           colors: [
-            const Color(0xFF4E5AE8),
-            const Color(0xFF6E5AE0),
-            theme.colorScheme.secondary,
+            Color(0xFF4E5AE8),
+            Color(0xFF6E5AE0),
+            Color(0xFF9A66E0),
           ],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
@@ -263,7 +279,7 @@ class _BalanceHero extends StatelessWidget {
                   color: Colors.white, size: 20),
               const SizedBox(width: 8),
               Text(
-                'Total balance',
+                strings.totalBalance,
                 style:
                     theme.textTheme.bodyMedium?.copyWith(color: Colors.white70),
               ),
@@ -296,7 +312,7 @@ class _BalanceHero extends StatelessWidget {
               Expanded(
                 child: _HeroStat(
                   icon: Icons.south_west_rounded,
-                  label: 'Income',
+                  label: strings.income,
                   value: showAmounts
                       ? formatCompactEtb(insights.incomeMinor)
                       : 'ETB ••••••',
@@ -310,7 +326,7 @@ class _BalanceHero extends StatelessWidget {
               Expanded(
                 child: _HeroStat(
                   icon: Icons.north_east_rounded,
-                  label: 'Expense',
+                  label: strings.expense,
                   value: showAmounts
                       ? formatCompactEtb(insights.expenseMinor)
                       : 'ETB ••••••',
@@ -368,7 +384,7 @@ class _HeroStat extends StatelessWidget {
   }
 }
 
-class _QuickActions extends StatelessWidget {
+class _QuickActions extends ConsumerWidget {
   const _QuickActions({
     required this.syncing,
     required this.onAdd,
@@ -380,13 +396,14 @@ class _QuickActions extends StatelessWidget {
   final VoidCallback? onSync;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final strings = ref.watch(stringsProvider);
     return Row(
       children: [
         Expanded(
           child: _ActionButton(
             icon: Icons.add_rounded,
-            label: 'Add',
+            label: strings.add,
             onPressed: onAdd,
             filled: true,
           ),
@@ -395,7 +412,7 @@ class _QuickActions extends StatelessWidget {
         Expanded(
           child: _ActionButton(
             icon: syncing ? null : Icons.sync_rounded,
-            label: syncing ? 'Syncing…' : 'Sync SMS',
+            label: syncing ? strings.syncing : strings.syncSms,
             onPressed: onSync,
             busy: syncing,
           ),
@@ -507,13 +524,14 @@ class _AccountCard extends StatelessWidget {
   }
 }
 
-class _CashflowCard extends StatelessWidget {
+class _CashflowCard extends ConsumerWidget {
   const _CashflowCard({required this.series});
 
   final List<MonthBucket> series;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final strings = ref.watch(stringsProvider);
     final bars = series
         .map(
           (b) => MonthlyBar(
@@ -532,10 +550,10 @@ class _CashflowCard extends StatelessWidget {
       child: Column(
         children: [
           Row(
-            children: const [
-              LegendDot(color: Color(0xFF2E9E6B), label: 'Income'),
-              SizedBox(width: 16),
-              LegendDot(color: Color(0xFFEF6C5A), label: 'Expense'),
+            children: [
+              LegendDot(color: const Color(0xFF2E9E6B), label: strings.income),
+              const SizedBox(width: 16),
+              LegendDot(color: const Color(0xFFEF6C5A), label: strings.expense),
             ],
           ),
           const SizedBox(height: 16),

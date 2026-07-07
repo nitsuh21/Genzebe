@@ -1,8 +1,8 @@
 import 'dart:convert';
 
-import 'package:genzebet/core/db/app_database.dart';
-import 'package:genzebet/features/budget/domain/models/budget.dart';
-import 'package:genzebet/features/budget/domain/repositories/budget_repository.dart';
+import 'package:genzeb/core/db/app_database.dart';
+import 'package:genzeb/features/budget/domain/models/budget.dart';
+import 'package:genzeb/features/budget/domain/repositories/budget_repository.dart';
 import 'package:sqflite/sqflite.dart';
 
 class SqfliteBudgetRepository implements BudgetRepository {

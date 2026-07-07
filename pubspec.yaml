@@ -1,7 +1,7 @@
-name: genzebet
-description: GenzeBet financial tracker for Ethiopian market.
+name: genzeb
+description: Genzeb — personal finance for Ethiopian market.
 publish_to: "none"
-version: 0.1.0+1
+version: 0.2.0+2
 
 environment:
   sdk: ">=3.3.0 <4.0.0"
@@ -19,11 +19,22 @@ dependencies:
   sqflite: ^2.4.3
   path: ^1.9.1
   http: ^1.6.0
+  supabase_flutter: ^2.8.0
+  google_sign_in: ^6.2.1
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^5.0.0
+  flutter_launcher_icons: ^0.14.1
 
 flutter:
   uses-material-design: true
+
+flutter_launcher_icons:
+  android: true
+  ios: true
+  remove_alpha_ios: true
+  image_path: assets/icon/icon.png
+  adaptive_icon_background: "#4E5AE8"
+  adaptive_icon_foreground: assets/icon/icon_foreground.png
