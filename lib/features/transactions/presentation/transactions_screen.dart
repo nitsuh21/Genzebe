@@ -5,6 +5,7 @@ import 'package:genzeb/core/utils/formatters.dart';
 import 'package:genzeb/features/reports/application/report_service.dart';
 import 'package:genzeb/features/transactions/domain/models/transaction_models.dart';
 import 'package:genzeb/features/transactions/presentation/add_transaction_sheet.dart';
+import 'package:genzeb/features/transactions/presentation/category_picker.dart';
 import 'package:genzeb/features/transactions/presentation/transaction_tile.dart';
 
 enum _LedgerFilter { all, income, expense, sms, manual }
@@ -314,7 +315,7 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
   }
 }
 
-class _GroupedList extends StatelessWidget {
+class _GroupedList extends ConsumerWidget {
   const _GroupedList({
     required this.records,
     required this.bottomInset,
@@ -324,7 +325,7 @@ class _GroupedList extends StatelessWidget {
   final double bottomInset;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     final groups = <String, List<TransactionRecord>>{};
     for (final record in records) {
@@ -365,7 +366,10 @@ class _GroupedList extends StatelessWidget {
         children.add(
           Padding(
             padding: const EdgeInsets.only(bottom: 10),
-            child: TransactionTile(record: item),
+            child: TransactionTile(
+              record: item,
+              onTap: () => promptRecategorize(context, ref, item),
+            ),
           ),
         );
       }

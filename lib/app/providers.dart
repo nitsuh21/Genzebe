@@ -22,7 +22,9 @@ import 'package:genzeb/features/reports/application/report_service.dart';
 import 'package:genzeb/features/sms_ingestion/application/account_mapping_service.dart';
 import 'package:genzeb/features/sms_ingestion/application/sms_ingestion_service.dart';
 import 'package:genzeb/features/sms_ingestion/data/android_device_sms_source.dart';
+import 'package:genzeb/features/sms_ingestion/data/sqflite_category_rule_repository.dart';
 import 'package:genzeb/features/sms_ingestion/data/sqflite_sms_message_repository.dart';
+import 'package:genzeb/features/sms_ingestion/domain/repositories/category_rule_repository.dart';
 import 'package:genzeb/features/sms_ingestion/domain/repositories/device_sms_source.dart';
 import 'package:genzeb/features/sms_ingestion/domain/repositories/sms_message_repository.dart';
 import 'package:genzeb/features/sms_ingestion/domain/models/sms_models.dart';
@@ -135,6 +137,10 @@ final smsMessageRepositoryProvider = Provider<SmsMessageRepository>((ref) {
   return SqfliteSmsMessageRepository(ref.watch(appDatabaseProvider));
 });
 
+final categoryRuleRepositoryProvider = Provider<CategoryRuleRepository>((ref) {
+  return SqfliteCategoryRuleRepository(ref.watch(appDatabaseProvider));
+});
+
 final deviceSmsSourceProvider = Provider<DeviceSmsSource>((ref) {
   return AndroidDeviceSmsSource();
 });
@@ -163,6 +169,7 @@ final smsIngestionServiceProvider = Provider<SmsIngestionService>((ref) {
     ledgerRepository: ref.watch(ledgerRepositoryProvider),
     smsMessageRepository: ref.watch(smsMessageRepositoryProvider),
     accountMappingService: ref.watch(accountMappingServiceProvider),
+    categoryRuleRepository: ref.watch(categoryRuleRepositoryProvider),
   );
 });
 
@@ -184,7 +191,10 @@ final demoDataServiceProvider = Provider<DemoDataService>((ref) {
 });
 
 final transactionServiceProvider = Provider<TransactionService>((ref) {
-  return TransactionService(ref.watch(ledgerRepositoryProvider));
+  return TransactionService(
+    ref.watch(ledgerRepositoryProvider),
+    ref.watch(categoryRuleRepositoryProvider),
+  );
 });
 
 final reportServiceProvider = Provider<ReportService>((ref) {

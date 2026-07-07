@@ -1,11 +1,42 @@
+import 'package:genzeb/features/sms_ingestion/domain/repositories/category_rule_repository.dart';
+import 'package:genzeb/features/sms_ingestion/domain/services/sms_parser.dart';
 import 'package:genzeb/features/transactions/domain/models/money.dart';
 import 'package:genzeb/features/transactions/domain/models/transaction_models.dart';
 import 'package:genzeb/features/transactions/domain/repositories/ledger_repository.dart';
 
 class TransactionService {
-  TransactionService(this._ledgerRepository);
+  TransactionService(this._ledgerRepository, this._categoryRules);
 
   final LedgerRepository _ledgerRepository;
+  final CategoryRuleRepository _categoryRules;
+
+  /// Recategorizes a transaction. For SMS transactions the merchant is also
+  /// remembered as a rule so every future sync files it correctly. Returns
+  /// the merchant a rule was learned for, or null.
+  Future<String?> changeCategory({
+    required String transactionId,
+    required String categoryId,
+  }) async {
+    final existing =
+        await _ledgerRepository.getTransactionById(transactionId);
+    if (existing == null || existing.categoryId == categoryId) return null;
+
+    await _ledgerRepository
+        .saveTransaction(existing.copyWith(categoryId: categoryId));
+
+    final snippet = existing.smsSnippet;
+    if (existing.source != TransactionSource.sms ||
+        snippet == null ||
+        snippet.trim().isEmpty) {
+      return null;
+    }
+    final isExpense = existing.type == TransactionType.expense ||
+        existing.type == TransactionType.transferOut;
+    final merchant = extractMerchant(snippet, isExpense: isExpense);
+    if (merchant == null) return null;
+    await _categoryRules.saveRule(normalizeMerchant(merchant), categoryId);
+    return merchant;
+  }
 
   Future<void> addManualTransaction({
     required String transactionId,

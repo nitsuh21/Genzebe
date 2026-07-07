@@ -306,9 +306,67 @@ bool _isAirtimeOrPackageMessage(String lowered) {
 }
 
 /// Keyword-driven category inference from the message body.
+///
+/// Order matters: the first matching rule wins, so more specific categories
+/// (airtime, fees) come before broad ones (shopping). Keywords include the
+/// common Ethiopian merchants and Amharic terms that appear in real bank and
+/// Telebirr notifications.
 String inferCategory({required String body, required bool isExpense}) {
   const Map<String, List<String>> rules = {
-    'groceries': ['supermarket', 'grocery', 'mart', 'market'],
+    'salary': ['salary', 'payroll', 'wage', 'ደመወዝ'],
+    'savings': ['saving', 'deposit to', 'fixed', 'equb', 'iqub', 'እቁብ', 'ቁጠባ'],
+    'airtime': [
+      'airtime',
+      'recharge',
+      'top up',
+      'topup',
+      'bundle',
+      'data package',
+      'internet package',
+      'package',
+      'minute',
+      'የአየር ሰዓት',
+    ],
+    'fees': [
+      'fee',
+      'charge',
+      'service charge',
+      'commission',
+      'vat',
+      'stamp duty',
+      'excise',
+      'disaster fund',
+    ],
+    'rent': ['rent', 'house rent', 'apartment', 'ኪራይ'],
+    'transport': [
+      'taxi',
+      'ride',
+      'trip',
+      'bus',
+      'anbessa',
+      'fuel',
+      'petrol',
+      'benzin',
+      'transport',
+      'feres',
+      'zayride',
+      'bolt',
+      'uber',
+      'yango',
+      'little',
+    ],
+    'groceries': [
+      'supermarket',
+      'grocery',
+      'mart',
+      'market',
+      'ገበያ',
+      'shoa',
+      'safari',
+      'fresh corner',
+      'queens',
+      'getfam',
+    ],
     'food': [
       'restaurant',
       'cafe',
@@ -316,29 +374,57 @@ String inferCategory({required String body, required bool isExpense}) {
       'food',
       'hotel',
       'burger',
-      'pizza'
+      'pizza',
+      'juice',
+      'bakery',
+      'lounge',
+      'tomoca',
+      'kaldi',
+      'kitfo',
+      'ምግብ',
     ],
-    'transport': [
-      'taxi',
-      'ride',
-      'bus',
-      'fuel',
-      'petrol',
-      'transport',
-      'feres',
-      'bolt',
-      'uber'
+    'bills': [
+      'bill',
+      'utility',
+      'electric',
+      'eeu',
+      'water',
+      'dstv',
+      'canal',
+      'tv',
+      'internet',
+      'wifi',
+      'መብራት',
+      'ውሃ',
+    ],
+    'health': [
+      'pharmacy',
+      'hospital',
+      'clinic',
+      'medical',
+      'health',
+      'ፋርማሲ',
+      'ሆስፒታል',
+      'መድኃኒት',
+    ],
+    'education': [
+      'school',
+      'tuition',
+      'university',
+      'college',
+      'course',
+      'ትምህርት',
+    ],
+    'entertainment': [
+      'cinema',
+      'movie',
+      'game',
+      'bet',
+      'ticket',
+      'concert',
+      'hulusport',
     ],
     'shopping': ['shop', 'store', 'mall', 'boutique', 'purchase'],
-    'bills': ['bill', 'utility', 'electric', 'water', 'dstv', 'tv', 'internet'],
-    'airtime': ['airtime', 'data', 'recharge', 'package', 'minute'],
-    'rent': ['rent', 'house', 'apartment'],
-    'health': ['pharmacy', 'hospital', 'clinic', 'medical', 'health'],
-    'education': ['school', 'tuition', 'university', 'college', 'course'],
-    'entertainment': ['cinema', 'movie', 'game', 'bet', 'ticket'],
-    'savings': ['saving', 'deposit to', 'fixed'],
-    'fees': ['fee', 'charge', 'service charge', 'commission'],
-    'salary': ['salary', 'payroll', 'wage'],
   };
 
   for (final entry in rules.entries) {
@@ -347,6 +433,7 @@ String inferCategory({required String body, required bool isExpense}) {
         if (!isExpense && entry.key != 'salary' && entry.key != 'savings') {
           continue;
         }
+        if (isExpense && entry.key == 'salary') continue;
         return entry.key;
       }
     }
@@ -365,6 +452,77 @@ String inferCategory({required String body, required bool isExpense}) {
     return 'transfer_out';
   }
   return 'expense';
+}
+
+// ---------------------------------------------------------------------------
+// Merchant / counterparty extraction
+// ---------------------------------------------------------------------------
+
+// Amount with the currency token on either side: "ETB 120.00" / "320.00 birr".
+const _amountPhrase =
+    r'(?:etb|birr|ብር)?\s*[\d,.]*\s*(?:etb|birr|ብር)?\s*';
+
+final List<RegExp> _expenseMerchantPatterns = [
+  // "paid ETB 120.00 to Shoa Supermarket via telebirr" /
+  // "paid 320.00 birr to GebeyaGo Delivery via app"
+  RegExp('paid\\s+${_amountPhrase}to\\s+([^.,\\n]{2,48}?)\\s+(?:via|through|on|using|ref)',
+      caseSensitive: false),
+  // "transferred to W/ro Almaz — house rent"
+  RegExp(r'transferred\s+to\s+([^.,\n—-]{2,48})', caseSensitive: false),
+  // "You have sent ETB 1,500.00 to Emebet K. via telebirr"
+  RegExp('sent\\s+${_amountPhrase}to\\s+([^.,\\n]{2,48}?)\\s+(?:via|through|on|ref)',
+      caseSensitive: false),
+  // "debited ETB 450.00 at Safari Supermarket"
+  RegExp(r'\bat\s+([a-zA-Z][^.,\n]{2,48})', caseSensitive: false),
+  // "paid ETB 260.00 for Ride trip via telebirr"
+  RegExp(r'\bfor\s+([a-zA-Z][^.,\n]{2,48}?)\s+(?:via|through|on|using)',
+      caseSensitive: false),
+];
+
+final List<RegExp> _incomeMerchantPatterns = [
+  // "received ETB 500.00 from Abebe Kebede via telebirr"
+  RegExp(r'from\s+([^.,\n]{2,48}?)\s+(?:via|through|on|ref)',
+      caseSensitive: false),
+  RegExp(r'from\s+([^.,\n]{2,48})', caseSensitive: false),
+];
+
+/// Extracts the merchant / counterparty name from a transaction SMS, or null
+/// when none can be found. Used for display and for learned category rules.
+String? extractMerchant(String body, {required bool isExpense}) {
+  final patterns =
+      isExpense ? _expenseMerchantPatterns : _incomeMerchantPatterns;
+  for (final pattern in patterns) {
+    final match = pattern.firstMatch(body);
+    final raw = match?.group(1)?.trim();
+    if (raw == null || raw.isEmpty) continue;
+    final cleaned = _cleanMerchant(raw);
+    if (cleaned != null) return cleaned;
+  }
+  return null;
+}
+
+String? _cleanMerchant(String raw) {
+  var value = raw
+      .replaceAll(RegExp(r'''["'“”]'''), '')
+      .replaceAll(RegExp(r'\s+'), ' ')
+      .trim();
+  // Drop trailing possessive/connector fragments left by loose matches.
+  value = value.replaceAll(RegExp(r'[—–-]\s*$'), '').trim();
+  if (value.length < 2) return null;
+  // Masked accounts / OTP-ish fragments are not merchants.
+  if (value.contains('*')) return null;
+  if (RegExp(r'^[\d\s+/-]+$').hasMatch(value)) return null;
+  if (value.length > 48) value = value.substring(0, 48).trim();
+  return value;
+}
+
+/// Canonical form used as the key for learned category rules.
+String normalizeMerchant(String merchant) {
+  return merchant
+      .toLowerCase()
+      .replaceAll(RegExp(r'[^a-z0-9ሀ-፿ ]'), ' ')
+      .replaceAll(RegExp(r'\s+'), ' ')
+      .trim();
 }
 
 bool _containsKeyword(String body, String keyword) {

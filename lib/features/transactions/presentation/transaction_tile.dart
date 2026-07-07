@@ -9,10 +9,14 @@ class TransactionTile extends StatelessWidget {
     super.key,
     required this.record,
     this.dense = false,
+    this.onTap,
   });
 
   final TransactionRecord record;
   final bool dense;
+
+  /// Typically opens the recategorize flow (see `promptRecategorize`).
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
@@ -32,7 +36,7 @@ class TransactionTile extends StatelessWidget {
       subtitleParts.insert(1, record.smsSender!);
     }
 
-    return Container(
+    final tile = Container(
       padding: EdgeInsets.symmetric(
         horizontal: 14,
         vertical: dense ? 8 : 12,
@@ -98,6 +102,16 @@ class TransactionTile extends StatelessWidget {
             ],
           ),
         ],
+      ),
+    );
+
+    if (onTap == null) return tile;
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: tile,
       ),
     );
   }

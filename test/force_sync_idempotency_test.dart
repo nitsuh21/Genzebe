@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:genzeb/features/sms_ingestion/application/account_mapping_service.dart';
 import 'package:genzeb/features/sms_ingestion/application/sms_ingestion_service.dart';
+import 'package:genzeb/features/sms_ingestion/data/in_memory_category_rule_repository.dart';
 import 'package:genzeb/features/sms_ingestion/data/in_memory_sms_message_repository.dart';
 import 'package:genzeb/features/sms_ingestion/domain/models/sms_models.dart';
 import 'package:genzeb/features/sms_ingestion/domain/repositories/device_sms_source.dart';
@@ -71,6 +72,7 @@ void main() {
       ledgerRepository: ledger,
       smsMessageRepository: smsStore,
       accountMappingService: accountMapping,
+      categoryRuleRepository: InMemoryCategoryRuleRepository(),
     );
     final sync = SyncService(
       smsMessageRepository: smsStore,

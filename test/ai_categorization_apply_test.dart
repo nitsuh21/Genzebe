@@ -7,6 +7,7 @@ import 'package:genzeb/features/budget/data/in_memory_budget_repository.dart';
 import 'package:genzeb/features/reports/application/report_service.dart';
 import 'package:genzeb/features/sms_ingestion/application/account_mapping_service.dart';
 import 'package:genzeb/features/sms_ingestion/application/sms_ingestion_service.dart';
+import 'package:genzeb/features/sms_ingestion/data/in_memory_category_rule_repository.dart';
 import 'package:genzeb/features/sms_ingestion/data/in_memory_sms_message_repository.dart';
 import 'package:genzeb/features/sms_ingestion/domain/services/sms_parser.dart';
 import 'package:genzeb/features/transactions/data/in_memory_ledger_repository.dart';
@@ -27,6 +28,7 @@ void main() {
       ledgerRepository: ledger,
       smsMessageRepository: InMemorySmsMessageRepository(),
       accountMappingService: AccountMappingService(ledger),
+      categoryRuleRepository: InMemoryCategoryRuleRepository(),
     );
     final service = AiCategorizationService(
       geminiClient: gemini,

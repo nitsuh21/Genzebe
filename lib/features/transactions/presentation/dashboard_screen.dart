@@ -6,6 +6,8 @@ import 'package:genzeb/design_system/widgets.dart';
 import 'package:genzeb/features/reports/application/report_service.dart';
 import 'package:genzeb/features/transactions/domain/models/categories.dart';
 import 'package:genzeb/features/transactions/presentation/add_transaction_sheet.dart';
+import 'package:genzeb/features/ai/presentation/ai_cleanup_sheet.dart';
+import 'package:genzeb/features/transactions/presentation/category_picker.dart';
 import 'package:genzeb/features/transactions/presentation/transaction_tile.dart';
 
 class DashboardScreen extends ConsumerStatefulWidget {
@@ -23,6 +25,8 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     setState(() => _syncing = true);
     final result = await ref.read(syncServiceProvider).forceSyncFromSms();
     refreshAppData(ref);
+    final aiAvailable =
+        await ref.read(aiAssistantServiceProvider).isAvailable();
     if (!mounted) return;
     setState(() => _syncing = false);
     ScaffoldMessenger.of(context).showSnackBar(
@@ -31,6 +35,13 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
           'Synced ${result.processed} SMS • ${result.newlyParsed} parsed • '
           '${result.pendingReview} need review',
         ),
+        // Offer the one-tap AI audit right when new data just landed.
+        action: aiAvailable && result.newlyParsed > 0
+            ? SnackBarAction(
+                label: 'AI check',
+                onPressed: () => showAiCleanupSheet(context),
+              )
+            : null,
       ),
     );
   }
@@ -164,7 +175,12 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                 ...recent.take(6).map(
                       (record) => Padding(
                         padding: const EdgeInsets.only(bottom: 10),
-                        child: TransactionTile(record: record, dense: true),
+                        child: TransactionTile(
+                          record: record,
+                          dense: true,
+                          onTap: () =>
+                              promptRecategorize(context, ref, record),
+                        ),
                       ),
                     ),
             ],

@@ -8,6 +8,7 @@ import 'package:genzeb/features/sms_ingestion/application/account_mapping_servic
 import 'package:genzeb/features/sms_ingestion/domain/models/sms_models.dart';
 import 'package:genzeb/features/sms_ingestion/domain/repositories/device_sms_source.dart';
 import 'package:genzeb/features/transactions/domain/models/categories.dart';
+import 'package:genzeb/features/transactions/presentation/category_picker.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 class ReviewQueueScreen extends ConsumerStatefulWidget {
@@ -168,10 +169,13 @@ class _ReviewQueueScreenState extends ConsumerState<ReviewQueueScreen> {
                   children: queue
                       .map((item) => _ReviewTile(
                             item: item,
-                            onApprove: () async {
+                            onApprove: (categoryOverride) async {
                               await ref
                                   .read(smsIngestionServiceProvider)
-                                  .approveReviewItem(item);
+                                  .approveReviewItem(
+                                    item,
+                                    categoryOverride: categoryOverride,
+                                  );
                               refreshAppData(ref);
                             },
                             onReject: () async {
@@ -864,7 +868,7 @@ String _institutionLabel(EthiopianInstitution i) {
   }
 }
 
-class _ReviewTile extends StatelessWidget {
+class _ReviewTile extends StatefulWidget {
   const _ReviewTile({
     required this.item,
     required this.onApprove,
@@ -872,13 +876,34 @@ class _ReviewTile extends StatelessWidget {
   });
 
   final SmsReviewItem item;
-  final VoidCallback onApprove;
+  final ValueChanged<String?> onApprove;
   final VoidCallback onReject;
+
+  @override
+  State<_ReviewTile> createState() => _ReviewTileState();
+}
+
+class _ReviewTileState extends State<_ReviewTile> {
+  String? _categoryOverride;
+
+  SmsReviewItem get item => widget.item;
+
+  Future<void> _pickCategory() async {
+    final selected = await showCategoryPicker(
+      context,
+      isExpense: item.parsed.detectedAmountMinor < 0,
+      current: _categoryOverride ?? item.parsed.categoryHint,
+    );
+    if (selected != null) {
+      setState(() => _categoryOverride = selected);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final info = categoryInfoFor(item.parsed.categoryHint);
+    final info =
+        categoryInfoFor(_categoryOverride ?? item.parsed.categoryHint);
     final amount = item.parsed.detectedAmountMinor.abs();
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
@@ -892,12 +917,42 @@ class _ReviewTile extends StatelessWidget {
         children: [
           Row(
             children: [
-              Icon(info.icon, color: info.color, size: 18),
-              const SizedBox(width: 6),
               Text(
-                '${item.smsMessage.sender} • ${info.label}',
+                item.smsMessage.sender,
                 style: theme.textTheme.labelMedium?.copyWith(
                   fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(width: 8),
+              // Tappable: fix the category before approving; the correction
+              // is remembered for this merchant on future syncs.
+              InkWell(
+                onTap: _pickCategory,
+                borderRadius: BorderRadius.circular(999),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 9, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: info.color.withValues(alpha: 0.14),
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(info.icon, color: info.color, size: 14),
+                      const SizedBox(width: 5),
+                      Text(
+                        info.label,
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          color: info.color,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const SizedBox(width: 2),
+                      Icon(Icons.arrow_drop_down_rounded,
+                          color: info.color, size: 16),
+                    ],
+                  ),
                 ),
               ),
               const Spacer(),
@@ -948,9 +1003,15 @@ class _ReviewTile extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.end,
             children: [
-              TextButton(onPressed: onReject, child: const Text('Reject')),
+              TextButton(
+                onPressed: widget.onReject,
+                child: const Text('Reject'),
+              ),
               const SizedBox(width: 8),
-              FilledButton(onPressed: onApprove, child: const Text('Approve')),
+              FilledButton(
+                onPressed: () => widget.onApprove(_categoryOverride),
+                child: const Text('Approve'),
+              ),
             ],
           ),
         ],
