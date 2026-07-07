@@ -119,7 +119,7 @@ class PlanCatalog {
     ),
     PlanInfo(
       code: 'plus',
-      name: 'Genze Plus',
+      name: 'Genzeb Plus',
       tagline: 'AI insights and cloud backup',
       priceLabel: 'Coming soon',
       available: false,
@@ -131,7 +131,7 @@ class PlanCatalog {
     ),
     PlanInfo(
       code: 'circle',
-      name: 'Genze Circle',
+      name: 'Genzeb Circle',
       tagline: 'Budgets for your household and equb',
       priceLabel: 'Coming soon',
       available: false,

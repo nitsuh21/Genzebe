@@ -60,6 +60,12 @@ class AppStrings {
     required this.automation,
     required this.dataPrivacy,
     required this.signOut,
+    required this.preferences,
+    required this.seePlans,
+    required this.currentPlan,
+    required this.transactions,
+    required this.budgets,
+    required this.madeFor,
   });
 
   final String navHome;
@@ -123,6 +129,12 @@ class AppStrings {
   final String automation;
   final String dataPrivacy;
   final String signOut;
+  final String preferences;
+  final String seePlans;
+  final String currentPlan;
+  final String transactions;
+  final String budgets;
+  final String madeFor;
 }
 
 const enStrings = AppStrings(
@@ -190,6 +202,12 @@ const enStrings = AppStrings(
   automation: 'Automation',
   dataPrivacy: 'Data & privacy',
   signOut: 'Sign out',
+  preferences: 'Preferences',
+  seePlans: 'See all plans',
+  currentPlan: 'Current plan',
+  transactions: 'Transactions',
+  budgets: 'Budgets',
+  madeFor: 'Made with ❤️ for Ethiopia',
 );
 
 const amStrings = AppStrings(
@@ -252,4 +270,10 @@ const amStrings = AppStrings(
   automation: 'ራስ-ሰር ተግባራት',
   dataPrivacy: 'ውሂብ እና ግላዊነት',
   signOut: 'ውጣ',
+  preferences: 'ምርጫዎች',
+  seePlans: 'ሁሉንም እቅዶች ይመልከቱ',
+  currentPlan: 'የአሁን እቅድ',
+  transactions: 'ግብይቶች',
+  budgets: 'በጀቶች',
+  madeFor: 'በ❤️ ለኢትዮጵያ የተሰራ',
 );
