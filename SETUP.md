@@ -28,15 +28,26 @@ and accounts, wire up Supabase once:
 
 ## 3. Run with configuration
 
+Copy `env.example.json` to `env.json` (gitignored), paste your values, then:
+
 ```bash
-flutter run \
-  --dart-define=SUPABASE_URL=https://YOURPROJECT.supabase.co \
-  --dart-define=SUPABASE_ANON_KEY=eyJ... \
-  --dart-define=GEMINI_API_KEY=... \
-  --dart-define=GOOGLE_SERVER_CLIENT_ID=1234-abc.apps.googleusercontent.com
+flutter run --dart-define-from-file=env.json
+flutter build apk --dart-define-from-file=env.json
 ```
 
-For release builds pass the same `--dart-define` flags to `flutter build apk`.
+(Individual `--dart-define=KEY=value` flags also still work.)
+
+### Values for this machine
+
+Debug signing SHA-1 for the Android OAuth client (package
+`com.nitsuh.genzeb`):
+
+```
+34:E3:B1:0F:28:FB:5F:80:CD:12:92:3E:4E:1C:6C:9F:F8:88:B0:09
+```
+
+Release builds are signed with a different key — add the release SHA-1 as a
+second fingerprint on the same Android OAuth client before shipping.
 
 Without these defines the app silently runs in local mode: onboarding still
 works via "Explore without an account" and all on-device features function.
