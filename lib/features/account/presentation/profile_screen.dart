@@ -92,15 +92,6 @@ class ProfileScreen extends ConsumerWidget {
               trailingWidget: _StatusDot(ready: aiAvailable ?? false),
               onTap: () => showAiAssistant(context),
             ),
-            _SettingsTile(
-              icon: Icons.key_rounded,
-              iconColor: const Color(0xFFD08A3E),
-              title: 'Gemini API key',
-              subtitle: (aiAvailable ?? false)
-                  ? 'Configured · stored only on this device'
-                  : 'Add a free key from aistudio.google.com',
-              onTap: () => _showGeminiKeyDialog(context, ref),
-            ),
           ],
         ),
         const SizedBox(height: 20),
@@ -1100,83 +1091,6 @@ class _SectionLabel extends StatelessWidget {
 // ---------------------------------------------------------------------------
 // Gemini key dialog + SMS ops host page
 // ---------------------------------------------------------------------------
-
-Future<void> _showGeminiKeyDialog(BuildContext context, WidgetRef ref) async {
-  final service = ref.read(aiAssistantServiceProvider);
-  if (service.hasBundledKey) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('This build already includes an AI key.')),
-    );
-    return;
-  }
-  final existing = await service.getApiKey();
-  if (!context.mounted) return;
-
-  final controller = TextEditingController(text: existing ?? '');
-  final action = await showDialog<String>(
-    context: context,
-    builder: (dialogContext) {
-      return AlertDialog(
-        title: const Text('Gemini API key'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Paste a free key from aistudio.google.com. It is stored only '
-              'on this device and used to answer your AI questions.',
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: controller,
-              autofocus: true,
-              obscureText: true,
-              decoration: const InputDecoration(
-                labelText: 'API key',
-                border: OutlineInputBorder(),
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          if (existing != null)
-            TextButton(
-              onPressed: () => Navigator.of(dialogContext).pop('clear'),
-              child: const Text('Remove key'),
-            ),
-          TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(dialogContext).pop('save'),
-            child: const Text('Save'),
-          ),
-        ],
-      );
-    },
-  );
-
-  if (action == 'save' && controller.text.trim().isNotEmpty) {
-    await service.saveApiKey(controller.text);
-  } else if (action == 'clear') {
-    await service.clearApiKey();
-  } else {
-    controller.dispose();
-    return;
-  }
-  controller.dispose();
-  refreshAppData(ref);
-  if (context.mounted) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          action == 'save' ? 'AI key saved.' : 'AI key removed.',
-        ),
-      ),
-    );
-  }
-}
 
 /// Standalone page hosting the SMS sync & review experience.
 class SmsOpsPage extends StatelessWidget {

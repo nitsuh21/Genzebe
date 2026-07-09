@@ -260,6 +260,40 @@ void main() {
     expect(report.internalMovedMinor, 0);
   });
 
+  test('fees are never overstated: itemized charge wins over category',
+      () async {
+    final ledger = InMemoryLedgerRepository();
+    // Historic misparse: a 5,000 debit that mentions charges got
+    // categorized as fees. Only the itemized ETB 11.50 is a bank fee.
+    await ledger.saveTransaction(_tx(
+      id: 'fee-mis',
+      accountId: 'cbe-main',
+      type: TransactionType.expense,
+      amountMinor: 501200,
+      at: DateTime(2026, 7, 5),
+      categoryId: 'fees',
+      snippet: 'Your account has been debited with ETB5,000.00. Service '
+          'charge of ETB 10.00 and VAT(15%) of ETB1.50 with a total of '
+          'ETB 5012.00.',
+    ));
+    // A genuine standalone charge with no itemization counts fully.
+    await ledger.saveTransaction(_tx(
+      id: 'fee-pure',
+      accountId: 'cbe-main',
+      type: TransactionType.expense,
+      amountMinor: 230,
+      at: DateTime(2026, 7, 6),
+      categoryId: 'fees',
+      snippet: 'Your account was debited ETB 2.30 for SMS alert.',
+    ));
+    final service = await _service(ledger);
+    final report = await service.generateReportForRange(
+      startInclusive: DateTime(2026, 7, 1),
+      endExclusive: DateTime(2026, 8, 1),
+    );
+    expect(report.feesMinor, 1150 + 230);
+  });
+
   test('pending parses are excluded and counted', () async {
     final ledger = InMemoryLedgerRepository();
     await ledger.saveTransaction(_tx(

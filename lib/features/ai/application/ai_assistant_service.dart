@@ -6,7 +6,6 @@ import 'package:genzeb/features/reports/application/report_service.dart';
 import 'package:genzeb/features/transactions/domain/models/categories.dart';
 import 'package:genzeb/features/transactions/domain/models/transaction_models.dart';
 import 'package:genzeb/features/transactions/domain/repositories/ledger_repository.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 class AiChatMessage {
   const AiChatMessage({required this.fromUser, required this.text});
@@ -33,34 +32,15 @@ class AiAssistantService {
   final BudgetService _budgetService;
   final LedgerRepository _ledgerRepository;
 
-  static const _keyPref = 'gemini_api_key';
-
-  /// Resolves the active Gemini key. The app-provided (bundled) key always wins
-  /// so users never need to supply their own; a locally stored key is only used
-  /// as an optional advanced override when no bundled key is configured.
+  /// AI is app-provided, invisibly: the bundled key or nothing. Users are
+  /// never asked for a key and there is no user-key storage.
   Future<String?> getApiKey() async {
     if (AiConfig.hasBundledKey) return AiConfig.bundledGeminiKey;
-    final prefs = await SharedPreferences.getInstance();
-    final value = prefs.getString(_keyPref)?.trim();
-    if (value == null || value.isEmpty) return null;
-    return value;
+    return null;
   }
 
-  /// True when AI is ready to use (app ships the key, or an override is stored).
-  Future<bool> isAvailable() async => (await getApiKey()) != null;
-
-  /// Whether the running build already includes an app-provided key.
-  bool get hasBundledKey => AiConfig.hasBundledKey;
-
-  Future<void> saveApiKey(String key) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_keyPref, key.trim());
-  }
-
-  Future<void> clearApiKey() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.remove(_keyPref);
-  }
+  /// True when the build ships with a working AI configuration.
+  Future<bool> isAvailable() async => AiConfig.hasBundledKey;
 
   /// Answers a free-form question grounded in the user's financial data.
   Future<String> ask(
@@ -123,8 +103,13 @@ class AiAssistantService {
   String _systemPrompt(String context) {
     return 'You are Genzeb AI, a friendly, sharp personal-finance assistant '
         'inside an Ethiopian money-tracking app. All amounts are in ETB. '
+        'Income and expense figures already EXCLUDE transfers between the '
+        'user\'s own accounts (shown separately as "Own transfers") — do not '
+        'treat those as earning or spending. '
         'Answer only from the financial snapshot provided; if the data is '
-        'insufficient, say so plainly. Be concise, concrete and encouraging. '
+        'insufficient, say so plainly. Be concise, concrete and encouraging: '
+        'short sentences, every claim backed by an ETB figure from the '
+        'snapshot, no filler and no disclaimers. '
         'Never invent numbers. If asked for biggest/lowest/single transaction, '
         'use the "Top single transactions" section directly.\n\n'
         'FINANCIAL SNAPSHOT:\n$context';
@@ -163,6 +148,9 @@ class AiAssistantService {
     buffer.writeln('- Net change vs last month: '
         '${insights.monthNetDeltaPercent.toStringAsFixed(1)}%');
     buffer.writeln('- Transactions tracked: ${insights.transactionCount}');
+    buffer.writeln('- Own transfers (between own accounts, not income or '
+        'spending): ${formatMinorEtb(insights.internalMovedMinor)}');
+    buffer.writeln('- Bank fees paid: ${formatMinorEtb(insights.feesMinor)}');
 
     if (insights.categoryTotalsMinor.isNotEmpty) {
       final sorted = insights.categoryTotalsMinor.entries.toList()

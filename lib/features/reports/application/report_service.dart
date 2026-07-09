@@ -70,11 +70,13 @@ class MerchantSpend {
     required this.name,
     required this.totalMinor,
     required this.count,
+    this.transactionIds = const {},
   });
 
   final String name;
   final int totalMinor;
   final int count;
+  final Set<String> transactionIds;
 }
 
 class BalancePoint {
@@ -97,6 +99,7 @@ class PeriodReport {
     required this.daysTotal,
     required this.scopedTransactions,
     required this.internalIds,
+    required this.feeByTransactionId,
   });
 
   /// Confirmed transactions inside the period (for drill-down and export).
@@ -104,6 +107,9 @@ class PeriodReport {
 
   /// Ids classified as own-account movements.
   final Set<String> internalIds;
+
+  /// Transactions that carried a bank fee, with the fee amount per id.
+  final Map<String, int> feeByTransactionId;
 
   final MonthlyReport totals;
 
@@ -211,6 +217,7 @@ class ReportService {
         name: existing?.name ?? merchant,
         totalMinor: (existing?.totalMinor ?? 0) + tx.amount.minorUnits,
         count: (existing?.count ?? 0) + 1,
+        transactionIds: {...?existing?.transactionIds, tx.id},
       );
     }
     final topMerchants = merchantTotals.values.toList()
@@ -241,6 +248,10 @@ class ReportService {
               tx.reviewStatus != TransactionReviewStatus.pendingReview)
           .toList(growable: false),
       internalIds: flows.internalIds,
+      feeByTransactionId: {
+        for (final tx in scoped)
+          if (_feesFor(tx, flows) > 0) tx.id: _feesFor(tx, flows),
+      },
     );
   }
 
@@ -354,6 +365,8 @@ class ReportService {
       smsTransactionCount: smsCount,
       transactionCount: transactions.length,
       accountCards: accountCards,
+      internalMovedMinor: currentTotals.internalMovedMinor,
+      feesMinor: currentTotals.feesMinor,
     );
   }
 
@@ -563,19 +576,21 @@ class ReportService {
     );
   }
 
-  /// Bank charges for one transaction: fees-category amount, itemized fees
-  /// from the receipt text, or the fee delta of a matched transfer pair.
+  /// Bank charges for one transaction. Itemized receipt fees are the ground
+  /// truth: a big debit that merely MENTIONS "service charge" (or was once
+  /// miscategorized as fees) contributes only its itemized charge — never
+  /// its whole amount. Only a pure charge SMS with no itemization counts
+  /// fully.
   static int _feesFor(TransactionRecord tx, FlowAnalysis flows) {
     if (tx.reviewStatus == TransactionReviewStatus.pendingReview) return 0;
-    if (tx.categoryId == 'fees' && isOutflowType(tx.type)) {
-      return tx.amount.minorUnits;
-    }
-    final pairFee = flows.pairFeeByOutflowId[tx.id];
     final itemized = tx.smsSnippet == null
         ? 0
         : extractItemizedFeesMinor(tx.smsSnippet!);
+    final pairFee = flows.pairFeeByOutflowId[tx.id];
     if (pairFee != null) return pairFee > itemized ? pairFee : itemized;
-    if (isOutflowType(tx.type)) return itemized;
+    if (!isOutflowType(tx.type)) return 0;
+    if (itemized > 0) return itemized;
+    if (tx.categoryId == 'fees') return tx.amount.minorUnits;
     return 0;
   }
 
@@ -691,6 +706,8 @@ class DashboardInsights {
     required this.smsTransactionCount,
     required this.transactionCount,
     required this.accountCards,
+    this.internalMovedMinor = 0,
+    this.feesMinor = 0,
   });
 
   final int netMinor;
@@ -707,6 +724,8 @@ class DashboardInsights {
   final int smsTransactionCount;
   final int transactionCount;
   final List<AccountInsightCard> accountCards;
+  final int internalMovedMinor;
+  final int feesMinor;
 }
 
 class MonthBucket {

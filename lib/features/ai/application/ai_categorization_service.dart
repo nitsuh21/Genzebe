@@ -89,7 +89,7 @@ class AiCategorizationService {
   }) async {
     final apiKey = await _assistant.getApiKey();
     if (apiKey == null) {
-      throw GeminiException('Add a Gemini API key in Profile to use AI.');
+      throw GeminiException('AI is not available in this build.');
     }
 
     final all = await _ledger.getTransactions();

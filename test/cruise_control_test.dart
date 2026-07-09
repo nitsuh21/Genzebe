@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:genzeb/core/config/app_config.dart';
 import 'package:genzeb/features/ai/application/ai_assistant_service.dart';
 import 'package:genzeb/features/ai/application/ai_categorization_service.dart';
 import 'package:genzeb/features/ai/application/cruise_control_service.dart';
@@ -96,8 +97,9 @@ Future<void> _seedTx(
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
-  // A stored key makes the assistant "available" without a bundled key.
-  SharedPreferences.setMockInitialValues({'flutter.gemini_api_key': 'test'});
+  SharedPreferences.setMockInitialValues({});
+  // AI is app-provided only; simulate a configured build.
+  AppConfig.overrideForTesting(geminiApiKey: 'test-key');
 
   test('steer applies category, direction, and account fixes safely',
       () async {

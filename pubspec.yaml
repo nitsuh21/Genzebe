@@ -22,6 +22,7 @@ dependencies:
   supabase_flutter: ^2.8.0
   google_sign_in: ^6.2.1
   share_plus: ^13.2.0
+  path_provider: ^2.1.6
 
 dev_dependencies:
   flutter_test:

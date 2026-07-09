@@ -9,6 +9,7 @@ import 'package:genzeb/design_system/widgets.dart';
 import 'package:genzeb/features/ai/application/ai_assistant_service.dart';
 import 'package:genzeb/features/reports/application/report_service.dart';
 import 'package:genzeb/features/transactions/domain/models/categories.dart';
+import 'package:genzeb/features/transactions/domain/models/transaction_models.dart';
 import 'package:genzeb/features/transactions/presentation/category_picker.dart';
 import 'package:genzeb/features/transactions/presentation/transaction_tile.dart';
 import 'package:share_plus/share_plus.dart';
@@ -142,8 +143,7 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
                 for (final period in _ReportPeriod.values)
                   ListTile(
                     dense: true,
-                    contentPadding:
-                        const EdgeInsets.symmetric(horizontal: 4),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 4),
                     title: Text(
                       period == _ReportPeriod.custom
                           ? 'Custom range…'
@@ -187,8 +187,7 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
         final theme = Theme.of(sheetContext);
         return Consumer(
           builder: (context, sheetRef, _) {
-            final selected =
-                sheetRef.watch(selectedInstitutionCodesProvider);
+            final selected = sheetRef.watch(selectedInstitutionCodesProvider);
             return SingleChildScrollView(
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
@@ -258,7 +257,8 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
       ..writeln('Own transfers: ${formatMinorEtb(t.internalMovedMinor)}')
       ..writeln('Bank fees: ${formatMinorEtb(t.feesMinor)}');
 
-    final csv = StringBuffer('date,type,category,amount_etb,account,internal\n');
+    final csv =
+        StringBuffer('date,type,category,amount_etb,account,internal\n');
     for (final tx in report.scopedTransactions) {
       final internal = report.internalIds.contains(tx.id);
       csv.writeln('${tx.occurredAt.toIso8601String().substring(0, 10)},'
@@ -289,10 +289,9 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
     final (start, endExclusive) = _rangeForPeriod();
     final selectedInstitutionCodes =
         ref.watch(selectedInstitutionCodesProvider);
-    final institutionOptionsAsync =
-        ref.watch(institutionFilterOptionsProvider);
-    final institutionOptions =
-        institutionOptionsAsync.valueOrNull ?? const <InstitutionFilterOption>[];
+    final institutionOptionsAsync = ref.watch(institutionFilterOptionsProvider);
+    final institutionOptions = institutionOptionsAsync.valueOrNull ??
+        const <InstitutionFilterOption>[];
     ref.watch(dataVersionProvider);
     final reportFuture = ref.watch(reportServiceProvider).generatePeriodReport(
           startInclusive: start,
@@ -379,12 +378,41 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
                 strings: strings,
                 totals: totals,
                 previous: report.previousTotals,
+                onIncomeTap: () => _showTransactionsSheet(
+                  context,
+                  title: strings.income,
+                  rows: report.scopedTransactions
+                      .where((tx) =>
+                          isInflowType(tx.type) &&
+                          !report.internalIds.contains(tx.id))
+                      .toList(growable: false),
+                ),
+                onExpenseTap: () => _showTransactionsSheet(
+                  context,
+                  title: strings.expense,
+                  rows: report.scopedTransactions
+                      .where((tx) =>
+                          isOutflowType(tx.type) &&
+                          !report.internalIds.contains(tx.id))
+                      .toList(growable: false),
+                ),
               ),
               const SizedBox(height: 10),
               _FlowStrip(
                 strings: strings,
                 totals: totals,
                 onTransfersTap: () => _showInternalSheet(context, report),
+                onFeesTap: () => _showTransactionsSheet(
+                  context,
+                  title: strings.bankFees,
+                  subtitle: 'Every transaction that carried a bank charge. '
+                      'The fees figure counts only the itemized charge, not '
+                      'the whole transaction.',
+                  rows: report.scopedTransactions
+                      .where(
+                          (tx) => report.feeByTransactionId.containsKey(tx.id))
+                      .toList(growable: false),
+                ),
               ),
               if (_period == _ReportPeriod.thisMonth) ...[
                 const SizedBox(height: 10),
@@ -416,7 +444,16 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
               if (report.topMerchants.isNotEmpty) ...[
                 const SizedBox(height: 20),
                 SectionHeader(title: strings.topMerchants),
-                _MerchantsCard(merchants: report.topMerchants),
+                _MerchantsCard(
+                  merchants: report.topMerchants,
+                  onMerchantTap: (merchant) => _showTransactionsSheet(
+                    context,
+                    title: merchant.name,
+                    rows: report.scopedTransactions
+                        .where((tx) => merchant.transactionIds.contains(tx.id))
+                        .toList(growable: false),
+                  ),
+                ),
               ],
               if (report.biggestSpends.isNotEmpty) ...[
                 const SizedBox(height: 20),
@@ -434,7 +471,19 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
               if (totals.incomeByCategoryMinor.isNotEmpty) ...[
                 const SizedBox(height: 20),
                 SectionHeader(title: strings.incomeBreakdown),
-                _IncomeCard(byCategory: totals.incomeByCategoryMinor),
+                _IncomeCard(
+                  byCategory: totals.incomeByCategoryMinor,
+                  onCategoryTap: (categoryId) => _showTransactionsSheet(
+                    context,
+                    title: categoryInfoFor(categoryId).label,
+                    rows: report.scopedTransactions
+                        .where((tx) =>
+                            tx.categoryId == categoryId &&
+                            isInflowType(tx.type) &&
+                            !report.internalIds.contains(tx.id))
+                        .toList(growable: false),
+                  ),
+                ),
               ],
               const SizedBox(height: 20),
               SectionHeader(title: strings.sixMonthTrend),
@@ -465,15 +514,18 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
     );
   }
 
-  /// Full transparency for the flow engine: every transaction classified as
-  /// an own-account movement, so a wrong call is visible and correctable
-  /// (recategorizing the outflow away from transfer/savings un-pairs it).
-  void _showInternalSheet(BuildContext context, PeriodReport report) {
+  /// Every card on this page opens the transactions behind its number —
+  /// the report is fully auditable.
+  void _showTransactionsSheet(
+    BuildContext context, {
+    required String title,
+    String? subtitle,
+    required List<TransactionRecord> rows,
+  }) {
     final strings = ref.read(stringsProvider);
-    final rows = report.scopedTransactions
-        .where((tx) => report.internalIds.contains(tx.id))
-        .toList()
+    final sorted = List<TransactionRecord>.from(rows)
       ..sort((a, b) => b.occurredAt.compareTo(a.occurredAt));
+    final total = sorted.fold<int>(0, (sum, tx) => sum + tx.amount.minorUnits);
 
     showModalBottomSheet<void>(
       context: context,
@@ -492,28 +544,39 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
               controller: scrollController,
               padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
               children: [
-                Text(
-                  strings.ownTransfers,
-                  style: theme.textTheme.titleLarge
-                      ?.copyWith(fontWeight: FontWeight.w800),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        title,
+                        style: theme.textTheme.titleLarge
+                            ?.copyWith(fontWeight: FontWeight.w800),
+                      ),
+                    ),
+                    Text(
+                      formatMinorEtb(total),
+                      style: theme.textTheme.titleMedium
+                          ?.copyWith(fontWeight: FontWeight.w800),
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 4),
-                Text(
-                  'Money moving between your own accounts — excluded from '
-                  'income and spending. Tap one to recategorize if the '
-                  'classification is wrong.',
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
+                if (subtitle != null) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    subtitle,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
                   ),
-                ),
+                ],
                 const SizedBox(height: 14),
-                if (rows.isEmpty)
+                if (sorted.isEmpty)
                   Padding(
                     padding: const EdgeInsets.all(24),
                     child: Center(child: Text(strings.noSpendingPeriod)),
                   )
                 else
-                  for (final tx in rows)
+                  for (final tx in sorted)
                     Padding(
                       padding: const EdgeInsets.only(bottom: 10),
                       child: TransactionTile(
@@ -527,6 +590,19 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
           },
         );
       },
+    );
+  }
+
+  void _showInternalSheet(BuildContext context, PeriodReport report) {
+    _showTransactionsSheet(
+      context,
+      title: ref.read(stringsProvider).ownTransfers,
+      subtitle: 'Money moving between your own accounts — excluded from '
+          'income and spending. Tap one to recategorize if the '
+          'classification is wrong.',
+      rows: report.scopedTransactions
+          .where((tx) => report.internalIds.contains(tx.id))
+          .toList(growable: false),
     );
   }
 
@@ -608,11 +684,15 @@ class _SummaryRow extends StatelessWidget {
     required this.strings,
     required this.totals,
     required this.previous,
+    required this.onIncomeTap,
+    required this.onExpenseTap,
   });
 
   final AppStrings strings;
   final MonthlyReport totals;
   final MonthlyReport previous;
+  final VoidCallback onIncomeTap;
+  final VoidCallback onExpenseTap;
 
   @override
   Widget build(BuildContext context) {
@@ -627,6 +707,7 @@ class _SummaryRow extends StatelessWidget {
             deltaPct: _pct(totals.incomeMinor, previous.incomeMinor),
             deltaGoodWhenUp: true,
             vsLabel: strings.vsPrevious,
+            onTap: onIncomeTap,
           ),
         ),
         const SizedBox(width: 10),
@@ -639,6 +720,7 @@ class _SummaryRow extends StatelessWidget {
             deltaPct: _pct(totals.expenseMinor, previous.expenseMinor),
             deltaGoodWhenUp: false,
             vsLabel: strings.vsPrevious,
+            onTap: onExpenseTap,
           ),
         ),
         const SizedBox(width: 10),
@@ -651,6 +733,7 @@ class _SummaryRow extends StatelessWidget {
             deltaPct: null,
             deltaGoodWhenUp: true,
             vsLabel: strings.vsPrevious,
+            onTap: null,
           ),
         ),
       ],
@@ -672,6 +755,7 @@ class _SummaryTile extends StatelessWidget {
     required this.deltaPct,
     required this.deltaGoodWhenUp,
     required this.vsLabel,
+    required this.onTap,
   });
 
   final String label;
@@ -681,6 +765,7 @@ class _SummaryTile extends StatelessWidget {
   final double? deltaPct;
   final bool deltaGoodWhenUp;
   final String vsLabel;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
@@ -692,7 +777,7 @@ class _SummaryTile extends StatelessWidget {
       final good = up == deltaGoodWhenUp;
       deltaColor = good ? const Color(0xFF2E9E6B) : const Color(0xFFE25555);
     }
-    return Container(
+    final tile = Container(
       padding: const EdgeInsets.all(13),
       decoration: BoxDecoration(
         color: theme.cardTheme.color,
@@ -747,6 +832,15 @@ class _SummaryTile extends StatelessWidget {
         ],
       ),
     );
+    if (onTap == null) return tile;
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: tile,
+      ),
+    );
   }
 }
 
@@ -755,75 +849,78 @@ class _FlowStrip extends StatelessWidget {
     required this.strings,
     required this.totals,
     required this.onTransfersTap,
+    required this.onFeesTap,
   });
 
   final AppStrings strings;
   final MonthlyReport totals;
   final VoidCallback onTransfersTap;
+  final VoidCallback onFeesTap;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    Widget item(IconData icon, Color color, String label, int minor) {
+    Widget item(IconData icon, Color color, String label, int minor,
+        VoidCallback onTap) {
       return Expanded(
-        child: Row(
-          children: [
-            Icon(icon, size: 16, color: color),
-            const SizedBox(width: 6),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    formatCompactEtb(minor),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: theme.textTheme.titleSmall
-                        ?.copyWith(fontWeight: FontWeight.w800),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(12),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 2),
+            child: Row(
+              children: [
+                Icon(icon, size: 16, color: color),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        formatCompactEtb(minor),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.titleSmall
+                            ?.copyWith(fontWeight: FontWeight.w800),
+                      ),
+                      Text(
+                        label,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
                   ),
-                  Text(
-                    label,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: theme.textTheme.labelSmall?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                ],
-              ),
+                ),
+                Icon(
+                  Icons.chevron_right_rounded,
+                  size: 16,
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ],
             ),
-          ],
+          ),
         ),
       );
     }
 
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTransfersTap,
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: BoxDecoration(
+        color: theme.cardTheme.color,
         borderRadius: BorderRadius.circular(16),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-          decoration: BoxDecoration(
-            color: theme.cardTheme.color,
-            borderRadius: BorderRadius.circular(16),
-          ),
-          child: Row(
-            children: [
-              item(Icons.swap_horiz_rounded, const Color(0xFF3B8DD6),
-                  strings.ownTransfers, totals.internalMovedMinor),
-              Container(width: 1, height: 30, color: theme.dividerColor),
-              const SizedBox(width: 12),
-              item(Icons.account_balance_rounded, const Color(0xFFD08A3E),
-                  strings.bankFees, totals.feesMinor),
-              Icon(
-                Icons.chevron_right_rounded,
-                size: 18,
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
-            ],
-          ),
-        ),
+      ),
+      child: Row(
+        children: [
+          item(Icons.swap_horiz_rounded, const Color(0xFF3B8DD6),
+              strings.ownTransfers, totals.internalMovedMinor, onTransfersTap),
+          Container(width: 1, height: 30, color: theme.dividerColor),
+          const SizedBox(width: 10),
+          item(Icons.account_balance_rounded, const Color(0xFFD08A3E),
+              strings.bankFees, totals.feesMinor, onFeesTap),
+        ],
       ),
     );
   }
@@ -846,8 +943,7 @@ class _RunRateCard extends StatelessWidget {
       ),
       child: Row(
         children: [
-          Icon(Icons.speed_rounded,
-              size: 18, color: theme.colorScheme.primary),
+          Icon(Icons.speed_rounded, size: 18, color: theme.colorScheme.primary),
           const SizedBox(width: 10),
           Expanded(
             child: Text(
@@ -972,8 +1068,8 @@ class _AiReportCardState extends State<_AiReportCard> {
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(
-            color: theme.colorScheme.primary.withValues(alpha: 0.4)),
+        border:
+            Border.all(color: theme.colorScheme.primary.withValues(alpha: 0.4)),
         color: theme.colorScheme.primary.withValues(alpha: 0.06),
       ),
       child: Column(
@@ -1063,9 +1159,8 @@ class _BreakdownCard extends StatelessWidget {
     final total =
         categoryEntries.fold<int>(0, (sum, entry) => sum + entry.value);
     final top = categoryEntries.take(5).toList(growable: false);
-    final otherTotal = categoryEntries
-        .skip(5)
-        .fold<int>(0, (sum, entry) => sum + entry.value);
+    final otherTotal =
+        categoryEntries.skip(5).fold<int>(0, (sum, entry) => sum + entry.value);
     final segments = [
       ...top.map((entry) => DonutSegment(
             value: entry.value.toDouble(),
@@ -1130,21 +1225,18 @@ class _BreakdownCard extends StatelessWidget {
                               Expanded(
                                 child: Text(
                                   info.label,
-                                  style:
-                                      theme.textTheme.bodyMedium?.copyWith(
+                                  style: theme.textTheme.bodyMedium?.copyWith(
                                     fontWeight: FontWeight.w600,
                                   ),
                                 ),
                               ),
                               if (deltaPct != null)
                                 Padding(
-                                  padding:
-                                      const EdgeInsets.only(right: 8),
+                                  padding: const EdgeInsets.only(right: 8),
                                   child: Text(
                                     '${deltaPct >= 0 ? '▲' : '▼'}'
                                     '${deltaPct.abs().toStringAsFixed(0)}%',
-                                    style: theme.textTheme.labelSmall
-                                        ?.copyWith(
+                                    style: theme.textTheme.labelSmall?.copyWith(
                                       color: deltaPct >= 0
                                           ? const Color(0xFFE25555)
                                           : const Color(0xFF2E9E6B),
@@ -1168,8 +1260,7 @@ class _BreakdownCard extends StatelessWidget {
                               minHeight: 6,
                               backgroundColor:
                                   info.color.withValues(alpha: 0.15),
-                              valueColor:
-                                  AlwaysStoppedAnimation(info.color),
+                              valueColor: AlwaysStoppedAnimation(info.color),
                             ),
                           ),
                         ],
@@ -1187,9 +1278,10 @@ class _BreakdownCard extends StatelessWidget {
 }
 
 class _MerchantsCard extends StatelessWidget {
-  const _MerchantsCard({required this.merchants});
+  const _MerchantsCard({required this.merchants, required this.onMerchantTap});
 
   final List<MerchantSpend> merchants;
+  final ValueChanged<MerchantSpend> onMerchantTap;
 
   @override
   Widget build(BuildContext context) {
@@ -1204,57 +1296,59 @@ class _MerchantsCard extends StatelessWidget {
       child: Column(
         children: [
           for (final merchant in merchants)
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 6),
-              child: Row(
-                children: [
-                  Expanded(
-                    flex: 5,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+            InkWell(
+              onTap: () => onMerchantTap(merchant),
+              borderRadius: BorderRadius.circular(10),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 6),
+                child: Row(
+                  children: [
+                    Expanded(
+                      flex: 5,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            merchant.name,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: theme.textTheme.bodyMedium
+                                ?.copyWith(fontWeight: FontWeight.w600),
+                          ),
+                          const SizedBox(height: 4),
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(999),
+                            child: LinearProgressIndicator(
+                              value: max == 0 ? 0 : merchant.totalMinor / max,
+                              minHeight: 5,
+                              backgroundColor: theme.colorScheme.primary
+                                  .withValues(alpha: 0.12),
+                              valueColor: AlwaysStoppedAnimation(
+                                  theme.colorScheme.primary),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
                       children: [
                         Text(
-                          merchant.name,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
+                          formatMinorEtb(merchant.totalMinor),
                           style: theme.textTheme.bodyMedium
-                              ?.copyWith(fontWeight: FontWeight.w600),
+                              ?.copyWith(fontWeight: FontWeight.w700),
                         ),
-                        const SizedBox(height: 4),
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(999),
-                          child: LinearProgressIndicator(
-                            value: max == 0
-                                ? 0
-                                : merchant.totalMinor / max,
-                            minHeight: 5,
-                            backgroundColor: theme.colorScheme.primary
-                                .withValues(alpha: 0.12),
-                            valueColor: AlwaysStoppedAnimation(
-                                theme.colorScheme.primary),
+                        Text(
+                          '×${merchant.count}',
+                          style: theme.textTheme.labelSmall?.copyWith(
+                            color: theme.colorScheme.onSurfaceVariant,
                           ),
                         ),
                       ],
                     ),
-                  ),
-                  const SizedBox(width: 12),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      Text(
-                        formatMinorEtb(merchant.totalMinor),
-                        style: theme.textTheme.bodyMedium
-                            ?.copyWith(fontWeight: FontWeight.w700),
-                      ),
-                      Text(
-                        '×${merchant.count}',
-                        style: theme.textTheme.labelSmall?.copyWith(
-                          color: theme.colorScheme.onSurfaceVariant,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
         ],
@@ -1264,9 +1358,10 @@ class _MerchantsCard extends StatelessWidget {
 }
 
 class _IncomeCard extends StatelessWidget {
-  const _IncomeCard({required this.byCategory});
+  const _IncomeCard({required this.byCategory, required this.onCategoryTap});
 
   final Map<String, int> byCategory;
+  final ValueChanged<String> onCategoryTap;
 
   @override
   Widget build(BuildContext context) {
@@ -1283,36 +1378,40 @@ class _IncomeCard extends StatelessWidget {
       child: Column(
         children: [
           for (final entry in entries)
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 5),
-              child: Row(
-                children: [
-                  Icon(
-                    categoryInfoFor(entry.key).icon,
-                    size: 18,
-                    color: categoryInfoFor(entry.key).color,
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Text(
-                      categoryInfoFor(entry.key).label,
+            InkWell(
+              onTap: () => onCategoryTap(entry.key),
+              borderRadius: BorderRadius.circular(10),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 5),
+                child: Row(
+                  children: [
+                    Icon(
+                      categoryInfoFor(entry.key).icon,
+                      size: 18,
+                      color: categoryInfoFor(entry.key).color,
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        categoryInfoFor(entry.key).label,
+                        style: theme.textTheme.bodyMedium
+                            ?.copyWith(fontWeight: FontWeight.w600),
+                      ),
+                    ),
+                    Text(
+                      '${total == 0 ? 0 : (entry.value / total * 100).round()}%',
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Text(
+                      formatMinorEtb(entry.value),
                       style: theme.textTheme.bodyMedium
-                          ?.copyWith(fontWeight: FontWeight.w600),
+                          ?.copyWith(fontWeight: FontWeight.w700),
                     ),
-                  ),
-                  Text(
-                    '${total == 0 ? 0 : (entry.value / total * 100).round()}%',
-                    style: theme.textTheme.labelSmall?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Text(
-                    formatMinorEtb(entry.value),
-                    style: theme.textTheme.bodyMedium
-                        ?.copyWith(fontWeight: FontWeight.w700),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
         ],
@@ -1356,8 +1455,7 @@ class _TrendCard extends StatelessWidget {
             children: [
               LegendDot(color: const Color(0xFF2E9E6B), label: strings.income),
               const SizedBox(width: 16),
-              LegendDot(
-                  color: const Color(0xFFEF6C5A), label: strings.expense),
+              LegendDot(color: const Color(0xFFEF6C5A), label: strings.expense),
             ],
           ),
           const SizedBox(height: 16),
@@ -1455,9 +1553,8 @@ class _FilterButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final color = active
-        ? theme.colorScheme.primary
-        : theme.colorScheme.onSurfaceVariant;
+    final color =
+        active ? theme.colorScheme.primary : theme.colorScheme.onSurfaceVariant;
     return Material(
       color: active
           ? theme.colorScheme.primary.withValues(alpha: 0.1)

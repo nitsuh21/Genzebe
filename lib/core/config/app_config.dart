@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:flutter/services.dart' show rootBundle;
 
 /// Backend configuration.
@@ -43,6 +44,11 @@ class AppConfig {
 
   static bool get isGoogleSignInConfigured =>
       isBackendConfigured && _googleServerClientId.trim().isNotEmpty;
+
+  @visibleForTesting
+  static void overrideForTesting({String? geminiApiKey}) {
+    if (geminiApiKey != null) _geminiApiKey = geminiApiKey;
+  }
 
   /// Fills any value missing from dart-defines with the bundled env.json.
   /// Safe to call when the asset is absent (tests, unconfigured clones).
