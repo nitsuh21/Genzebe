@@ -41,6 +41,11 @@ class AccountController extends StateNotifier<AccountState> {
       }
       return;
     }
+    // A configured build must never resurrect the preview-only demo session.
+    final hygiene = await SharedPreferences.getInstance();
+    if (hygiene.getBool(_demoSignedInPref) ?? false) {
+      await hygiene.setBool(_demoSignedInPref, false);
+    }
     try {
       final profile = await repository.restoreSession();
       if (profile != null) {
@@ -104,9 +109,13 @@ class AccountController extends StateNotifier<AccountState> {
       return true;
     } catch (error) {
       AppLogger.info('auth', 'Google sign-in failed: $error');
+      // Surface the real cause — OAuth misconfiguration (wrong SHA-1 /
+      // client id) is indistinguishable from a network blip otherwise.
+      final detail = error.toString().replaceAll(RegExp(r'\s+'), ' ');
       state = state.copyWith(
         busy: false,
-        error: 'Sign-in failed. Check your connection and try again.',
+        error: 'Sign-in failed: '
+            '${detail.length > 160 ? '${detail.substring(0, 160)}…' : detail}',
       );
       return false;
     }

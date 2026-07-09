@@ -37,6 +37,30 @@ ThemeData _buildTheme(Brightness brightness) {
         );
       }),
     ),
+    // Dialogs/sheets follow the app's card language instead of stock M3.
+    dialogTheme: DialogThemeData(
+      backgroundColor: isDark ? const Color(0xFF151B34) : Colors.white,
+      surfaceTintColor: Colors.transparent,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+      titleTextStyle: TextStyle(
+        fontSize: 19,
+        fontWeight: FontWeight.w800,
+        letterSpacing: -0.2,
+        color: colorScheme.onSurface,
+      ),
+      contentTextStyle: TextStyle(
+        fontSize: 14.5,
+        height: 1.45,
+        color: colorScheme.onSurfaceVariant,
+      ),
+    ),
+    bottomSheetTheme: BottomSheetThemeData(
+      backgroundColor: isDark ? const Color(0xFF151B34) : Colors.white,
+      surfaceTintColor: Colors.transparent,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+      ),
+    ),
     cardTheme: CardThemeData(
       color: isDark ? const Color(0xFF151B34) : Colors.white,
       elevation: 0,

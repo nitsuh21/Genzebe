@@ -989,26 +989,7 @@ class _SignOutTile extends ConsumerWidget {
           subtitle: 'Your on-device data stays on this phone',
           destructive: true,
           onTap: () async {
-            final confirmed = await showDialog<bool>(
-              context: context,
-              builder: (dialogContext) => AlertDialog(
-                title: Text('${strings.signOut}?'),
-                content: const Text(
-                  'Your transactions and budgets stay safely on this device. '
-                  'You can sign back in anytime.',
-                ),
-                actions: [
-                  TextButton(
-                    onPressed: () => Navigator.of(dialogContext).pop(false),
-                    child: const Text('Cancel'),
-                  ),
-                  FilledButton(
-                    onPressed: () => Navigator.of(dialogContext).pop(true),
-                    child: Text(strings.signOut),
-                  ),
-                ],
-              ),
-            );
+            final confirmed = await _showSignOutSheet(context, strings);
             if (confirmed == true) {
               await ref.read(accountControllerProvider.notifier).signOut();
             }
@@ -1017,6 +998,81 @@ class _SignOutTile extends ConsumerWidget {
       ],
     );
   }
+}
+
+/// Branded sign-out confirmation: a bottom sheet in the app's own design
+/// language instead of the stock Android dialog.
+Future<bool?> _showSignOutSheet(BuildContext context, AppStrings strings) {
+  return showModalBottomSheet<bool>(
+    context: context,
+    useSafeArea: true,
+    showDragHandle: true,
+    builder: (sheetContext) {
+      final theme = Theme.of(sheetContext);
+      return Padding(
+        padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 56,
+              height: 56,
+              decoration: BoxDecoration(
+                color: const Color(0xFFE25555).withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(18),
+              ),
+              child: const Icon(
+                Icons.logout_rounded,
+                color: Color(0xFFE25555),
+                size: 26,
+              ),
+            ),
+            const SizedBox(height: 14),
+            Text(
+              '${strings.signOut}?',
+              style: theme.textTheme.titleLarge?.copyWith(
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Your transactions and budgets stay safely on this device. '
+              'You can sign back in anytime.',
+              textAlign: TextAlign.center,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+                height: 1.45,
+              ),
+            ),
+            const SizedBox(height: 20),
+            SizedBox(
+              width: double.infinity,
+              height: 50,
+              child: FilledButton(
+                style: FilledButton.styleFrom(
+                  backgroundColor: const Color(0xFFE25555),
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                ),
+                onPressed: () => Navigator.of(sheetContext).pop(true),
+                child: Text(
+                  strings.signOut,
+                  style: const TextStyle(fontWeight: FontWeight.w700),
+                ),
+              ),
+            ),
+            const SizedBox(height: 6),
+            TextButton(
+              onPressed: () => Navigator.of(sheetContext).pop(false),
+              child: const Text('Cancel'),
+            ),
+          ],
+        ),
+      );
+    },
+  );
 }
 
 class _SectionLabel extends StatelessWidget {
