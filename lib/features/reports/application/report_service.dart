@@ -485,19 +485,38 @@ class ReportService {
   }
 
   /// Detects own-account movements so they never masquerade as income or
-  /// spending:
-  ///  - Pair matching: an outflow and an inflow on DIFFERENT accounts within
-  ///    48 hours whose amounts differ only by a plausible fee (<= 2% or
-  ///    ETB 25) are two legs of one transfer (CBE debit + telebirr credit).
+  /// spending. Deliberately conservative — a false pair silently deletes
+  /// real income AND real spending, which is worse than missing a transfer:
+  ///  - The OUTFLOW leg must actually look like a transfer (transfer_out /
+  ///    savings category, or the receipt says "transfer"). A grocery
+  ///    payment can never be swallowed by a coincidental same-amount credit.
+  ///  - The inflow leg must not be salary.
+  ///  - Legs must be on DIFFERENT accounts, within 3 hours (bank->wallet
+  ///    hops land in minutes), amounts equal up to a plausible fee
+  ///    (<= 2% or ETB 25).
   ///  - Outflows categorized as savings are money the user keeps.
   static FlowAnalysis analyzeFlows(List<TransactionRecord> records) {
     final confirmed = records
         .where((tx) =>
             tx.reviewStatus != TransactionReviewStatus.pendingReview)
         .toList(growable: false);
-    final outflows = confirmed.where((tx) => isOutflowType(tx.type)).toList()
+
+    bool transferishOutflow(TransactionRecord tx) {
+      if (tx.type == TransactionType.transferOut) return true;
+      if (tx.categoryId == 'transfer_out' || tx.categoryId == 'savings') {
+        return true;
+      }
+      final snippet = tx.smsSnippet?.toLowerCase();
+      return snippet != null && snippet.contains('transfer');
+    }
+
+    final outflows = confirmed
+        .where((tx) => isOutflowType(tx.type) && transferishOutflow(tx))
+        .toList()
       ..sort((a, b) => a.occurredAt.compareTo(b.occurredAt));
-    final inflows = confirmed.where((tx) => isInflowType(tx.type)).toList()
+    final inflows = confirmed
+        .where((tx) => isInflowType(tx.type) && tx.categoryId != 'salary')
+        .toList()
       ..sort((a, b) => a.occurredAt.compareTo(b.occurredAt));
 
     final internalIds = <String>{};
@@ -519,7 +538,7 @@ class ReportService {
         if (usedInflows.contains(inn.id)) continue;
         if (inn.accountId == out.accountId) continue;
         final gap = inn.occurredAt.difference(out.occurredAt).abs();
-        if (gap > const Duration(hours: 48)) continue;
+        if (gap > const Duration(hours: 3)) continue;
         if (!feeTolerated(out.amount.minorUnits, inn.amount.minorUnits)) {
           continue;
         }

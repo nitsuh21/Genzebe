@@ -381,7 +381,11 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
                 previous: report.previousTotals,
               ),
               const SizedBox(height: 10),
-              _FlowStrip(strings: strings, totals: totals),
+              _FlowStrip(
+                strings: strings,
+                totals: totals,
+                onTransfersTap: () => _showInternalSheet(context, report),
+              ),
               if (_period == _ReportPeriod.thisMonth) ...[
                 const SizedBox(height: 10),
                 _RunRateCard(strings: strings, report: report),
@@ -456,6 +460,71 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
               ],
             ],
           ),
+        );
+      },
+    );
+  }
+
+  /// Full transparency for the flow engine: every transaction classified as
+  /// an own-account movement, so a wrong call is visible and correctable
+  /// (recategorizing the outflow away from transfer/savings un-pairs it).
+  void _showInternalSheet(BuildContext context, PeriodReport report) {
+    final strings = ref.read(stringsProvider);
+    final rows = report.scopedTransactions
+        .where((tx) => report.internalIds.contains(tx.id))
+        .toList()
+      ..sort((a, b) => b.occurredAt.compareTo(a.occurredAt));
+
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      showDragHandle: true,
+      builder: (sheetContext) {
+        return DraggableScrollableSheet(
+          expand: false,
+          initialChildSize: 0.7,
+          minChildSize: 0.4,
+          maxChildSize: 0.95,
+          builder: (context, scrollController) {
+            final theme = Theme.of(context);
+            return ListView(
+              controller: scrollController,
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
+              children: [
+                Text(
+                  strings.ownTransfers,
+                  style: theme.textTheme.titleLarge
+                      ?.copyWith(fontWeight: FontWeight.w800),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Money moving between your own accounts — excluded from '
+                  'income and spending. Tap one to recategorize if the '
+                  'classification is wrong.',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+                const SizedBox(height: 14),
+                if (rows.isEmpty)
+                  Padding(
+                    padding: const EdgeInsets.all(24),
+                    child: Center(child: Text(strings.noSpendingPeriod)),
+                  )
+                else
+                  for (final tx in rows)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 10),
+                      child: TransactionTile(
+                        record: tx,
+                        dense: true,
+                        onTap: () => promptRecategorize(context, ref, tx),
+                      ),
+                    ),
+              ],
+            );
+          },
         );
       },
     );
@@ -682,10 +751,15 @@ class _SummaryTile extends StatelessWidget {
 }
 
 class _FlowStrip extends StatelessWidget {
-  const _FlowStrip({required this.strings, required this.totals});
+  const _FlowStrip({
+    required this.strings,
+    required this.totals,
+    required this.onTransfersTap,
+  });
 
   final AppStrings strings;
   final MonthlyReport totals;
+  final VoidCallback onTransfersTap;
 
   @override
   Widget build(BuildContext context) {
@@ -723,21 +797,33 @@ class _FlowStrip extends StatelessWidget {
       );
     }
 
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      decoration: BoxDecoration(
-        color: theme.cardTheme.color,
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTransfersTap,
         borderRadius: BorderRadius.circular(16),
-      ),
-      child: Row(
-        children: [
-          item(Icons.swap_horiz_rounded, const Color(0xFF3B8DD6),
-              strings.ownTransfers, totals.internalMovedMinor),
-          Container(width: 1, height: 30, color: theme.dividerColor),
-          const SizedBox(width: 12),
-          item(Icons.account_balance_rounded, const Color(0xFFD08A3E),
-              strings.bankFees, totals.feesMinor),
-        ],
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          decoration: BoxDecoration(
+            color: theme.cardTheme.color,
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Row(
+            children: [
+              item(Icons.swap_horiz_rounded, const Color(0xFF3B8DD6),
+                  strings.ownTransfers, totals.internalMovedMinor),
+              Container(width: 1, height: 30, color: theme.dividerColor),
+              const SizedBox(width: 12),
+              item(Icons.account_balance_rounded, const Color(0xFFD08A3E),
+                  strings.bankFees, totals.feesMinor),
+              Icon(
+                Icons.chevron_right_rounded,
+                size: 18,
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

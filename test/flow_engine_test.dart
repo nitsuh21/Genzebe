@@ -167,6 +167,99 @@ void main() {
     expect(report.internalMovedMinor, 0);
   });
 
+  test(
+      'coincidental same-amount purchase and credit are NOT a transfer pair',
+      () async {
+    final ledger = InMemoryLedgerRepository();
+    final t = DateTime(2026, 7, 10, 12, 0);
+    // A grocery payment (not transfer-ish) and an unrelated same-amount
+    // credit on another account an hour later — real income + real expense.
+    await ledger.saveTransaction(_tx(
+      id: 'buy-x',
+      accountId: 'telebirr-main',
+      type: TransactionType.expense,
+      amountMinor: 50000,
+      at: t,
+      categoryId: 'groceries',
+      snippet: 'You have paid ETB 500.00 to Shoa Supermarket via telebirr.',
+    ));
+    await ledger.saveTransaction(_tx(
+      id: 'gift-x',
+      accountId: 'cbe-main',
+      type: TransactionType.income,
+      amountMinor: 50000,
+      at: t.add(const Duration(hours: 1)),
+      categoryId: 'income',
+      snippet: 'Dear customer your account has been credited with ETB 500.00',
+    ));
+    final service = await _service(ledger);
+    final report = await service.generateReportForRange(
+      startInclusive: DateTime(2026, 7, 1),
+      endExclusive: DateTime(2026, 8, 1),
+    );
+    expect(report.incomeMinor, 50000);
+    expect(report.expenseMinor, 50000);
+    expect(report.internalMovedMinor, 0);
+  });
+
+  test('transfer legs more than 3 hours apart are not paired', () async {
+    final ledger = InMemoryLedgerRepository();
+    final t = DateTime(2026, 7, 11, 8, 0);
+    await ledger.saveTransaction(_tx(
+      id: 'slow-out',
+      accountId: 'cbe-main',
+      type: TransactionType.transferOut,
+      amountMinor: 100000,
+      at: t,
+      categoryId: 'transfer_out',
+      snippet: 'You have successfully transferred ETB1000.00 from account '
+          '1**9722 to account 1**4607.',
+    ));
+    await ledger.saveTransaction(_tx(
+      id: 'slow-in',
+      accountId: 'telebirr-main',
+      type: TransactionType.income,
+      amountMinor: 100000,
+      at: t.add(const Duration(hours: 5)),
+      categoryId: 'income',
+    ));
+    final service = await _service(ledger);
+    final report = await service.generateReportForRange(
+      startInclusive: DateTime(2026, 7, 1),
+      endExclusive: DateTime(2026, 8, 1),
+    );
+    expect(report.internalMovedMinor, 0);
+  });
+
+  test('salary credit is never swallowed as a transfer leg', () async {
+    final ledger = InMemoryLedgerRepository();
+    final t = DateTime(2026, 7, 12, 9, 0);
+    await ledger.saveTransaction(_tx(
+      id: 'send-y',
+      accountId: 'telebirr-main',
+      type: TransactionType.transferOut,
+      amountMinor: 2000000,
+      at: t,
+      categoryId: 'transfer_out',
+      snippet: 'You have transferred ETB 20,000.00 to Abebe via telebirr',
+    ));
+    await ledger.saveTransaction(_tx(
+      id: 'salary-y',
+      accountId: 'cbe-main',
+      type: TransactionType.income,
+      amountMinor: 2000000,
+      at: t.add(const Duration(minutes: 30)),
+      categoryId: 'salary',
+    ));
+    final service = await _service(ledger);
+    final report = await service.generateReportForRange(
+      startInclusive: DateTime(2026, 7, 1),
+      endExclusive: DateTime(2026, 8, 1),
+    );
+    expect(report.incomeMinor, 2000000);
+    expect(report.internalMovedMinor, 0);
+  });
+
   test('pending parses are excluded and counted', () async {
     final ledger = InMemoryLedgerRepository();
     await ledger.saveTransaction(_tx(
