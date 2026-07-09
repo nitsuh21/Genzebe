@@ -90,14 +90,20 @@ class AiAssistantService {
   }
 
   /// One-shot insight generation for a specific area of the app.
+  /// [periodContext] scopes the reports insight to the period the user is
+  /// actually looking at instead of a hardcoded month.
   Future<String> generateInsight(
     AiInsightKind kind, {
     Set<String> institutionCodes = const <String>{},
+    String? periodContext,
   }) async {
+    final reportsWindow = periodContext == null
+        ? 'this month versus last month'
+        : 'the period $periodContext, compared with the period before it';
     final prompt = switch (kind) {
       AiInsightKind.reports =>
         'Give me 3 concise, specific insights about my spending and income '
-            'this month versus last month. Call out the biggest changes and '
+            'for $reportsWindow. Call out the biggest changes and '
             'one concrete action. Use short bullet points.',
       AiInsightKind.budget =>
         'Review my budgets versus actual spend this month. Tell me which '

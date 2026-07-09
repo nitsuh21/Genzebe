@@ -562,6 +562,24 @@ String? _cleanMerchant(String raw) {
   return value;
 }
 
+final _feeItemPattern = RegExp(
+  '(?:service\\s+charge|vat\\s*\\(?[0-9%]*\\)?|commission|'
+  'disaster\\s+(?:recovery|fund)\\s*\\(?[0-9%]*\\)?|stamp\\s+duty|'
+  'excise)\\s*(?:of)?\\s*(?:etb|birr|ብር)?\\s*$_amountCapturePattern',
+  caseSensitive: false,
+);
+
+/// Sums the fee components a bank itemizes inside a receipt ("Service charge
+/// of ETB 1.00 and VAT(15%) of ETB0.15 ..."). Returns 0 when none.
+int extractItemizedFeesMinor(String body) {
+  var total = 0;
+  for (final match in _feeItemPattern.allMatches(body)) {
+    final major = _toMajor(match.group(1));
+    if (major != null) total += (major * 100).round();
+  }
+  return total;
+}
+
 /// Canonical form used as the key for learned category rules.
 String normalizeMerchant(String merchant) {
   return merchant

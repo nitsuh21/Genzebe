@@ -66,6 +66,22 @@ class AppStrings {
     required this.transactions,
     required this.budgets,
     required this.madeFor,
+    required this.net,
+    required this.ownTransfers,
+    required this.bankFees,
+    required this.awaitingReview,
+    required this.spendingBreakdown,
+    required this.topMerchants,
+    required this.biggestTransactions,
+    required this.incomeBreakdown,
+    required this.balanceOverTime,
+    required this.sixMonthTrend,
+    required this.dailyAverage,
+    required this.projectedTotal,
+    required this.vsPrevious,
+    required this.other,
+    required this.noSpendingPeriod,
+    required this.share,
   });
 
   final String navHome;
@@ -135,6 +151,22 @@ class AppStrings {
   final String transactions;
   final String budgets;
   final String madeFor;
+  final String net;
+  final String ownTransfers;
+  final String bankFees;
+  final String awaitingReview;
+  final String spendingBreakdown;
+  final String topMerchants;
+  final String biggestTransactions;
+  final String incomeBreakdown;
+  final String balanceOverTime;
+  final String sixMonthTrend;
+  final String dailyAverage;
+  final String projectedTotal;
+  final String vsPrevious;
+  final String other;
+  final String noSpendingPeriod;
+  final String share;
 }
 
 const enStrings = AppStrings(
@@ -208,6 +240,22 @@ const enStrings = AppStrings(
   transactions: 'Transactions',
   budgets: 'Budgets',
   madeFor: 'Made with ❤️ for Ethiopia',
+  net: 'Net',
+  ownTransfers: 'Own transfers',
+  bankFees: 'Bank fees',
+  awaitingReview: 'awaiting review',
+  spendingBreakdown: 'Spending breakdown',
+  topMerchants: 'Top merchants',
+  biggestTransactions: 'Biggest transactions',
+  incomeBreakdown: 'Income breakdown',
+  balanceOverTime: 'Balance over time',
+  sixMonthTrend: '6-month trend',
+  dailyAverage: 'Daily average',
+  projectedTotal: 'Projected total',
+  vsPrevious: 'vs previous',
+  other: 'Other',
+  noSpendingPeriod: 'No spending in this period.',
+  share: 'Share',
 );
 
 const amStrings = AppStrings(
@@ -276,4 +324,20 @@ const amStrings = AppStrings(
   transactions: 'ግብይቶች',
   budgets: 'በጀቶች',
   madeFor: 'በ❤️ ለኢትዮጵያ የተሰራ',
+  net: 'ተጣራ',
+  ownTransfers: 'የራስ ዝውውሮች',
+  bankFees: 'የባንክ ክፍያዎች',
+  awaitingReview: 'ግምገማ በመጠበቅ ላይ',
+  spendingBreakdown: 'የወጪ ትንተና',
+  topMerchants: 'ዋና ነጋዴዎች',
+  biggestTransactions: 'ትልልቅ ግብይቶች',
+  incomeBreakdown: 'የገቢ ትንተና',
+  balanceOverTime: 'ቀሪ ሂሳብ በጊዜ ሂደት',
+  sixMonthTrend: 'የ6 ወር አዝማሚያ',
+  dailyAverage: 'ዕለታዊ አማካይ',
+  projectedTotal: 'የተገመተ ጠቅላላ',
+  vsPrevious: 'ካለፈው ጋር',
+  other: 'ሌላ',
+  noSpendingPeriod: 'በዚህ ጊዜ ውስጥ ወጪ የለም።',
+  share: 'አጋራ',
 );

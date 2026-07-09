@@ -176,10 +176,14 @@ class MonthlyBarChart extends StatelessWidget {
     super.key,
     required this.bars,
     this.height = 150,
+    this.onBarTap,
   });
 
   final List<MonthlyBar> bars;
   final double height;
+
+  /// Called with the tapped bar's index (e.g. to focus that month).
+  final ValueChanged<int>? onBarTap;
 
   @override
   Widget build(BuildContext context) {
@@ -192,41 +196,131 @@ class MonthlyBarChart extends StatelessWidget {
       height: height,
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.end,
-        children: bars.map((bar) {
+        children: bars.asMap().entries.map((barEntry) {
+          final index = barEntry.key;
+          final bar = barEntry.value;
           return Expanded(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                Expanded(
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      _Bar(
-                        fraction: bar.incomeMajor / maxValue,
-                        color: const Color(0xFF2E9E6B),
-                      ),
-                      const SizedBox(width: 4),
-                      _Bar(
-                        fraction: bar.expenseMajor / maxValue,
-                        color: const Color(0xFFEF6C5A),
-                      ),
-                    ],
+            child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: onBarTap == null ? null : () => onBarTap!(index),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  Expanded(
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        _Bar(
+                          fraction: bar.incomeMajor / maxValue,
+                          color: const Color(0xFF2E9E6B),
+                        ),
+                        const SizedBox(width: 4),
+                        _Bar(
+                          fraction: bar.expenseMajor / maxValue,
+                          color: const Color(0xFFEF6C5A),
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  bar.label,
-                  style: theme.textTheme.labelSmall?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
+                  const SizedBox(height: 6),
+                  Text(
+                    bar.label,
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           );
         }).toList(growable: false),
       ),
     );
+  }
+}
+
+/// Minimal line chart for value-over-time series (e.g. balance history).
+class SimpleLineChart extends StatelessWidget {
+  const SimpleLineChart({
+    super.key,
+    required this.values,
+    this.height = 120,
+    this.color = const Color(0xFF4E5AE8),
+  });
+
+  final List<double> values;
+  final double height;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: height,
+      width: double.infinity,
+      child: CustomPaint(
+        painter: _LinePainter(values: values, color: color),
+      ),
+    );
+  }
+}
+
+class _LinePainter extends CustomPainter {
+  _LinePainter({required this.values, required this.color});
+
+  final List<double> values;
+  final Color color;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (values.length < 2) return;
+    final minV = values.reduce(math.min);
+    final maxV = values.reduce(math.max);
+    final span = (maxV - minV).abs() < 0.001 ? 1.0 : maxV - minV;
+
+    Offset pointAt(int i) {
+      final x = size.width * i / (values.length - 1);
+      final y = size.height -
+          ((values[i] - minV) / span) * size.height * 0.9 -
+          size.height * 0.05;
+      return Offset(x, y);
+    }
+
+    final path = Path()..moveTo(pointAt(0).dx, pointAt(0).dy);
+    for (var i = 1; i < values.length; i++) {
+      final p = pointAt(i);
+      path.lineTo(p.dx, p.dy);
+    }
+
+    final fill = Path.from(path)
+      ..lineTo(size.width, size.height)
+      ..lineTo(0, size.height)
+      ..close();
+    canvas.drawPath(
+      fill,
+      Paint()
+        ..shader = LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [color.withValues(alpha: 0.25), color.withValues(alpha: 0)],
+        ).createShader(Offset.zero & size),
+    );
+    canvas.drawPath(
+      path,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2.4
+        ..strokeCap = StrokeCap.round
+        ..strokeJoin = StrokeJoin.round
+        ..color = color,
+    );
+    // End dot.
+    canvas.drawCircle(pointAt(values.length - 1), 4, Paint()..color = color);
+  }
+
+  @override
+  bool shouldRepaint(covariant _LinePainter oldDelegate) {
+    return oldDelegate.values != values || oldDelegate.color != color;
   }
 }
 

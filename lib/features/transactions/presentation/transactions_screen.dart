@@ -135,7 +135,12 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
               .where(_matchesPeriod)
               .toList()
             ..sort((a, b) => b.occurredAt.compareTo(a.occurredAt));
+          // Pending parses show in the list (badged) but never in the total,
+          // matching how Reports counts.
           final net = records.fold<int>(0, (sum, record) {
+            if (record.reviewStatus == TransactionReviewStatus.pendingReview) {
+              return sum;
+            }
             return sum + signedMinorForRecord(record);
           });
           return Column(
