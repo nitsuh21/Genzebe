@@ -299,34 +299,38 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
         return Consumer(
           builder: (context, sheetRef, _) {
             final selected = sheetRef.watch(selectedInstitutionCodesProvider);
-            return Padding(
-              padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Institutions',
-                    style: theme.textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.w800,
+            return SingleChildScrollView(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Institutions',
+                      style: theme.textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.w800,
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 8),
-                  CheckboxListTile(
-                    value: selected.isEmpty,
-                    contentPadding: EdgeInsets.zero,
-                    title: const Text('All institutions'),
-                    onChanged: (_) => clearInstitutionFilters(ref),
-                  ),
-                  for (final option in options)
+                    const SizedBox(height: 8),
                     CheckboxListTile(
-                      value: selected.contains(option.code),
+                      value: selected.isEmpty,
+                      dense: true,
                       contentPadding: EdgeInsets.zero,
-                      title: Text(option.label),
-                      onChanged: (_) =>
-                          toggleInstitutionFilter(ref, option.code),
+                      title: const Text('All institutions'),
+                      onChanged: (_) => clearInstitutionFilters(ref),
                     ),
-                ],
+                    for (final option in options)
+                      CheckboxListTile(
+                        value: selected.contains(option.code),
+                        dense: true,
+                        contentPadding: EdgeInsets.zero,
+                        title: Text(option.label),
+                        onChanged: (_) =>
+                            toggleInstitutionFilter(ref, option.code),
+                      ),
+                  ],
+                ),
               ),
             );
           },

@@ -70,56 +70,58 @@ class _PickerSheetState extends State<_PickerSheet> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final ids = _isExpense ? kExpenseCategoryIds : kIncomeCategoryIds;
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Category',
-            style: theme.textTheme.titleLarge?.copyWith(
-              fontWeight: FontWeight.w800,
+    return SingleChildScrollView(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Category',
+              style: theme.textTheme.titleLarge?.copyWith(
+                fontWeight: FontWeight.w800,
+              ),
             ),
-          ),
-          if (widget.allowDirectionSwitch) ...[
-            const SizedBox(height: 12),
-            SegmentedButton<bool>(
-              segments: const [
-                ButtonSegment(
-                  value: true,
-                  label: Text('Expense'),
-                  icon: Icon(Icons.north_east_rounded, size: 16),
-                ),
-                ButtonSegment(
-                  value: false,
-                  label: Text('Income'),
-                  icon: Icon(Icons.south_west_rounded, size: 16),
-                ),
+            if (widget.allowDirectionSwitch) ...[
+              const SizedBox(height: 12),
+              SegmentedButton<bool>(
+                segments: const [
+                  ButtonSegment(
+                    value: true,
+                    label: Text('Expense'),
+                    icon: Icon(Icons.north_east_rounded, size: 16),
+                  ),
+                  ButtonSegment(
+                    value: false,
+                    label: Text('Income'),
+                    icon: Icon(Icons.south_west_rounded, size: 16),
+                  ),
+                ],
+                selected: {_isExpense},
+                onSelectionChanged: (selection) {
+                  setState(() => _isExpense = selection.first);
+                },
+              ),
+            ],
+            const SizedBox(height: 14),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                for (final id in ids)
+                  _CategoryChip(
+                    info: categoryInfoFor(id),
+                    selected: id == widget.current &&
+                        _isExpense == widget.initialExpense,
+                    onTap: () => Navigator.of(context).pop(
+                      CategoryPick(categoryId: id, isExpense: _isExpense),
+                    ),
+                  ),
               ],
-              selected: {_isExpense},
-              onSelectionChanged: (selection) {
-                setState(() => _isExpense = selection.first);
-              },
             ),
           ],
-          const SizedBox(height: 14),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              for (final id in ids)
-                _CategoryChip(
-                  info: categoryInfoFor(id),
-                  selected: id == widget.current &&
-                      _isExpense == widget.initialExpense,
-                  onTap: () => Navigator.of(context).pop(
-                    CategoryPick(categoryId: id, isExpense: _isExpense),
-                  ),
-                ),
-            ],
-          ),
-        ],
+        ),
       ),
     );
   }
@@ -191,17 +193,16 @@ Future<void> promptRecategorize(
     current: record.categoryId,
   );
   if (pick == null) return;
-  if (pick.categoryId == record.categoryId &&
-      pick.isExpense == wasExpense) {
+  if (pick.categoryId == record.categoryId && pick.isExpense == wasExpense) {
     return;
   }
 
-  final learnedMerchant = await ref.read(transactionServiceProvider)
-      .changeCategory(
-        transactionId: record.id,
-        categoryId: pick.categoryId,
-        makeExpense: pick.isExpense,
-      );
+  final learnedMerchant =
+      await ref.read(transactionServiceProvider).changeCategory(
+            transactionId: record.id,
+            categoryId: pick.categoryId,
+            makeExpense: pick.isExpense,
+          );
   refreshAppData(ref);
   if (!context.mounted) return;
   final label = categoryInfoFor(pick.categoryId).label;
