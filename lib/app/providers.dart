@@ -13,6 +13,7 @@ import 'package:genzeb/features/account/domain/repositories/account_repository.d
 import 'package:genzeb/features/ai/ai_config.dart';
 import 'package:genzeb/features/ai/application/ai_assistant_service.dart';
 import 'package:genzeb/features/ai/application/ai_categorization_service.dart';
+import 'package:genzeb/features/ai/application/cruise_control_service.dart';
 import 'package:genzeb/features/ai/data/gemini_client.dart';
 import 'package:genzeb/features/budget/application/budget_service.dart';
 import 'package:genzeb/features/budget/data/sqflite_budget_repository.dart';
@@ -120,6 +121,13 @@ final aiCategorizationServiceProvider =
     geminiClient: ref.watch(geminiClientProvider),
     assistantService: ref.watch(aiAssistantServiceProvider),
     ledgerRepository: ref.watch(ledgerRepositoryProvider),
+    categoryRuleRepository: ref.watch(categoryRuleRepositoryProvider),
+  );
+});
+
+final cruiseControlServiceProvider = Provider<CruiseControlService>((ref) {
+  return CruiseControlService(
+    categorization: ref.watch(aiCategorizationServiceProvider),
   );
 });
 
@@ -179,6 +187,8 @@ final syncServiceProvider = Provider<SyncService>((ref) {
     smsIngestionService: ref.watch(smsIngestionServiceProvider),
     deviceSmsSource: ref.watch(deviceSmsSourceProvider),
     accountMappingService: ref.watch(accountMappingServiceProvider),
+    ledgerRepository: ref.watch(ledgerRepositoryProvider),
+    cruiseControl: ref.watch(cruiseControlServiceProvider),
   );
 });
 

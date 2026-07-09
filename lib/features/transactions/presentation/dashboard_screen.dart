@@ -29,13 +29,17 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
         await ref.read(aiAssistantServiceProvider).isAvailable();
     if (!mounted) return;
     setState(() => _syncing = false);
+    final cruise = result.cruiseControl;
+    final cruiseNote = cruise == null || !cruise.aiUsed
+        ? ''
+        : ' • CruiseControl fixed ${cruise.corrected}';
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(
           'Synced ${result.processed} SMS • ${result.newlyParsed} parsed • '
-          '${result.pendingReview} need review',
+          '${result.pendingReview} need review$cruiseNote',
         ),
-        // Offer the one-tap AI audit right when new data just landed.
+        // Manual AI audit remains available for older transactions.
         action: aiAvailable && result.newlyParsed > 0
             ? SnackBarAction(
                 label: 'AI check',

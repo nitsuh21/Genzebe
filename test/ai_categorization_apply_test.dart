@@ -32,6 +32,7 @@ void main() {
     );
     final service = AiCategorizationService(
       geminiClient: gemini,
+      categoryRuleRepository: InMemoryCategoryRuleRepository(),
       assistantService: AiAssistantService(
         geminiClient: gemini,
         reportService: ReportService(ledger, ingestion),

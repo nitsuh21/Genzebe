@@ -1,9 +1,11 @@
 import 'package:genzeb/core/logging/app_logger.dart';
+import 'package:genzeb/features/ai/application/cruise_control_service.dart';
 import 'package:genzeb/features/sms_ingestion/application/sms_ingestion_service.dart';
 import 'package:genzeb/features/sms_ingestion/application/account_mapping_service.dart';
 import 'package:genzeb/features/sms_ingestion/domain/models/sms_models.dart';
 import 'package:genzeb/features/sms_ingestion/domain/repositories/device_sms_source.dart';
 import 'package:genzeb/features/sms_ingestion/domain/repositories/sms_message_repository.dart';
+import 'package:genzeb/features/transactions/domain/repositories/ledger_repository.dart';
 
 class ForceSyncResult {
   const ForceSyncResult({
@@ -17,6 +19,7 @@ class ForceSyncResult {
     required this.importedCount,
     required this.mappingRuleCount,
     required this.smsPermissionState,
+    this.cruiseControl,
   });
 
   final int processed;
@@ -29,6 +32,10 @@ class ForceSyncResult {
   final int importedCount;
   final int mappingRuleCount;
   final SmsPermissionState smsPermissionState;
+
+  /// CruiseControl's pass over the transactions this sync created; null when
+  /// no CruiseControl is wired (tests) or nothing new was ingested.
+  final CruiseControlReport? cruiseControl;
 }
 
 class SyncService {
@@ -37,15 +44,21 @@ class SyncService {
     required SmsIngestionService smsIngestionService,
     required DeviceSmsSource deviceSmsSource,
     required AccountMappingService accountMappingService,
+    LedgerRepository? ledgerRepository,
+    CruiseControlService? cruiseControl,
   })  : _smsMessageRepository = smsMessageRepository,
         _smsIngestionService = smsIngestionService,
         _deviceSmsSource = deviceSmsSource,
-        _accountMappingService = accountMappingService;
+        _accountMappingService = accountMappingService,
+        _ledgerRepository = ledgerRepository,
+        _cruiseControl = cruiseControl;
 
   final SmsMessageRepository _smsMessageRepository;
   final SmsIngestionService _smsIngestionService;
   final DeviceSmsSource _deviceSmsSource;
   final AccountMappingService _accountMappingService;
+  final LedgerRepository? _ledgerRepository;
+  final CruiseControlService? _cruiseControl;
 
   Future<ForceSyncResult> forceSyncFromSms({
     String? importedRawPayload,
@@ -88,6 +101,14 @@ class SyncService {
           'mappingRules=${mappings.length}, activeRules=${activeMappings.length}, '
           'syncAllMappings=$syncAllMappings, permission=$permissionState, since=$since',
     );
+    // Snapshot existing transactions so CruiseControl only audits what THIS
+    // sync creates — corrections the user made earlier are never revisited.
+    final preExistingIds = _ledgerRepository == null
+        ? const <String>{}
+        : (await _ledgerRepository.getTransactions())
+            .map((tx) => tx.id)
+            .toSet();
+
     var duplicates = 0;
     var failed = 0;
     for (final message in allMessages) {
@@ -97,6 +118,18 @@ class SyncService {
       if (stored.status == SmsIngestionStatus.duplicate) duplicates += 1;
       if (stored.status == SmsIngestionStatus.failed) failed += 1;
     }
+
+    CruiseControlReport? cruiseReport;
+    if (_cruiseControl != null && _ledgerRepository != null) {
+      final newIds = (await _ledgerRepository.getTransactions())
+          .map((tx) => tx.id)
+          .toSet()
+        ..removeAll(preExistingIds);
+      if (newIds.isNotEmpty) {
+        cruiseReport = await _cruiseControl.steer(transactionIds: newIds);
+      }
+    }
+
     final allStored = await _smsMessageRepository.getAll();
     final newlyParsed = allStored
         .where((message) => message.status == SmsIngestionStatus.parsed)
@@ -115,6 +148,7 @@ class SyncService {
       importedCount: importedMessages.length,
       mappingRuleCount: activeMappings.length,
       smsPermissionState: permissionState,
+      cruiseControl: cruiseReport,
     );
   }
 
