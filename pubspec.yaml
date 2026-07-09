@@ -31,6 +31,11 @@ dev_dependencies:
 flutter:
   uses-material-design: true
 
+  assets:
+    # Local backend config (gitignored; copy env.example.json -> env.json).
+    # Bundled so plain `flutter run` works without --dart-define flags.
+    - env.json
+
 flutter_launcher_icons:
   android: true
   ios: true

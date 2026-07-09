@@ -1,27 +1,82 @@
-/// Backend configuration, injected at build time so no secrets live in git:
+import 'dart:convert';
+
+import 'package:flutter/services.dart' show rootBundle;
+
+/// Backend configuration.
 ///
-///   flutter run \
-///     --dart-define=SUPABASE_URL=https://xyz.supabase.co \
-///     --dart-define=SUPABASE_ANON_KEY=eyJ... \
-///     --dart-define=GOOGLE_SERVER_CLIENT_ID=1234-abc.apps.googleusercontent.com
+/// Resolution order, so every workflow just works with no flags:
+///  1. `--dart-define` / `--dart-define-from-file` values (release builds,
+///     CI) — these always win when present.
+///  2. The bundled `env.json` asset, loaded at runtime — this is what makes
+///     a plain `flutter run` from the IDE fully configured.
 ///
-/// When these are absent the app runs in local mode: everything works
-/// offline, and account/plan features show as unavailable. See SETUP.md.
+/// When neither source provides values the app runs in local mode:
+/// everything on-device works, account features show as unavailable.
 class AppConfig {
   AppConfig._();
 
-  static const String supabaseUrl = String.fromEnvironment('SUPABASE_URL');
-  static const String supabaseAnonKey =
+  static const String _defineUrl = String.fromEnvironment('SUPABASE_URL');
+  static const String _defineAnonKey =
       String.fromEnvironment('SUPABASE_ANON_KEY');
+  static const String _defineGoogleClientId =
+      String.fromEnvironment('GOOGLE_SERVER_CLIENT_ID');
+  static const String _defineGeminiKey =
+      String.fromEnvironment('GEMINI_API_KEY');
+
+  static String _supabaseUrl = _defineUrl;
+  static String _supabaseAnonKey = _defineAnonKey;
+  static String _googleServerClientId = _defineGoogleClientId;
+  static String _geminiApiKey = _defineGeminiKey;
+
+  static String get supabaseUrl => _supabaseUrl;
+  static String get supabaseAnonKey => _supabaseAnonKey;
 
   /// The *web* OAuth client ID from Google Cloud console. Required for
   /// Google sign-in to return an ID token that Supabase can verify.
-  static const String googleServerClientId =
-      String.fromEnvironment('GOOGLE_SERVER_CLIENT_ID');
+  static String get googleServerClientId => _googleServerClientId;
+
+  /// App-provided Gemini key (users can still store their own in Profile).
+  static String get geminiApiKey => _geminiApiKey;
 
   static bool get isBackendConfigured =>
-      supabaseUrl.trim().isNotEmpty && supabaseAnonKey.trim().isNotEmpty;
+      _supabaseUrl.trim().isNotEmpty && _supabaseAnonKey.trim().isNotEmpty;
 
   static bool get isGoogleSignInConfigured =>
-      isBackendConfigured && googleServerClientId.trim().isNotEmpty;
+      isBackendConfigured && _googleServerClientId.trim().isNotEmpty;
+
+  /// Fills any value missing from dart-defines with the bundled env.json.
+  /// Safe to call when the asset is absent (tests, unconfigured clones).
+  static Future<void> load() async {
+    if (_supabaseUrl.isNotEmpty &&
+        _supabaseAnonKey.isNotEmpty &&
+        _googleServerClientId.isNotEmpty &&
+        _geminiApiKey.isNotEmpty) {
+      return; // fully provided at build time
+    }
+    try {
+      final raw = await rootBundle.loadString('env.json');
+      final env = jsonDecode(raw) as Map<String, dynamic>;
+      String fromAsset(String key) {
+        final value = (env[key] as String?)?.trim() ?? '';
+        // Ignore untouched placeholder values from env.example.json.
+        if (value.contains('YOURPROJECT') ||
+            value.startsWith('optional') ||
+            value.contains('paste')) {
+          return '';
+        }
+        return value;
+      }
+
+      if (_supabaseUrl.isEmpty) _supabaseUrl = fromAsset('SUPABASE_URL');
+      if (_supabaseAnonKey.isEmpty) {
+        _supabaseAnonKey = fromAsset('SUPABASE_ANON_KEY');
+      }
+      if (_googleServerClientId.isEmpty) {
+        _googleServerClientId = fromAsset('GOOGLE_SERVER_CLIENT_ID');
+      }
+      if (_geminiApiKey.isEmpty) _geminiApiKey = fromAsset('GEMINI_API_KEY');
+    } catch (_) {
+      // No bundled env.json — stay with whatever the defines provided.
+    }
+  }
 }

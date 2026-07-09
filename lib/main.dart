@@ -6,6 +6,9 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  // Merge dart-defines with the bundled env.json so a plain `flutter run`
+  // is fully configured without any flags.
+  await AppConfig.load();
   if (AppConfig.isBackendConfigured) {
     await Supabase.initialize(
       url: AppConfig.supabaseUrl,
