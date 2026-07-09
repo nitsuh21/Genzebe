@@ -51,6 +51,48 @@ class _ReviewQueueScreenState extends ConsumerState<ReviewQueueScreen> {
     );
   }
 
+  Future<void> _reparseHistory() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Re-parse history?'),
+        content: const Text(
+          'Every stored SMS is re-read with the latest parser and your '
+          'learned rules — amounts, directions and categories are '
+          'recalculated. Manual edits without a learned rule may be '
+          'recomputed.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('Re-parse'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    setState(() => _syncing = true);
+    final changed =
+        await ref.read(smsIngestionServiceProvider).reparseAllStoredMessages();
+    refreshAppData(ref);
+    if (!mounted) return;
+    setState(() => _syncing = false);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          changed == 0
+              ? 'History already matches the latest parser.'
+              : 'Re-parsed history — $changed transaction'
+                  '${changed == 1 ? '' : 's'} corrected.',
+        ),
+      ),
+    );
+  }
+
   Future<void> _openAndRunForceSync({String? payload}) async {
     final selection = await _openSyncSelectionDialog(context, ref);
     if (!mounted || selection == null) return;
@@ -133,7 +175,15 @@ class _ReviewQueueScreenState extends ConsumerState<ReviewQueueScreen> {
                     await _openAndRunForceSync(payload: payload);
                   },
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: 6),
+          Center(
+            child: TextButton.icon(
+              onPressed: _syncing ? null : _reparseHistory,
+              icon: const Icon(Icons.history_rounded, size: 16),
+              label: const Text('Re-parse history with latest parser'),
+            ),
+          ),
+          const SizedBox(height: 6),
           _StatStrip(
             parsed: parsedCount,
             pending: reviewCount,

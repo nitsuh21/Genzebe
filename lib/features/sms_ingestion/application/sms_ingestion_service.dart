@@ -248,6 +248,64 @@ class SmsIngestionService {
     return merchant;
   }
 
+  /// Re-runs the CURRENT parser + learned rules over every stored SMS and
+  /// rewrites the resulting transactions in place (amount, direction,
+  /// category, balance). Used after parser upgrades so history benefits from
+  /// fixes. Rejected/failed/duplicate messages stay untouched; review status
+  /// is preserved. Note: manual category edits without a learned rule will
+  /// be recomputed — the UI warns before running. Returns how many
+  /// transactions changed.
+  Future<int> reparseAllStoredMessages() async {
+    final stored = await _smsMessageRepository.getAll();
+    var changed = 0;
+    for (final message in stored) {
+      if (message.status != SmsIngestionStatus.parsed &&
+          message.status != SmsIngestionStatus.pendingReview) {
+        continue;
+      }
+      final parsed = _parser.parse(message.sms);
+      if (parsed == null) continue;
+      final transactionId = 'sms-${message.sms.id}';
+      final existing =
+          await _ledgerRepository.getTransactionById(transactionId);
+      if (existing == null) continue;
+
+      final isExpense = parsed.detectedAmountMinor < 0;
+      var categoryId = parsed.categoryHint;
+      final merchant = extractMerchant(message.sms.body, isExpense: isExpense);
+      if (merchant != null) {
+        final ruleCategory = await _categoryRules
+            .categoryForMerchant(normalizeMerchant(merchant));
+        if (ruleCategory != null) categoryId = ruleCategory;
+      }
+      final type =
+          isExpense ? TransactionType.expense : TransactionType.income;
+
+      final updated = existing.copyWith(
+        type: type,
+        amount: Money(minorUnits: parsed.detectedAmountMinor.abs()),
+        categoryId: categoryId,
+        parserConfidence: parsed.confidence,
+        statementBalanceMinor: parsed.balanceMinor,
+      );
+      final unchanged = updated.type == existing.type &&
+          updated.amount.minorUnits == existing.amount.minorUnits &&
+          updated.categoryId == existing.categoryId;
+      if (unchanged) continue;
+
+      final hadEntry =
+          await _ledgerRepository.hasLedgerEntryForTransaction(transactionId);
+      await _ledgerRepository.deleteTransaction(transactionId);
+      await _ledgerRepository.saveTransaction(updated);
+      if (hadEntry) {
+        await _appendLedgerIfMissing(updated);
+      }
+      changed += 1;
+    }
+    AppLogger.info('sms.reparse', 'Re-parsed history: $changed updated');
+    return changed;
+  }
+
   Future<void> reingestStoredMessages() async {
     final messages = await _smsMessageRepository.getAll();
     for (final stored in messages) {
