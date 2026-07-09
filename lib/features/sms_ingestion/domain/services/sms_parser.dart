@@ -108,9 +108,10 @@ class CbeSmsParserTemplate extends _InstitutionTemplate {
   @override
   ParsedSmsTransaction? parse(SmsMessage sms) {
     final lowered = sms.body.toLowerCase();
-    final isCredit = lowered.contains('credited') || lowered.contains('credit');
-    final isDebit = lowered.contains('debited') || lowered.contains('debit');
-    final isExpense = isDebit && !isCredit;
+    // Position-based: a CBE transfer contains BOTH "debited" (your side) and
+    // "credited to the beneficiary" — the earlier cue decides whose
+    // transaction this is.
+    final isExpense = isExpenseMessage(lowered);
 
     final amountMajor = _extractCbeTransactionAmountMajor(
           sms.body,
@@ -251,41 +252,61 @@ String? extractAccountHint(String body) {
   return match?.group(1);
 }
 
+const _expenseCues = [
+  'debited',
+  'debit',
+  'paid',
+  'payment',
+  'purchase',
+  'withdraw',
+  'sent',
+  'transferred to',
+  'you have transferred',
+  'ተከፍሏል',
+  'ወጪ',
+];
+
+const _incomeCues = [
+  'credited',
+  'credit',
+  'received',
+  'deposit',
+  'salary',
+  'refund',
+  'refunded',
+  'reversal',
+  'transferred to your',
+  'ገቢ',
+  'ተቀብለዋል',
+  'ተመላሽ',
+];
+
+/// Direction detection: the EARLIEST cue in the message wins.
+///
+/// Ethiopian bank/wallet SMS lead with the primary action ("Your account has
+/// been debited…", "You have received…") and often mention the counterparty's
+/// side later ("…and credited to the beneficiary", "…Abebe has received the
+/// amount"). Whichever side is mentioned first is whose transaction this is;
+/// a bare income word later in the body must not flip an expense to income.
 bool isExpenseMessage(String lowered) {
-  const expenseWords = [
-    'debited',
-    'debit',
-    'paid',
-    'payment',
-    'purchase',
-    'withdraw',
-    'sent',
-    'transferred to',
-    'ተከፍሏል',
-    'ወጪ',
-  ];
-  const incomeWords = [
-    'credited',
-    'credit',
-    'received',
-    'deposit',
-    'salary',
-    'refund',
-    'refunded',
-    'reversal',
-    'transferred to your',
-    'ገቢ',
-    'ተቀብለዋል',
-    'ተመላሽ',
-  ];
-  for (final word in incomeWords) {
-    if (lowered.contains(word)) return false;
+  int? earliest(List<String> cues) {
+    int? best;
+    for (final cue in cues) {
+      final index = lowered.indexOf(cue);
+      if (index >= 0 && (best == null || index < best)) best = index;
+    }
+    return best;
   }
-  for (final word in expenseWords) {
-    if (lowered.contains(word)) return true;
-  }
-  // Default: treat unknown direction as expense (more conservative).
-  return true;
+
+  final expenseAt = earliest(_expenseCues);
+  final incomeAt = earliest(_incomeCues);
+
+  if (incomeAt == null) return true; // no income cue -> default expense
+  if (expenseAt == null) return false; // only income cues -> income
+  // Same position means an income phrase extends an expense one (e.g.
+  // 'transferred to' vs 'transferred to your') — the longer, more specific
+  // income phrase wins.
+  return expenseAt < incomeAt;
 }
 
 bool _isAirtimeOrPackageMessage(String lowered) {

@@ -10,19 +10,63 @@ class TransactionService {
   final LedgerRepository _ledgerRepository;
   final CategoryRuleRepository _categoryRules;
 
-  /// Recategorizes a transaction. For SMS transactions the merchant is also
+  /// Recategorizes a transaction, optionally flipping its direction (fixes
+  /// income parsed as expense and vice versa — the ledger entry is rewritten
+  /// so balances stay correct). For SMS transactions the merchant is also
   /// remembered as a rule so every future sync files it correctly. Returns
   /// the merchant a rule was learned for, or null.
   Future<String?> changeCategory({
     required String transactionId,
     required String categoryId,
+    bool? makeExpense,
   }) async {
     final existing =
         await _ledgerRepository.getTransactionById(transactionId);
-    if (existing == null || existing.categoryId == categoryId) return null;
+    if (existing == null) return null;
 
-    await _ledgerRepository
-        .saveTransaction(existing.copyWith(categoryId: categoryId));
+    final currentlyExpense = existing.type == TransactionType.expense ||
+        existing.type == TransactionType.transferOut;
+    final wantExpense = makeExpense ?? currentlyExpense;
+    final newType = wantExpense
+        ? (categoryId == 'transfer_out'
+            ? TransactionType.transferOut
+            : TransactionType.expense)
+        : (categoryId == 'transfer_in'
+            ? TransactionType.transferIn
+            : TransactionType.income);
+
+    if (existing.categoryId == categoryId && existing.type == newType) {
+      return null;
+    }
+
+    final updated =
+        existing.copyWith(categoryId: categoryId, type: newType);
+    if (newType != existing.type) {
+      // The old ledger entry's sign encodes the old direction — rebuild it.
+      final hadEntry =
+          await _ledgerRepository.hasLedgerEntryForTransaction(existing.id);
+      await _ledgerRepository.deleteTransaction(existing.id);
+      await _ledgerRepository.saveTransaction(updated);
+      if (hadEntry) {
+        await _ledgerRepository.appendLedgerEntry(
+          LedgerEntry(
+            id: 'ledger-${updated.id}',
+            transactionId: updated.id,
+            accountId: updated.accountId,
+            delta: Money(
+              minorUnits: wantExpense
+                  ? -updated.amount.minorUnits
+                  : updated.amount.minorUnits,
+              currency: updated.amount.currency,
+            ),
+            createdAt: DateTime.now(),
+            source: updated.source,
+          ),
+        );
+      }
+    } else {
+      await _ledgerRepository.saveTransaction(updated);
+    }
 
     final snippet = existing.smsSnippet;
     if (existing.source != TransactionSource.sms ||
@@ -30,9 +74,7 @@ class TransactionService {
         snippet.trim().isEmpty) {
       return null;
     }
-    final isExpense = existing.type == TransactionType.expense ||
-        existing.type == TransactionType.transferOut;
-    final merchant = extractMerchant(snippet, isExpense: isExpense);
+    final merchant = extractMerchant(snippet, isExpense: wantExpense);
     if (merchant == null) return null;
     await _categoryRules.saveRule(normalizeMerchant(merchant), categoryId);
     return merchant;
