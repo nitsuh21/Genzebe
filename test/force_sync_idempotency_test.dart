@@ -8,6 +8,8 @@ import 'package:genzeb/features/sms_ingestion/domain/repositories/device_sms_sou
 import 'package:genzeb/features/sms_ingestion/domain/services/sms_parser.dart';
 import 'package:genzeb/features/sync/application/sync_service.dart';
 import 'package:genzeb/features/transactions/data/in_memory_ledger_repository.dart';
+import 'package:genzeb/features/transactions/domain/models/money.dart';
+import 'package:genzeb/features/transactions/domain/models/transaction_models.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 /// Test-only fake; the app itself reads real device SMS on Android.
@@ -93,5 +95,40 @@ void main() {
     expect(txAfterSecond.length, txAfterFirst.length);
     expect(ledgerAfterSecond.length, ledgerAfterFirst.length);
     expect(second.processed, first.processed);
+
+    // --- Rebuild sync: clears SMS-derived rows and re-parses everything ---
+
+    // Corrupt one SMS transaction as if an old parser had misfiled it, and
+    // add a manual entry that must survive the rebuild.
+    final cbeTx = txAfterSecond.firstWhere((tx) => tx.id == 'sms-fake-cbe-1');
+    await ledger.saveTransaction(cbeTx.copyWith(
+      type: TransactionType.income,
+      categoryId: 'income',
+    ));
+    await ledger.saveTransaction(TransactionRecord(
+      id: 'manual-1',
+      accountId: 'main-wallet',
+      type: TransactionType.expense,
+      amount: const Money(minorUnits: 5000),
+      occurredAt: DateTime(2026, 6, 3),
+      categoryId: 'food',
+      source: TransactionSource.manual,
+    ));
+
+    final third = await sync.forceSyncFromSms(rebuild: true);
+    final txAfterRebuild = await ledger.getTransactions();
+
+    expect(third.processed, first.processed);
+    // The misfiled row was rebuilt from the SMS with the current parser.
+    final rebuilt =
+        txAfterRebuild.firstWhere((tx) => tx.id == 'sms-fake-cbe-1');
+    expect(rebuilt.type, TransactionType.expense);
+    // Manual entries are never touched by a rebuild.
+    expect(txAfterRebuild.any((tx) => tx.id == 'manual-1'), isTrue);
+    // No duplicates: same number of SMS transactions as the first sync.
+    expect(
+      txAfterRebuild.where((tx) => tx.source == TransactionSource.sms).length,
+      txAfterFirst.length,
+    );
   });
 }

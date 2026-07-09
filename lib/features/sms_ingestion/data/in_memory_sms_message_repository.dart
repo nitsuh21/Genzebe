@@ -35,4 +35,9 @@ class InMemorySmsMessageRepository implements SmsMessageRepository {
   Future<void> save(StoredSmsMessage message) async {
     _messagesById[message.sms.id] = message;
   }
+
+  @override
+  Future<void> delete(String smsId) async {
+    _messagesById.remove(smsId);
+  }
 }

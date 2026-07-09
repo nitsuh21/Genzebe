@@ -57,6 +57,12 @@ class SqfliteSmsMessageRepository implements SmsMessageRepository {
   }
 
   @override
+  Future<void> delete(String smsId) async {
+    final db = await _db;
+    await db.delete('sms_messages', where: 'id = ?', whereArgs: [smsId]);
+  }
+
+  @override
   Future<void> save(StoredSmsMessage message) async {
     final db = await _db;
     await db.insert(

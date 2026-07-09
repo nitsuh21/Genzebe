@@ -6,4 +6,5 @@ abstract class SmsMessageRepository {
   Future<void> save(StoredSmsMessage message);
   Future<List<StoredSmsMessage>> getAll();
   Future<List<StoredSmsMessage>> getByStatus(SmsIngestionStatus status);
+  Future<void> delete(String smsId);
 }

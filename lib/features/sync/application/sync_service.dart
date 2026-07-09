@@ -5,6 +5,7 @@ import 'package:genzeb/features/sms_ingestion/application/account_mapping_servic
 import 'package:genzeb/features/sms_ingestion/domain/models/sms_models.dart';
 import 'package:genzeb/features/sms_ingestion/domain/repositories/device_sms_source.dart';
 import 'package:genzeb/features/sms_ingestion/domain/repositories/sms_message_repository.dart';
+import 'package:genzeb/features/transactions/domain/models/transaction_models.dart';
 import 'package:genzeb/features/transactions/domain/repositories/ledger_repository.dart';
 
 class ForceSyncResult {
@@ -64,7 +65,9 @@ class SyncService {
     String? importedRawPayload,
     bool syncAllMappings = true,
     Set<String>? selectedMappingSenderPatterns,
+    bool rebuild = false,
   }) async {
+    if (rebuild) await _clearSmsDerivedData();
     final since = DateTime.now().subtract(const Duration(days: 365 * 2));
     final mappings = await _accountMappingService.getMappings();
     final normalizedSelection = selectedMappingSenderPatterns
@@ -150,6 +153,28 @@ class SyncService {
       smsPermissionState: permissionState,
       cruiseControl: cruiseReport,
     );
+  }
+
+  /// Rebuild support: drops every SMS-derived transaction and stored message
+  /// so the following ingest re-parses the whole inbox with the CURRENT
+  /// parser and learned rules. Manual transactions are untouched; rejected
+  /// messages are kept so user rejections stay honored across rebuilds.
+  Future<void> _clearSmsDerivedData() async {
+    final ledger = _ledgerRepository;
+    if (ledger != null) {
+      final transactions = await ledger.getTransactions();
+      for (final tx in transactions) {
+        if (tx.source == TransactionSource.sms) {
+          await ledger.deleteTransaction(tx.id);
+        }
+      }
+    }
+    final stored = await _smsMessageRepository.getAll();
+    for (final message in stored) {
+      if (message.status == SmsIngestionStatus.rejected) continue;
+      await _smsMessageRepository.delete(message.sms.id);
+    }
+    AppLogger.info('sync.rebuild', 'Cleared SMS-derived data for rebuild');
   }
 
   List<SmsMessage> _parseImportedPayload(String? payload) {

@@ -23,7 +23,11 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
 
   Future<void> _forceSync() async {
     setState(() => _syncing = true);
-    final result = await ref.read(syncServiceProvider).forceSyncFromSms();
+    // Home sync is a full rebuild: SMS-derived data is cleared and the whole
+    // inbox re-parsed with the current parser + learned rules, so history is
+    // always up to date with the latest fixes. Manual entries survive.
+    final result =
+        await ref.read(syncServiceProvider).forceSyncFromSms(rebuild: true);
     refreshAppData(ref);
     final aiAvailable =
         await ref.read(aiAssistantServiceProvider).isAvailable();
