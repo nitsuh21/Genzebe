@@ -149,89 +149,44 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
                       ?.copyWith(fontWeight: FontWeight.w800),
                 ),
               ),
-              SizedBox(
-                height: 44,
-                child: ListView(
-                  scrollDirection: Axis.horizontal,
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
+              // One compact filter bar — no horizontal scrolling. Each button
+              // opens a bottom-sheet picker and shows the active value.
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 4, 16, 4),
+                child: Row(
                   children: [
-                    for (final filter in _LedgerFilter.values)
-                      Padding(
-                        padding: const EdgeInsets.only(right: 8),
-                        child: FilterChip(
-                          selected: _filter == filter,
-                          onSelected: (_) => setState(() => _filter = filter),
-                          showCheckmark: false,
-                          label: Text(_filterLabel(filter)),
+                    Expanded(
+                      child: _FilterButton(
+                        icon: Icons.tune_rounded,
+                        label: _filterLabel(_filter),
+                        active: _filter != _LedgerFilter.all,
+                        onTap: _pickTypeFilter,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: _FilterButton(
+                        icon: Icons.account_balance_rounded,
+                        label: _institutionSummary(
+                          institutionOptionsAsync.valueOrNull ?? const [],
+                          selectedInstitutionCodes,
+                        ),
+                        active: selectedInstitutionCodes.isNotEmpty,
+                        onTap: () => _pickInstitutions(
+                          institutionOptionsAsync.valueOrNull ?? const [],
                         ),
                       ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 8),
-              institutionOptionsAsync.when(
-                loading: () => const SizedBox.shrink(),
-                error: (_, __) => const SizedBox.shrink(),
-                data: (options) {
-                  if (options.isEmpty) return const SizedBox.shrink();
-                  return SizedBox(
-                    height: 42,
-                    child: ListView(
-                      scrollDirection: Axis.horizontal,
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      children: [
-                        Padding(
-                          padding: const EdgeInsets.only(right: 8),
-                          child: FilterChip(
-                            selected: selectedInstitutionCodes.isEmpty,
-                            showCheckmark: false,
-                            label: const Text('All institutions'),
-                            onSelected: (_) => clearInstitutionFilters(ref),
-                          ),
-                        ),
-                        ...options.map(
-                          (option) => Padding(
-                            padding: const EdgeInsets.only(right: 8),
-                            child: FilterChip(
-                              selected: selectedInstitutionCodes.contains(option.code),
-                              showCheckmark: false,
-                              label: Text(option.label),
-                              onSelected: (_) => toggleInstitutionFilter(ref, option.code),
-                            ),
-                          ),
-                        ),
-                      ],
                     ),
-                  );
-                },
-              ),
-              const SizedBox(height: 8),
-              SizedBox(
-                height: 42,
-                child: ListView(
-                  scrollDirection: Axis.horizontal,
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  children: [
-                    for (final period in _LedgerPeriod.values)
-                      if (period != _LedgerPeriod.custom)
-                        Padding(
-                          padding: const EdgeInsets.only(right: 8),
-                          child: FilterChip(
-                            selected: _period == period,
-                            onSelected: (_) => setState(() => _period = period),
-                            showCheckmark: false,
-                            label: Text(_periodLabel(period)),
-                          ),
-                        ),
-                    Padding(
-                      padding: const EdgeInsets.only(right: 8),
-                      child: ActionChip(
-                        label: Text(
-                          _period == _LedgerPeriod.custom && _customRange != null
-                              ? '${formatDay(_customRange!.start)} - ${formatDay(_customRange!.end)}'
-                              : 'Date range',
-                        ),
-                        onPressed: _pickDateRange,
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: _FilterButton(
+                        icon: Icons.calendar_month_rounded,
+                        label: _period == _LedgerPeriod.custom &&
+                                _customRange != null
+                            ? '${formatDay(_customRange!.start)}–${formatDay(_customRange!.end)}'
+                            : _periodLabel(_period),
+                        active: _period != _LedgerPeriod.all,
+                        onTap: _pickPeriod,
                       ),
                     ),
                   ],
@@ -278,6 +233,165 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
     );
   }
 
+  String _institutionSummary(
+    List<InstitutionFilterOption> options,
+    Set<String> selected,
+  ) {
+    if (selected.isEmpty) return 'All banks';
+    if (selected.length == 1) {
+      return options
+          .firstWhere(
+            (o) => o.code == selected.first,
+            orElse: () => InstitutionFilterOption(
+              code: selected.first,
+              label: selected.first.toUpperCase(),
+            ),
+          )
+          .label;
+    }
+    return '${selected.length} banks';
+  }
+
+  Future<void> _pickTypeFilter() async {
+    final picked = await _showOptionsSheet<_LedgerFilter>(
+      title: 'Show',
+      options: [
+        for (final filter in _LedgerFilter.values)
+          _SheetOption(value: filter, label: _filterLabel(filter)),
+      ],
+      current: _filter,
+    );
+    if (picked != null) setState(() => _filter = picked);
+  }
+
+  Future<void> _pickPeriod() async {
+    final picked = await _showOptionsSheet<_LedgerPeriod>(
+      title: 'Period',
+      options: [
+        for (final period in _LedgerPeriod.values)
+          if (period != _LedgerPeriod.custom)
+            _SheetOption(value: period, label: _periodLabel(period)),
+        const _SheetOption(
+          value: _LedgerPeriod.custom,
+          label: 'Custom range…',
+        ),
+      ],
+      current: _period,
+    );
+    if (picked == null) return;
+    if (picked == _LedgerPeriod.custom) {
+      await _pickDateRange();
+    } else {
+      setState(() => _period = picked);
+    }
+  }
+
+  Future<void> _pickInstitutions(
+    List<InstitutionFilterOption> options,
+  ) async {
+    if (options.isEmpty) return;
+    await showModalBottomSheet<void>(
+      context: context,
+      useSafeArea: true,
+      showDragHandle: true,
+      builder: (sheetContext) {
+        final theme = Theme.of(sheetContext);
+        return Consumer(
+          builder: (context, sheetRef, _) {
+            final selected = sheetRef.watch(selectedInstitutionCodesProvider);
+            return Padding(
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Institutions',
+                    style: theme.textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  CheckboxListTile(
+                    value: selected.isEmpty,
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text('All institutions'),
+                    onChanged: (_) => clearInstitutionFilters(ref),
+                  ),
+                  for (final option in options)
+                    CheckboxListTile(
+                      value: selected.contains(option.code),
+                      contentPadding: EdgeInsets.zero,
+                      title: Text(option.label),
+                      onChanged: (_) =>
+                          toggleInstitutionFilter(ref, option.code),
+                    ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Future<T?> _showOptionsSheet<T>({
+    required String title,
+    required List<_SheetOption<T>> options,
+    required T current,
+  }) {
+    return showModalBottomSheet<T>(
+      context: context,
+      useSafeArea: true,
+      showDragHandle: true,
+      builder: (sheetContext) {
+        final theme = Theme.of(sheetContext);
+        return SingleChildScrollView(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: theme.textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                for (final option in options)
+                  ListTile(
+                    dense: true,
+                    contentPadding:
+                        const EdgeInsets.symmetric(horizontal: 4),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    title: Text(
+                      option.label,
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: option.value == current
+                            ? FontWeight.w700
+                            : FontWeight.w500,
+                      ),
+                    ),
+                    trailing: option.value == current
+                        ? Icon(Icons.check_circle_rounded,
+                            color: theme.colorScheme.primary)
+                        : null,
+                    onTap: () =>
+                        Navigator.of(sheetContext).pop(option.value),
+                  ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   String _filterLabel(_LedgerFilter filter) {
     switch (filter) {
       case _LedgerFilter.all:
@@ -300,18 +414,87 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
       case _LedgerPeriod.yesterday:
         return 'Yesterday';
       case _LedgerPeriod.thisWeek:
-        return 'This week';
+        return 'Week';
       case _LedgerPeriod.thisMonth:
-        return 'This month';
+        return 'Month';
       case _LedgerPeriod.quarter:
-        return 'Quarterly';
+        return 'Quarter';
       case _LedgerPeriod.semiAnnual:
-        return 'Semi-annual';
+        return '6 months';
       case _LedgerPeriod.all:
         return 'All time';
       case _LedgerPeriod.custom:
         return 'Custom';
     }
+  }
+}
+
+class _SheetOption<T> {
+  const _SheetOption({required this.value, required this.label});
+
+  final T value;
+  final String label;
+}
+
+class _FilterButton extends StatelessWidget {
+  const _FilterButton({
+    required this.icon,
+    required this.label,
+    required this.active,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String label;
+  final bool active;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final color = active
+        ? theme.colorScheme.primary
+        : theme.colorScheme.onSurfaceVariant;
+    return Material(
+      color: active
+          ? theme.colorScheme.primary.withValues(alpha: 0.1)
+          : theme.cardTheme.color,
+      borderRadius: BorderRadius.circular(12),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: active
+                  ? theme.colorScheme.primary.withValues(alpha: 0.5)
+                  : theme.colorScheme.outlineVariant.withValues(alpha: 0.3),
+            ),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon, size: 15, color: color),
+              const SizedBox(width: 5),
+              Flexible(
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.labelMedium?.copyWith(
+                    color: color,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+              Icon(Icons.arrow_drop_down_rounded, size: 18, color: color),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }
 

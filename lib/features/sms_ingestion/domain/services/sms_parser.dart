@@ -51,9 +51,12 @@ abstract class _InstitutionTemplate implements SmsParserTemplate {
 
   @override
   bool canParse(SmsMessage sms) {
+    // Sender-only: matching on the body misfiles cross-institution messages
+    // (a telebirr receipt mentioning "from CBE account" is NOT a CBE
+    // transaction). Unknown senders fall through to the generic template and
+    // CruiseControl re-homes them.
     final sender = sms.sender.toLowerCase();
-    final body = sms.body.toLowerCase();
-    return senderKeywords.any((kw) => sender.contains(kw) || body.contains(kw));
+    return senderKeywords.any(sender.contains);
   }
 
   @override
@@ -120,13 +123,7 @@ class CbeSmsParserTemplate extends _InstitutionTemplate {
         extractTransactionAmountMajor(sms.body);
     if (amountMajor == null) return null;
 
-    var category = inferCategory(body: lowered, isExpense: isExpense);
-    if (isExpense &&
-        (lowered.contains('service charge') ||
-            lowered.contains('vat') ||
-            lowered.contains('disaster fund'))) {
-      category = 'fees';
-    }
+    final category = inferCategory(body: lowered, isExpense: isExpense);
 
     return ParsedSmsTransaction(
       detectedAmountMinor: (amountMajor * 100).round() * (isExpense ? -1 : 1),
@@ -148,7 +145,12 @@ class AwashSmsParserTemplate extends _InstitutionTemplate {
 
 class TelebirrSmsParserTemplate extends _InstitutionTemplate {
   const TelebirrSmsParserTemplate()
-      : super(EthiopianInstitution.telebirr, const ['telebirr', 'tele birr']);
+      : super(
+          EthiopianInstitution.telebirr,
+          // 127 is the telebirr shortcode; Ethio telecom also delivers
+          // telebirr receipts under its own sender name.
+          const ['telebirr', 'tele birr', '127', 'ethio telecom'],
+        );
 }
 
 class BoaSmsParserTemplate extends _InstitutionTemplate {
@@ -260,6 +262,10 @@ const _expenseCues = [
   'purchase',
   'withdraw',
   'sent',
+  // Bare 'transferred' covers "successfully transferred ETB... from account
+  // X to account Y"; the longer 'transferred to your' income phrase still
+  // wins on ties (same index -> income).
+  'transferred',
   'transferred to',
   'you have transferred',
   'ተከፍሏል',
@@ -333,7 +339,7 @@ bool _isAirtimeOrPackageMessage(String lowered) {
 /// common Ethiopian merchants and Amharic terms that appear in real bank and
 /// Telebirr notifications.
 String inferCategory({required String body, required bool isExpense}) {
-  const Map<String, List<String>> rules = {
+  const Map<String, List<String>> priorityRules = {
     'salary': ['salary', 'payroll', 'wage', 'ደመወዝ'],
     'savings': ['saving', 'deposit to', 'fixed', 'equb', 'iqub', 'እቁብ', 'ቁጠባ'],
     'airtime': [
@@ -348,6 +354,8 @@ String inferCategory({required String body, required bool isExpense}) {
       'minute',
       'የአየር ሰዓት',
     ],
+  };
+  const Map<String, List<String>> rules = {
     'fees': [
       'fee',
       'charge',
@@ -448,17 +456,34 @@ String inferCategory({required String body, required bool isExpense}) {
     'shopping': ['shop', 'store', 'mall', 'boutique', 'purchase'],
   };
 
-  for (final entry in rules.entries) {
-    for (final keyword in entry.value) {
-      if (_containsKeyword(body, keyword)) {
-        if (!isExpense && entry.key != 'salary' && entry.key != 'savings') {
-          continue;
+  String? matchRules(Map<String, List<String>> ruleSet) {
+    for (final entry in ruleSet.entries) {
+      for (final keyword in entry.value) {
+        if (_containsKeyword(body, keyword)) {
+          if (!isExpense && entry.key != 'salary' && entry.key != 'savings') {
+            continue;
+          }
+          if (isExpense && entry.key == 'salary') continue;
+          return entry.key;
         }
-        if (isExpense && entry.key == 'salary') continue;
-        return entry.key;
       }
     }
+    return null;
   }
+
+  final priority = matchRules(priorityRules);
+  if (priority != null) return priority;
+
+  // A person-to-person / account-to-account transfer outranks incidental
+  // fee wording: CBE transfer receipts always list "service charge" and
+  // "VAT", but the transaction is the transfer, not the fees.
+  if (_containsKeyword(body, 'transferred') ||
+      _containsKeyword(body, 'transfer')) {
+    return isExpense ? 'transfer_out' : 'transfer_in';
+  }
+
+  final matched = matchRules(rules);
+  if (matched != null) return matched;
 
   if (!isExpense) {
     if (_containsKeyword(body, 'salary') || _containsKeyword(body, 'payroll')) {

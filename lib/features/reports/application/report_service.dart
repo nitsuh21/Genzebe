@@ -161,6 +161,9 @@ class ReportService {
       var income = 0;
       var expense = 0;
       for (final record in transactions) {
+        if (record.reviewStatus == TransactionReviewStatus.pendingReview) {
+          continue;
+        }
         if (record.occurredAt.year == monthStart.year &&
             record.occurredAt.month == monthStart.month) {
           if (isOutflowType(record.type)) {
@@ -273,6 +276,11 @@ class ReportService {
     int expense = 0;
     final categoryTotals = <String, int>{};
     for (final entry in records) {
+      // Unconfirmed parses must never inflate totals — they count only after
+      // the user approves them in Review.
+      if (entry.reviewStatus == TransactionReviewStatus.pendingReview) {
+        continue;
+      }
       if (isOutflowType(entry.type)) {
         expense += entry.amount.minorUnits;
         categoryTotals.update(

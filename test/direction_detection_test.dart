@@ -54,6 +54,58 @@ void main() {
     });
   });
 
+  test('real CBE transfer receipt: expense, total amount, transfer_out', () {
+    // Reported by the user as wrongly recorded income. The receipt has no
+    // "debited" keyword, mentions fees, and says "successfully transferred".
+    final parsed = const CbeSmsParserTemplate().parse(
+      SmsMessage(
+        id: 'cbe-real-1',
+        sender: 'CBE',
+        body: 'Dear  Nitsuh Demissew Mekonnen You have successfully '
+            'transferred ETB1100.00 from account 1**9722 to account 1**4607 '
+            '(Nebyou Elias Zewde). Service charge of ETB 1.00 and VAT(15%) '
+            'of ETB0.15 and Disaster Recovery(5%) of 0.05 with total of '
+            'ETB1101.20 .Your current balance is ETB89,468.32. Thanks for '
+            'Banking with CBE. https://mbreciept.cbe.com.et/v2-hfHCxzVQsJzR5',
+        receivedAt: DateTime(2026, 7, 9, 12, 0),
+      ),
+    );
+    expect(parsed, isNotNull);
+    // Money left the account: expense, and the debited total incl. charges.
+    expect(parsed!.detectedAmountMinor, -110120);
+    // The transfer is the transaction — not the fees it happens to mention.
+    expect(parsed.categoryHint, 'transfer_out');
+    expect(parsed.balanceMinor, 8946832);
+  });
+
+  test('cross-institution mention does not steal the message', () {
+    // A telebirr receipt that mentions CBE must NOT match the CBE template.
+    expect(
+      const CbeSmsParserTemplate().canParse(
+        SmsMessage(
+          id: 'tb-x',
+          sender: '127',
+          body: 'You have received ETB 200.00 from CBE account transfer '
+              'via telebirr.',
+          receivedAt: DateTime(2026, 7, 9),
+        ),
+      ),
+      isFalse,
+    );
+    // ...and the 127 shortcode routes to the telebirr template.
+    expect(
+      const TelebirrSmsParserTemplate().canParse(
+        SmsMessage(
+          id: 'tb-y',
+          sender: '127',
+          body: 'You have paid ETB 50.00 to Shoa Supermarket via telebirr.',
+          receivedAt: DateTime(2026, 7, 9),
+        ),
+      ),
+      isTrue,
+    );
+  });
+
   group('CBE template uses position-based direction', () {
     test('transfer with both debited and credited parses as expense', () {
       final parsed = const CbeSmsParserTemplate().parse(
