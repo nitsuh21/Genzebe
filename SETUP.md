@@ -37,6 +37,18 @@ flutter build apk --dart-define-from-file=env.json
 
 (Individual `--dart-define=KEY=value` flags also still work.)
 
+> **Gotcha — debug APKs lose dart-defines.** A debug (JIT) APK installed
+> manually via `adb install` does NOT reliably carry `String.fromEnvironment`
+> values, so the app silently runs in no-backend demo mode. For on-device
+> testing of Google sign-in / Supabase, either use `flutter run` (which
+> supplies the defines at runtime) or install the **release** APK. To verify
+> a release binary really has the config baked in:
+>
+> ```bash
+> unzip -p build/app/outputs/flutter-apk/app-release.apk \
+>   lib/arm64-v8a/libapp.so | grep -ac YOURPROJECTREF   # expect > 0
+> ```
+
 ### Values for this machine
 
 Debug signing SHA-1 for the Android OAuth client (package
