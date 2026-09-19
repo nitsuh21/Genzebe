@@ -17,13 +17,13 @@ class BudgetScreen extends ConsumerStatefulWidget {
 }
 
 class _BudgetScreenState extends ConsumerState<BudgetScreen> {
-  bool _showAmounts = false;
-
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final safeBottom = MediaQuery.of(context).viewPadding.bottom;
     final overviewAsync = ref.watch(budgetOverviewProvider);
+    // One app-wide privacy switch, shared with Home.
+    final showAmounts = !ref.watch(amountsHiddenProvider);
 
     return Scaffold(
       floatingActionButton: Padding(
@@ -37,7 +37,8 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> {
       ),
       body: overviewAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (error, _) => Center(child: Text('Could not load budgets: $error')),
+        error: (error, _) =>
+            Center(child: Text('Could not load budgets: $error')),
         data: (overview) {
           return ListView(
             padding: EdgeInsets.fromLTRB(16, 12, 16, 28 + safeBottom + 84),
@@ -61,10 +62,9 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> {
               else ...[
                 _OverallCard(
                   overview: overview,
-                  showAmounts: _showAmounts,
-                  onToggleAmounts: () {
-                    setState(() => _showAmounts = !_showAmounts);
-                  },
+                  showAmounts: showAmounts,
+                  onToggleAmounts: () =>
+                      ref.read(amountsHiddenProvider.notifier).toggle(),
                 ),
                 const SizedBox(height: 12),
                 _AiBudgetCard(ref: ref),
@@ -72,18 +72,18 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> {
                 ...overview.items.map(
                   (item) => _BudgetTile(
                     progress: item,
-                    showAmounts: _showAmounts,
+                    showAmounts: showAmounts,
                     onEdit: () =>
                         _openBudgetEditor(context, ref, existing: item.budget),
                     onDelete: () => _deleteBudget(context, ref, item.budget),
-                    onViewTransactions: () =>
-                        _openBudgetTransactions(context: context, budget: item.budget),
+                    onViewTransactions: () => _openBudgetTransactions(
+                        context: context, budget: item.budget),
                   ),
                 ),
                 if (overview.unbudgetedSpendMinor > 0)
                   _UnbudgetedCard(
                     amountMinor: overview.unbudgetedSpendMinor,
-                    showAmounts: _showAmounts,
+                    showAmounts: showAmounts,
                   ),
               ],
             ],
@@ -192,7 +192,9 @@ class _OverallCard extends StatelessWidget {
               IconButton(
                 onPressed: onToggleAmounts,
                 icon: Icon(
-                  showAmounts ? Icons.visibility_rounded : Icons.visibility_off_rounded,
+                  showAmounts
+                      ? Icons.visibility_rounded
+                      : Icons.visibility_off_rounded,
                 ),
                 tooltip: showAmounts ? 'Hide amounts' : 'Show amounts',
               ),
@@ -200,7 +202,9 @@ class _OverallCard extends StatelessWidget {
           ),
           const SizedBox(height: 6),
           Text(
-            showAmounts ? formatMinorEtb(overview.totalSpentMinor) : 'ETB ••••••',
+            showAmounts
+                ? formatMinorEtb(overview.totalSpentMinor)
+                : 'ETB ••••••',
             style: theme.textTheme.headlineMedium?.copyWith(
               fontWeight: FontWeight.w800,
             ),
@@ -256,7 +260,6 @@ class _BudgetTransactionsPage extends ConsumerStatefulWidget {
 class _BudgetTransactionsPageState
     extends ConsumerState<_BudgetTransactionsPage> {
   late Budget _budget;
-  bool _showAmounts = false;
   bool _updating = false;
 
   @override
@@ -270,6 +273,7 @@ class _BudgetTransactionsPageState
     final theme = Theme.of(context);
     final transactionsAsync = ref.watch(allTransactionsProvider);
     final accountsAsync = ref.watch(accountsProvider);
+    final showAmounts = !ref.watch(amountsHiddenProvider);
     final now = DateTime.now();
     final start = DateTime(now.year, now.month, 1);
     final end = DateTime(now.year, now.month + 1, 1);
@@ -288,13 +292,13 @@ class _BudgetTransactionsPageState
         ),
         actions: [
           IconButton(
-            onPressed: () => setState(() => _showAmounts = !_showAmounts),
+            onPressed: () => ref.read(amountsHiddenProvider.notifier).toggle(),
             icon: Icon(
-              _showAmounts
+              showAmounts
                   ? Icons.visibility_rounded
                   : Icons.visibility_off_rounded,
             ),
-            tooltip: _showAmounts ? 'Hide amounts' : 'Show amounts',
+            tooltip: showAmounts ? 'Hide amounts' : 'Show amounts',
           ),
         ],
       ),
@@ -307,122 +311,125 @@ class _BudgetTransactionsPageState
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (error, _) => Center(child: Text('Error: $error')),
         data: (accounts) => transactionsAsync.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (error, _) => Center(child: Text('Error: $error')),
-        data: (records) {
-          final institutionByAccount = <String, String>{
-            for (final account in accounts)
-              account.id: account.institutionCode?.trim().toLowerCase() ?? '',
-          };
-          final scoped = records.where((record) {
-            if (!isOutflowType(record.type)) return false;
-            if (record.occurredAt.isBefore(start) ||
-                !record.occurredAt.isBefore(end)) {
-              return false;
-            }
-            if (_budget.institutionCodes.isNotEmpty) {
-              final code = institutionByAccount[record.accountId] ?? '';
-              if (!_budget.institutionCodes.contains(code)) return false;
-            }
-            if (_budget.excludedTransactionIds.contains(record.id)) return false;
-            if (_budget.isGeneral) return true;
-            return _budget.categoryIds.contains(record.categoryId);
-          }).toList(growable: false)
-            ..sort((a, b) => b.occurredAt.compareTo(a.occurredAt));
+          loading: () => const Center(child: CircularProgressIndicator()),
+          error: (error, _) => Center(child: Text('Error: $error')),
+          data: (records) {
+            final institutionByAccount = <String, String>{
+              for (final account in accounts)
+                account.id: account.institutionCode?.trim().toLowerCase() ?? '',
+            };
+            final scoped = records.where((record) {
+              if (!isOutflowType(record.type)) return false;
+              if (record.occurredAt.isBefore(start) ||
+                  !record.occurredAt.isBefore(end)) {
+                return false;
+              }
+              if (_budget.institutionCodes.isNotEmpty) {
+                final code = institutionByAccount[record.accountId] ?? '';
+                if (!_budget.institutionCodes.contains(code)) return false;
+              }
+              if (_budget.excludedTransactionIds.contains(record.id)) {
+                return false;
+              }
+              if (_budget.isGeneral) return true;
+              return _budget.categoryIds.contains(record.categoryId);
+            }).toList(growable: false)
+              ..sort((a, b) => b.occurredAt.compareTo(a.occurredAt));
 
-          final total =
-              scoped.fold<int>(0, (sum, tx) => sum + tx.amount.minorUnits);
-          final safeBottom = MediaQuery.of(context).viewPadding.bottom;
-          return ListView(
-            padding: EdgeInsets.fromLTRB(16, 12, 16, 96 + safeBottom),
-            children: [
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: theme.cardTheme.color,
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      categoryScopeLabel,
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      institutionScopeLabel,
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      _showAmounts ? formatMinorEtb(total) : 'ETB ••••••',
-                      style: theme.textTheme.headlineSmall?.copyWith(
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      '${scoped.length} matching transaction(s) this month',
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 14),
-              Text(
-                'Transactions',
-                style: theme.textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-              const SizedBox(height: 8),
-              if (scoped.isEmpty)
+            final total =
+                scoped.fold<int>(0, (sum, tx) => sum + tx.amount.minorUnits);
+            final safeBottom = MediaQuery.of(context).viewPadding.bottom;
+            return ListView(
+              padding: EdgeInsets.fromLTRB(16, 12, 16, 96 + safeBottom),
+              children: [
                 Container(
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
                     color: theme.cardTheme.color,
-                    borderRadius: BorderRadius.circular(14),
+                    borderRadius: BorderRadius.circular(16),
                   ),
-                  child: Text(
-                    'No matching transactions this month yet.\n'
-                    'Use + to add one; it will also appear in Ledger.',
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                )
-              else
-                ...scoped.map(
-                  (record) => Padding(
-                    padding: const EdgeInsets.only(bottom: 10),
-                    child: Column(
-                      children: [
-                        TransactionTile(record: record),
-                        Align(
-                          alignment: Alignment.centerRight,
-                          child: TextButton.icon(
-                            onPressed: _updating
-                                ? null
-                                : () => _excludeFromBudget(record.id),
-                            icon: const Icon(Icons.remove_circle_outline_rounded),
-                            label: const Text('Remove from budget'),
-                          ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        categoryScopeLabel,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
                         ),
-                      ],
-                    ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        institutionScopeLabel,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        showAmounts ? formatMinorEtb(total) : 'ETB ••••••',
+                        style: theme.textTheme.headlineSmall?.copyWith(
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        '${scoped.length} matching transaction(s) this month',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-            ],
-          );
-        },
-      ),
+                const SizedBox(height: 14),
+                Text(
+                  'Transactions',
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                if (scoped.isEmpty)
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: theme.cardTheme.color,
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: Text(
+                      'No matching transactions this month yet.\n'
+                      'Use + to add one; it will also appear in Ledger.',
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  )
+                else
+                  ...scoped.map(
+                    (record) => Padding(
+                      padding: const EdgeInsets.only(bottom: 10),
+                      child: Column(
+                        children: [
+                          TransactionTile(record: record, showDate: true),
+                          Align(
+                            alignment: Alignment.centerRight,
+                            child: TextButton.icon(
+                              onPressed: _updating
+                                  ? null
+                                  : () => _excludeFromBudget(record.id),
+                              icon: const Icon(
+                                  Icons.remove_circle_outline_rounded),
+                              label: const Text('Remove from budget'),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+              ],
+            );
+          },
+        ),
       ),
     );
   }
@@ -508,15 +515,8 @@ class _BudgetTile extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            accent.withValues(alpha: 0.14),
-            theme.colorScheme.surfaceContainer,
-          ],
-        ),
-        border: Border.all(color: accent.withValues(alpha: 0.35)),
+        color: theme.cardTheme.color,
+        border: Border.all(color: accent.withValues(alpha: 0.22)),
         borderRadius: BorderRadius.circular(18),
       ),
       child: Column(
@@ -578,7 +578,9 @@ class _BudgetTile extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                showAmounts ? formatMinorEtb(progress.spentMinor) : 'ETB ••••••',
+                showAmounts
+                    ? formatMinorEtb(progress.spentMinor)
+                    : 'ETB ••••••',
                 style: theme.textTheme.bodyMedium?.copyWith(
                   fontWeight: FontWeight.w700,
                 ),
@@ -649,7 +651,8 @@ class _UnbudgetedCard extends StatelessWidget {
       ),
       child: Row(
         children: [
-          Icon(Icons.info_outline_rounded, color: theme.colorScheme.onSurfaceVariant),
+          Icon(Icons.info_outline_rounded,
+              color: theme.colorScheme.onSurfaceVariant),
           const SizedBox(width: 12),
           Expanded(
             child: Text(
@@ -700,7 +703,8 @@ class _AiBudgetCardState extends State<_AiBudgetCard> {
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: theme.colorScheme.primary.withValues(alpha: 0.4)),
+        border:
+            Border.all(color: theme.colorScheme.primary.withValues(alpha: 0.4)),
         color: theme.colorScheme.primary.withValues(alpha: 0.06),
       ),
       child: Column(
@@ -727,7 +731,8 @@ class _AiBudgetCardState extends State<_AiBudgetCard> {
           ),
           if (_insight != null) ...[
             const SizedBox(height: 4),
-            Text(_insight!, style: theme.textTheme.bodyMedium?.copyWith(height: 1.4)),
+            Text(_insight!,
+                style: theme.textTheme.bodyMedium?.copyWith(height: 1.4)),
           ] else
             Text(
               'Let Genzeb AI flag at-risk budgets and suggest adjustments.',
@@ -756,7 +761,8 @@ class _EmptyBudgets extends StatelessWidget {
       ),
       child: Column(
         children: [
-          Icon(Icons.savings_outlined, size: 48, color: theme.colorScheme.primary),
+          Icon(Icons.savings_outlined,
+              size: 48, color: theme.colorScheme.primary),
           const SizedBox(height: 12),
           Text(
             'No budgets yet',
@@ -847,10 +853,12 @@ class _BudgetEditorSheetState extends ConsumerState<_BudgetEditorSheet> {
     }
     final minor = (major * 100).round();
     final budget = Budget(
-      id: widget.existing?.id ?? 'budget-${DateTime.now().millisecondsSinceEpoch}',
+      id: widget.existing?.id ??
+          'budget-${DateTime.now().millisecondsSinceEpoch}',
       name: name,
-      categoryIds:
-          _isGeneral ? const <String>[] : _selectedCategories.toList(growable: false),
+      categoryIds: _isGeneral
+          ? const <String>[]
+          : _selectedCategories.toList(growable: false),
       institutionCodes: _allInstitutions
           ? const <String>[]
           : _selectedInstitutionCodes.toList(growable: false),
@@ -917,7 +925,8 @@ class _BudgetEditorSheetState extends ConsumerState<_BudgetEditorSheet> {
               const SizedBox(height: 14),
               TextField(
                 controller: _amountController,
-                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                keyboardType:
+                    const TextInputType.numberWithOptions(decimal: true),
                 autofocus: true,
                 decoration: const InputDecoration(
                   labelText: 'Monthly limit (ETB)',
@@ -929,7 +938,8 @@ class _BudgetEditorSheetState extends ConsumerState<_BudgetEditorSheet> {
               SwitchListTile.adaptive(
                 contentPadding: EdgeInsets.zero,
                 title: const Text('General budget'),
-                subtitle: const Text('Apply this budget to all spending categories'),
+                subtitle:
+                    const Text('Apply this budget to all spending categories'),
                 value: _isGeneral,
                 onChanged: (value) {
                   setState(() => _isGeneral = value);
@@ -965,7 +975,8 @@ class _BudgetEditorSheetState extends ConsumerState<_BudgetEditorSheet> {
               SwitchListTile.adaptive(
                 contentPadding: EdgeInsets.zero,
                 title: const Text('All institutions'),
-                subtitle: const Text('Apply this budget across every institution'),
+                subtitle:
+                    const Text('Apply this budget across every institution'),
                 value: _allInstitutions,
                 onChanged: (value) {
                   setState(() => _allInstitutions = value);
@@ -999,8 +1010,8 @@ class _BudgetEditorSheetState extends ConsumerState<_BudgetEditorSheet> {
                         for (final option in options)
                           FilterChip(
                             label: Text(option.label),
-                            selected: _selectedInstitutionCodes
-                                .contains(option.code),
+                            selected:
+                                _selectedInstitutionCodes.contains(option.code),
                             onSelected: (_) {
                               setState(() {
                                 if (_selectedInstitutionCodes

@@ -1,9 +1,127 @@
+import 'dart:math' as math;
+
 import 'package:genzeb/features/sms_ingestion/domain/models/sms_models.dart';
 
 abstract class SmsParserTemplate {
   bool canParse(SmsMessage sms);
   ParsedSmsTransaction? parse(SmsMessage sms);
 }
+
+// ---------------------------------------------------------------------------
+// Sender identification
+// ---------------------------------------------------------------------------
+
+/// Alphanumeric sender IDs each institution is known to use. Matched as a
+/// substring of the letters in the sender, so "CBE", "CBE Birr" and
+/// "CBEBirr" all resolve to CBE.
+const Map<EthiopianInstitution, List<String>> kInstitutionSenderKeywords = {
+  EthiopianInstitution.cbe: ['cbe', 'commercial bank'],
+  EthiopianInstitution.awash: ['awash'],
+  // Ethio telecom delivers telebirr receipts under its own sender name too.
+  EthiopianInstitution.telebirr: [
+    'telebirr',
+    'tele birr',
+    'ethio telecom',
+    'ethiotelecom',
+  ],
+  EthiopianInstitution.boa: ['abyssinia', 'boa'],
+  EthiopianInstitution.hibret: ['hibret', 'united bank'],
+  EthiopianInstitution.dashen: ['dashen'],
+};
+
+/// Purely numeric shortcodes. Matched EXACTLY: a personal number that happens
+/// to contain "127" must never be filed as telebirr.
+const Map<EthiopianInstitution, List<String>> kInstitutionShortcodes = {
+  EthiopianInstitution.telebirr: ['127'],
+};
+
+/// Resolves the institution behind an SMS sender ID, or `unknown`.
+EthiopianInstitution institutionForSender(String sender) {
+  final lowered = sender.trim().toLowerCase();
+  final letters = lowered.replaceAll(RegExp(r'[^a-z ]'), '').trim();
+  if (letters.isEmpty) {
+    final digits = lowered.replaceAll(RegExp(r'[^0-9]'), '');
+    for (final entry in kInstitutionShortcodes.entries) {
+      if (entry.value.contains(digits)) return entry.key;
+    }
+    return EthiopianInstitution.unknown;
+  }
+  for (final entry in kInstitutionSenderKeywords.entries) {
+    if (entry.value.any(letters.contains)) return entry.key;
+  }
+  return EthiopianInstitution.unknown;
+}
+
+/// Sign-off phrases an institution puts in its OWN receipts. Only used when
+/// the sender is unrecognised; a mere mention of another bank inside a
+/// message ("from CBE account") deliberately does not count.
+const Map<EthiopianInstitution, List<String>> _institutionSignatures = {
+  EthiopianInstitution.cbe: [
+    'thank you for banking with cbe',
+    'thanks for banking with cbe',
+    'cbe.com.et',
+  ],
+  EthiopianInstitution.telebirr: [
+    'thank you for using telebirr',
+    'e-money account',
+    'telebirr wallet',
+  ],
+  EthiopianInstitution.awash: [
+    'thank you for banking with awash',
+    'awash bank'
+  ],
+  EthiopianInstitution.boa: ['bank of abyssinia', 'abyssinia bank'],
+  EthiopianInstitution.hibret: ['hibret bank'],
+  EthiopianInstitution.dashen: ['dashen bank'],
+};
+
+/// Best-effort institution for a message from an unrecognised sender.
+EthiopianInstitution inferInstitutionFromSignature(String lowered) {
+  for (final entry in _institutionSignatures.entries) {
+    if (entry.value.any(lowered.contains)) return entry.key;
+  }
+  return EthiopianInstitution.unknown;
+}
+
+// ---------------------------------------------------------------------------
+// Confidence
+// ---------------------------------------------------------------------------
+
+/// Parses at or above this confidence are booked directly; below it they
+/// wait in the review queue for the user.
+const double kAutoAcceptConfidence = 0.85;
+
+/// Confidence is a function of the evidence, nothing else.
+///
+/// Two facts are non-negotiable for auto-accept: a recognised sender and an
+/// unambiguous direction phrase. Without both, the score is capped just
+/// below [kAutoAcceptConfidence] no matter how much else lines up, because
+/// those are precisely the mistakes (wrong account, income booked as
+/// expense) a user cannot spot at a glance.
+double scoreConfidence(ParseEvidence evidence) {
+  var score = evidence.institutionKnown ? 0.80 : 0.58;
+  if (evidence.explicitDirection) score += 0.10;
+  if (evidence.hasReference) score += 0.03;
+  if (evidence.hasBalance) score += 0.03;
+  if (evidence.specificCategory) score += 0.02;
+  if (evidence.hasCounterparty) score += 0.02;
+
+  final cap = evidence.institutionKnown && evidence.explicitDirection
+      ? 0.98
+      : kAutoAcceptConfidence - 0.01;
+  return (math.min(score, cap) * 100).round() / 100;
+}
+
+/// Category ids that mean "no idea, just the direction".
+bool isSpecificCategory(String categoryId) {
+  return categoryId != 'expense' &&
+      categoryId != 'income' &&
+      categoryId != 'other';
+}
+
+// ---------------------------------------------------------------------------
+// Templates
+// ---------------------------------------------------------------------------
 
 /// Fallback parser for any bank/wallet SMS that mentions money.
 class GenericAmountParserTemplate implements SmsParserTemplate {
@@ -21,151 +139,140 @@ class GenericAmountParserTemplate implements SmsParserTemplate {
     final lowered = sms.body.toLowerCase();
     if (_shouldIgnoreNonLedgerMessage(lowered)) return null;
 
-    final amountMajor = extractTransactionAmountMajor(sms.body);
+    final direction = detectDirection(lowered);
+    final amountMajor = extractTransactionAmountMajor(
+      sms.body,
+      allowBalanceAsAmount: direction.explicit,
+    );
     if (amountMajor == null) return null;
-    final isExpense = isExpenseMessage(lowered);
-    final baseConfidence = lowered.contains('etb') ||
-            lowered.contains('birr') ||
-            lowered.contains('ብር')
-        ? 0.82
-        : 0.6;
+
+    final isExpense = direction.isExpense;
+    final category = inferCategory(body: lowered, isExpense: isExpense);
+    final reference = extractReference(sms.body);
+    final balanceMinor = extractBalanceMinor(sms.body);
+    final evidence = ParseEvidence(
+      // The sender is unrecognised by definition here; a signature can name
+      // the institution but does not vouch for the message.
+      institutionKnown: false,
+      explicitDirection: direction.explicit,
+      hasReference: reference != null,
+      hasBalance: balanceMinor != null,
+      specificCategory: isSpecificCategory(category),
+      hasCounterparty: extractMerchant(sms.body, isExpense: isExpense) != null,
+    );
 
     return ParsedSmsTransaction(
       detectedAmountMinor: (amountMajor * 100).round() * (isExpense ? -1 : 1),
-      confidence: baseConfidence,
-      categoryHint: inferCategory(body: lowered, isExpense: isExpense),
+      confidence: scoreConfidence(evidence),
+      categoryHint: category,
       description: sms.body,
-      institution: EthiopianInstitution.unknown,
-      reference: extractReference(sms.body),
-      balanceMinor: extractBalanceMinor(sms.body),
+      institution: inferInstitutionFromSignature(lowered),
+      reference: reference,
+      balanceMinor: balanceMinor,
       accountNumberHint: extractAccountHint(sms.body),
+      evidence: evidence,
     );
   }
 }
 
 abstract class _InstitutionTemplate implements SmsParserTemplate {
-  const _InstitutionTemplate(this.institution, this.senderKeywords);
+  const _InstitutionTemplate(this.institution);
 
   final EthiopianInstitution institution;
-  final List<String> senderKeywords;
 
   @override
   bool canParse(SmsMessage sms) {
     // Sender-only: matching on the body misfiles cross-institution messages
     // (a telebirr receipt mentioning "from CBE account" is NOT a CBE
-    // transaction). Unknown senders fall through to the generic template and
-    // CruiseControl re-homes them.
-    final sender = sms.sender.toLowerCase();
-    return senderKeywords.any(sender.contains);
+    // transaction). Unknown senders fall through to the generic template
+    // and the review queue, where the user can map the sender once.
+    return institutionForSender(sms.sender) == institution;
   }
+
+  /// Institution-specific amount extraction; null falls back to the shared
+  /// currency-token scan.
+  double? amountFor(String body, {required DirectionEvidence direction}) =>
+      null;
+
+  /// Institution-specific reference extraction; null falls back to the
+  /// shared "ref/txn" scan.
+  String? referenceFor(String body) => null;
 
   @override
   ParsedSmsTransaction? parse(SmsMessage sms) {
     final lowered = sms.body.toLowerCase();
     if (_shouldIgnoreNonLedgerMessage(lowered)) return null;
 
-    final amountMajor = extractTransactionAmountMajor(sms.body);
+    final direction = detectDirection(lowered);
+    final amountMajor = amountFor(sms.body, direction: direction) ??
+        extractTransactionAmountMajor(
+          sms.body,
+          allowBalanceAsAmount: direction.explicit,
+        );
     if (amountMajor == null) return null;
-    final isExpense = isExpenseMessage(lowered);
+
+    final isExpense = direction.isExpense;
+    final category = inferCategory(body: lowered, isExpense: isExpense);
+    final reference = referenceFor(sms.body) ?? extractReference(sms.body);
+    final balanceMinor = extractBalanceMinor(sms.body);
+    final evidence = ParseEvidence(
+      institutionKnown: true,
+      explicitDirection: direction.explicit,
+      hasReference: reference != null,
+      hasBalance: balanceMinor != null,
+      specificCategory: isSpecificCategory(category),
+      hasCounterparty: extractMerchant(sms.body, isExpense: isExpense) != null,
+    );
 
     return ParsedSmsTransaction(
       detectedAmountMinor: (amountMajor * 100).round() * (isExpense ? -1 : 1),
-      confidence: _confidenceFor(lowered),
-      categoryHint: inferCategory(body: lowered, isExpense: isExpense),
+      confidence: scoreConfidence(evidence),
+      categoryHint: category,
       description: sms.body,
       institution: institution,
-      reference: extractReference(sms.body),
-      balanceMinor: extractBalanceMinor(sms.body),
+      reference: reference,
+      balanceMinor: balanceMinor,
       accountNumberHint: extractAccountHint(sms.body),
+      evidence: evidence,
     );
-  }
-
-  double _confidenceFor(String loweredBody) {
-    var confidence = 0.74;
-    if (loweredBody.contains('etb') ||
-        loweredBody.contains('birr') ||
-        loweredBody.contains('ብር')) {
-      confidence += 0.08;
-    }
-    if (loweredBody.contains('account') ||
-        loweredBody.contains('wallet') ||
-        loweredBody.contains('ac ')) {
-      confidence += 0.06;
-    }
-    if (extractReference(loweredBody) != null) {
-      confidence += 0.04;
-    }
-    if (isExpenseMessage(loweredBody) ||
-        loweredBody.contains('credited') ||
-        loweredBody.contains('received')) {
-      confidence += 0.04;
-    }
-    return confidence.clamp(0.0, 0.98).toDouble();
   }
 }
 
 class CbeSmsParserTemplate extends _InstitutionTemplate {
-  const CbeSmsParserTemplate()
-      : super(EthiopianInstitution.cbe, const ['cbe', 'commercial bank']);
+  const CbeSmsParserTemplate() : super(EthiopianInstitution.cbe);
 
+  /// CBE receipts itemize fees and state a "total of ETB X" — the total is
+  /// what actually left the account, so it wins over the headline amount.
   @override
-  ParsedSmsTransaction? parse(SmsMessage sms) {
-    final lowered = sms.body.toLowerCase();
-    // Position-based: a CBE transfer contains BOTH "debited" (your side) and
-    // "credited to the beneficiary" — the earlier cue decides whose
-    // transaction this is.
-    final isExpense = isExpenseMessage(lowered);
-
-    final amountMajor = _extractCbeTransactionAmountMajor(
-          sms.body,
-          isExpense: isExpense,
-        ) ??
-        extractTransactionAmountMajor(sms.body);
-    if (amountMajor == null) return null;
-
-    final category = inferCategory(body: lowered, isExpense: isExpense);
-
-    return ParsedSmsTransaction(
-      detectedAmountMinor: (amountMajor * 100).round() * (isExpense ? -1 : 1),
-      confidence: 0.96,
-      categoryHint: category,
-      description: sms.body,
-      institution: EthiopianInstitution.cbe,
-      reference: _extractCbeReference(sms.body) ?? extractReference(sms.body),
-      balanceMinor: extractBalanceMinor(sms.body),
-      accountNumberHint: extractAccountHint(sms.body),
+  double? amountFor(String body, {required DirectionEvidence direction}) {
+    return _extractCbeTransactionAmountMajor(
+      body,
+      isExpense: direction.isExpense,
     );
   }
+
+  @override
+  String? referenceFor(String body) => _extractCbeReference(body);
 }
 
 class AwashSmsParserTemplate extends _InstitutionTemplate {
-  const AwashSmsParserTemplate()
-      : super(EthiopianInstitution.awash, const ['awash']);
+  const AwashSmsParserTemplate() : super(EthiopianInstitution.awash);
 }
 
 class TelebirrSmsParserTemplate extends _InstitutionTemplate {
-  const TelebirrSmsParserTemplate()
-      : super(
-          EthiopianInstitution.telebirr,
-          // 127 is the telebirr shortcode; Ethio telecom also delivers
-          // telebirr receipts under its own sender name.
-          const ['telebirr', 'tele birr', '127', 'ethio telecom'],
-        );
+  const TelebirrSmsParserTemplate() : super(EthiopianInstitution.telebirr);
 }
 
 class BoaSmsParserTemplate extends _InstitutionTemplate {
-  const BoaSmsParserTemplate()
-      : super(EthiopianInstitution.boa, const ['abyssinia', 'boa']);
+  const BoaSmsParserTemplate() : super(EthiopianInstitution.boa);
 }
 
 class HibretSmsParserTemplate extends _InstitutionTemplate {
-  const HibretSmsParserTemplate()
-      : super(EthiopianInstitution.hibret, const ['hibret', 'united bank']);
+  const HibretSmsParserTemplate() : super(EthiopianInstitution.hibret);
 }
 
 class DashenSmsParserTemplate extends _InstitutionTemplate {
-  const DashenSmsParserTemplate()
-      : super(EthiopianInstitution.dashen, const ['dashen']);
+  const DashenSmsParserTemplate() : super(EthiopianInstitution.dashen);
 }
 
 class SmsParserEngine {
@@ -210,7 +317,15 @@ double? _toMajor(String? raw) {
 
 /// Extracts the transaction amount, deliberately skipping the balance figure
 /// when both appear in the same message.
-double? extractTransactionAmountMajor(String body) {
+///
+/// When the only amount in the message IS the balance, this is a balance
+/// inquiry rather than a transaction — unless [allowBalanceAsAmount] says an
+/// explicit transaction phrase is present (a first deposit can legitimately
+/// equal the new balance).
+double? extractTransactionAmountMajor(
+  String body, {
+  bool allowBalanceAsAmount = false,
+}) {
   final balanceRaw = _balanceRegex.firstMatch(body)?.group(1);
   final balance = _toMajor(balanceRaw);
 
@@ -228,7 +343,7 @@ double? extractTransactionAmountMajor(String body) {
     if (balance != null && value == balance) continue;
     return value;
   }
-  if (candidates.isNotEmpty) return candidates.first;
+  if (candidates.isNotEmpty && allowBalanceAsAmount) return candidates.first;
   return null;
 }
 
@@ -238,9 +353,12 @@ int? extractBalanceMinor(String body) {
   return (major * 100).round();
 }
 
+/// "Ref AXE1234", "Transaction number ABC123", "Your transaction number is
+/// DF24JC2U3S". A real reference always carries a digit, so prose after the
+/// keyword ("transaction with CBE") is never mistaken for one.
 String? extractReference(String body) {
   final match = RegExp(
-    r'(?:ref(?:erence)?|trx|txn|txnid|transaction)[:\s#-]*([a-z0-9]{4,})',
+    r'(?:ref(?:erence)?|trx|txn|txnid|transaction)(?:\s+(?:number|no|id))?[:\s#.-]*(?:is\s+)?((?=[a-z]*[0-9])[a-z0-9]{4,})',
     caseSensitive: false,
   ).firstMatch(body);
   return match?.group(1);
@@ -254,7 +372,96 @@ String? extractAccountHint(String body) {
   return match?.group(1);
 }
 
-const _expenseCues = [
+// ---------------------------------------------------------------------------
+// Direction
+// ---------------------------------------------------------------------------
+
+class DirectionEvidence {
+  const DirectionEvidence({required this.isExpense, required this.explicit});
+
+  final bool isExpense;
+
+  /// True when an unambiguous phrase decided it; false when only a bare
+  /// keyword (or nothing at all) was available.
+  final bool explicit;
+}
+
+/// Phrases that can only describe money LEAVING the user's account.
+/// Lower-case; matched by position, so the earliest phrase in a message wins.
+const _explicitOutflowPhrases = [
+  'has been debited',
+  'have been debited',
+  'is debited',
+  'was debited',
+  'account debited',
+  'debited with',
+  'debited by',
+  'debited from',
+  'debited etb',
+  'debited birr',
+  'you have paid',
+  'you paid',
+  'paid etb',
+  'paid birr',
+  'paid to',
+  'you have transferred',
+  'successfully transferred',
+  'you have sent',
+  'you sent',
+  'sent etb',
+  'sent birr',
+  'you have recharged',
+  'recharged etb',
+  'recharged birr',
+  'you have purchased',
+  'purchase of',
+  'withdrawn',
+  'withdrawal',
+  'cash out',
+  'cash-out',
+  'ወጪ',
+  'ተከፍሏል',
+  'ልከዋል',
+  'ከፍለዋል',
+];
+
+/// Phrases that can only describe money ARRIVING in the user's account.
+const _explicitInflowPhrases = [
+  'has been credited',
+  'have been credited',
+  'is credited',
+  'was credited',
+  'account credited',
+  'credited with',
+  'credited by',
+  'credited etb',
+  'credited birr',
+  'credited to your',
+  'you have received',
+  'you received',
+  'received etb',
+  'received birr',
+  'received from',
+  'sent you',
+  'sent to you',
+  'transferred to your',
+  'deposited to your',
+  'deposited into your',
+  'deposit to your',
+  'paid to you',
+  'paid into your',
+  'cash in',
+  'cash-in',
+  'refund',
+  'reversal',
+  'reversed',
+  'ገቢ',
+  'ተቀብለዋል',
+  'ተመላሽ',
+];
+
+/// Bare keywords used only when no explicit phrase is present.
+const _weakExpenseCues = [
   'debited',
   'debit',
   'paid',
@@ -262,63 +469,76 @@ const _expenseCues = [
   'purchase',
   'withdraw',
   'sent',
-  // Bare 'transferred' covers "successfully transferred ETB... from account
-  // X to account Y"; the longer 'transferred to your' income phrase still
-  // wins on ties (same index -> income).
   'transferred',
-  'transferred to',
-  'you have transferred',
-  'ተከፍሏል',
-  'ወጪ',
+  'transfer',
 ];
 
-const _incomeCues = [
+const _weakIncomeCues = [
   'credited',
   'credit',
   'received',
   'deposit',
   'salary',
-  'refund',
-  'refunded',
-  'reversal',
-  'transferred to your',
-  'ገቢ',
-  'ተቀብለዋል',
-  'ተመላሽ',
 ];
+
+int? _earliestIndex(String lowered, List<String> cues) {
+  int? best;
+  for (final cue in cues) {
+    final index = lowered.indexOf(cue);
+    if (index >= 0 && (best == null || index < best)) best = index;
+  }
+  return best;
+}
 
 /// Direction detection: the EARLIEST cue in the message wins.
 ///
 /// Ethiopian bank/wallet SMS lead with the primary action ("Your account has
 /// been debited…", "You have received…") and often mention the counterparty's
 /// side later ("…and credited to the beneficiary", "…Abebe has received the
-/// amount"). Whichever side is mentioned first is whose transaction this is;
-/// a bare income word later in the body must not flip an expense to income.
-bool isExpenseMessage(String lowered) {
-  int? earliest(List<String> cues) {
-    int? best;
-    for (final cue in cues) {
-      final index = lowered.indexOf(cue);
-      if (index >= 0 && (best == null || index < best)) best = index;
+/// amount"). Whichever side is mentioned first is whose transaction this is.
+///
+/// Explicit phrases are consulted first and make the result [explicit];
+/// bare keywords are a fallback and leave the parse in the review queue.
+/// With no cue at all the message is treated as an expense (the safer
+/// default for a spending tracker) — also non-explicit.
+DirectionEvidence detectDirection(String lowered) {
+  final outAt = _earliestIndex(lowered, _explicitOutflowPhrases);
+  final inAt = _earliestIndex(lowered, _explicitInflowPhrases);
+  if (outAt != null || inAt != null) {
+    if (inAt == null) {
+      return const DirectionEvidence(isExpense: true, explicit: true);
     }
-    return best;
+    if (outAt == null) {
+      return const DirectionEvidence(isExpense: false, explicit: true);
+    }
+    // Same position means an inflow phrase extends an outflow one ("paid to"
+    // vs "paid to your") — the longer, more specific inflow phrase wins.
+    return DirectionEvidence(isExpense: outAt < inAt, explicit: true);
   }
 
-  final expenseAt = earliest(_expenseCues);
-  final incomeAt = earliest(_incomeCues);
-
-  if (incomeAt == null) return true; // no income cue -> default expense
-  if (expenseAt == null) return false; // only income cues -> income
-  // Same position means an income phrase extends an expense one (e.g.
-  // 'transferred to' vs 'transferred to your') — the longer, more specific
-  // income phrase wins.
-  return expenseAt < incomeAt;
+  final weakOutAt = _earliestIndex(lowered, _weakExpenseCues);
+  final weakInAt = _earliestIndex(lowered, _weakIncomeCues);
+  if (weakInAt == null) {
+    return const DirectionEvidence(isExpense: true, explicit: false);
+  }
+  if (weakOutAt == null) {
+    return const DirectionEvidence(isExpense: false, explicit: false);
+  }
+  return DirectionEvidence(isExpense: weakOutAt < weakInAt, explicit: false);
 }
+
+/// Convenience for callers that only need the sign.
+bool isExpenseMessage(String lowered) => detectDirection(lowered).isExpense;
+
+// ---------------------------------------------------------------------------
+// Category
+// ---------------------------------------------------------------------------
 
 bool _isAirtimeOrPackageMessage(String lowered) {
   const tokens = [
     'airtime',
     'recharge',
+    'recharged',
     'top up',
     'topup',
     'data package',
@@ -345,6 +565,7 @@ String inferCategory({required String body, required bool isExpense}) {
     'airtime': [
       'airtime',
       'recharge',
+      'recharged',
       'top up',
       'topup',
       'bundle',
@@ -489,7 +710,8 @@ String inferCategory({required String body, required bool isExpense}) {
     if (_containsKeyword(body, 'salary') || _containsKeyword(body, 'payroll')) {
       return 'salary';
     }
-    if (_containsKeyword(body, 'transfer') || _containsKeyword(body, 'received')) {
+    if (_containsKeyword(body, 'transfer') ||
+        _containsKeyword(body, 'received')) {
       return 'transfer_in';
     }
     return 'income';
@@ -505,18 +727,23 @@ String inferCategory({required String body, required bool isExpense}) {
 // ---------------------------------------------------------------------------
 
 // Amount with the currency token on either side: "ETB 120.00" / "320.00 birr".
-const _amountPhrase =
-    r'(?:etb|birr|ብር)?\s*[\d,.]*\s*(?:etb|birr|ብር)?\s*';
+const _amountPhrase = r'(?:etb|birr|ብር)?\s*[\d,.]*\s*(?:etb|birr|ብር)?\s*';
 
 final List<RegExp> _expenseMerchantPatterns = [
   // "paid ETB 120.00 to Shoa Supermarket via telebirr" /
   // "paid 320.00 birr to GebeyaGo Delivery via app"
-  RegExp('paid\\s+${_amountPhrase}to\\s+([^.,\\n]{2,48}?)\\s+(?:via|through|on|using|ref)',
+  RegExp(
+      'paid\\s+${_amountPhrase}to\\s+([^.,\\n]{2,48}?)\\s+(?:via|through|on|using|ref)',
       caseSensitive: false),
   // "transferred to W/ro Almaz — house rent"
   RegExp(r'transferred\s+to\s+([^.,\n—-]{2,48})', caseSensitive: false),
+  // "transferred ETB 500.00 to Abebe Kebede (2519****) on 09/07/2026"
+  RegExp(
+      'transferred\\s+${_amountPhrase}to\\s+([^.,\\n(]{2,48}?)\\s*(?:\\(|via|through|on|ref)',
+      caseSensitive: false),
   // "You have sent ETB 1,500.00 to Emebet K. via telebirr"
-  RegExp('sent\\s+${_amountPhrase}to\\s+([^.,\\n]{2,48}?)\\s+(?:via|through|on|ref)',
+  RegExp(
+      'sent\\s+${_amountPhrase}to\\s+([^.,\\n]{2,48}?)\\s+(?:via|through|on|ref)',
       caseSensitive: false),
   // "debited ETB 450.00 at Safari Supermarket"
   RegExp(r'\bat\s+([a-zA-Z][^.,\n]{2,48})', caseSensitive: false),
@@ -549,6 +776,9 @@ String? extractMerchant(String body, {required bool isExpense}) {
 
 String? _cleanMerchant(String raw) {
   var value = raw
+      // "Mekuria Solomon(2519****4846)" — the masked phone in parentheses is
+      // not part of the name.
+      .replaceAll(RegExp(r'\([^)]*\)'), ' ')
       .replaceAll(RegExp(r'''["'“”]'''), '')
       .replaceAll(RegExp(r'\s+'), ' ')
       .trim();
@@ -602,9 +832,15 @@ bool _containsCurrencyToken(String body) {
       .hasMatch(body.toLowerCase());
 }
 
+// ---------------------------------------------------------------------------
+// Non-ledger message filters
+// ---------------------------------------------------------------------------
+
 bool _looksTransactionalMessage(String body) {
   if (_shouldIgnoreNonLedgerMessage(body)) return false;
   if (_isAirtimeOrPackageMessage(body)) return true;
+  // Note: a bare "balance" is deliberately NOT an indicator — a balance
+  // inquiry reply mentions money without any money moving.
   const indicators = [
     'debited',
     'debit',
@@ -614,11 +850,14 @@ bool _looksTransactionalMessage(String body) {
     'payment',
     'purchase',
     'withdraw',
+    'withdrawn',
+    'withdrawal',
     'sent',
     'transfer',
+    'transferred',
     'received',
     'deposit',
-    'balance',
+    'deposited',
     'service charge',
     'vat',
     'disaster fund',
@@ -660,10 +899,37 @@ bool _isAirtimeReceivedMirrorMessage(String body) {
       _containsKeyword(body, 'from');
 }
 
+/// A declined or failed attempt moves no money and must not reach the ledger.
+bool _isFailedTransactionMessage(String body) {
+  const blockers = [
+    'unsuccessful',
+    'not successful',
+    'failed',
+    'declined',
+    'rejected',
+    'insufficient balance',
+    'insufficient funds',
+    'could not be processed',
+    'cannot be processed',
+    'has been cancelled',
+    'has been canceled',
+    'አልተሳካም',
+  ];
+  for (final blocker in blockers) {
+    if (_containsKeyword(body, blocker)) return true;
+  }
+  return false;
+}
+
 bool _shouldIgnoreNonLedgerMessage(String body) {
   return _isLikelyOtpOrVerification(body) ||
-      _isAirtimeReceivedMirrorMessage(body);
+      _isAirtimeReceivedMirrorMessage(body) ||
+      _isFailedTransactionMessage(body);
 }
+
+// ---------------------------------------------------------------------------
+// CBE specifics
+// ---------------------------------------------------------------------------
 
 double? _extractCbeTransactionAmountMajor(
   String body, {

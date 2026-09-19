@@ -244,8 +244,8 @@ class ReportService {
       daysElapsed: daysElapsed.clamp(1, 1 << 30),
       daysTotal: daysTotal.clamp(1, 1 << 30),
       scopedTransactions: scoped
-          .where((tx) =>
-              tx.reviewStatus != TransactionReviewStatus.pendingReview)
+          .where(
+              (tx) => tx.reviewStatus != TransactionReviewStatus.pendingReview)
           .toList(growable: false),
       internalIds: flows.internalIds,
       feeByTransactionId: {
@@ -276,8 +276,7 @@ class ReportService {
           !tx.occurredAt.isBefore(endExclusive)) {
         continue;
       }
-      final total =
-          latestByAccount.values.fold<int>(0, (sum, v) => sum + v);
+      final total = latestByAccount.values.fold<int>(0, (sum, v) => sum + v);
       points.add(BalancePoint(at: tx.occurredAt, balanceMinor: total));
     }
     // Cap the point count for painting.
@@ -455,8 +454,7 @@ class ReportService {
     for (final record in records) {
       if (record.statementBalanceMinor == null) continue;
       final existing = latestStatementByAccount[record.accountId];
-      if (existing == null ||
-          record.occurredAt.isAfter(existing.occurredAt)) {
+      if (existing == null || record.occurredAt.isAfter(existing.occurredAt)) {
         latestStatementByAccount[record.accountId] = record;
       }
     }
@@ -510,8 +508,7 @@ class ReportService {
   ///  - Outflows categorized as savings are money the user keeps.
   static FlowAnalysis analyzeFlows(List<TransactionRecord> records) {
     final confirmed = records
-        .where((tx) =>
-            tx.reviewStatus != TransactionReviewStatus.pendingReview)
+        .where((tx) => tx.reviewStatus != TransactionReviewStatus.pendingReview)
         .toList(growable: false);
 
     bool transferishOutflow(TransactionRecord tx) {
@@ -583,9 +580,8 @@ class ReportService {
   /// fully.
   static int _feesFor(TransactionRecord tx, FlowAnalysis flows) {
     if (tx.reviewStatus == TransactionReviewStatus.pendingReview) return 0;
-    final itemized = tx.smsSnippet == null
-        ? 0
-        : extractItemizedFeesMinor(tx.smsSnippet!);
+    final itemized =
+        tx.smsSnippet == null ? 0 : extractItemizedFeesMinor(tx.smsSnippet!);
     final pairFee = flows.pairFeeByOutflowId[tx.id];
     if (pairFee != null) return pairFee > itemized ? pairFee : itemized;
     if (!isOutflowType(tx.type)) return 0;
@@ -667,7 +663,8 @@ class ReportService {
   }) async {
     final transactions = await _ledgerRepository.getTransactions();
     if (institutionCodes.isEmpty) return transactions;
-    final accountIds = await _filteredAccountIds(institutionCodes: institutionCodes);
+    final accountIds =
+        await _filteredAccountIds(institutionCodes: institutionCodes);
     return transactions
         .where((tx) => accountIds.contains(tx.accountId))
         .toList(growable: false);

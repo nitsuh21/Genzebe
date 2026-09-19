@@ -1,0 +1,20 @@
+{
+  "institution": "dashen",
+  "cases": [
+    {
+      "id": "dashen-debited-taxi",
+      "source": "synthetic",
+      "sender": "DASHEN",
+      "body": "Dashen account debited ETB 90.00 taxi",
+      "expect": {
+        "parsed": true,
+        "institution": "dashen",
+        "direction": "out",
+        "amountMinor": 9000,
+        "category": "transport",
+        "explicitDirection": true,
+        "autoAccept": true
+      }
+    }
+  ]
+}

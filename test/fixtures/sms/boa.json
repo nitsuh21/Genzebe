@@ -1,0 +1,20 @@
+{
+  "institution": "boa",
+  "cases": [
+    {
+      "id": "boa-debited-with-ref",
+      "source": "synthetic",
+      "sender": "ABYSSINIA",
+      "body": "BOA account debited ETB 300.00 ref AA11",
+      "expect": {
+        "parsed": true,
+        "institution": "boa",
+        "direction": "out",
+        "amountMinor": 30000,
+        "referenceContains": "AA11",
+        "explicitDirection": true,
+        "autoAccept": true
+      }
+    }
+  ]
+}

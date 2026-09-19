@@ -2,13 +2,15 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:genzeb/app/providers.dart';
 import 'package:genzeb/core/utils/formatters.dart';
+import 'package:genzeb/design_system/widgets.dart';
 import 'package:genzeb/features/reports/application/report_service.dart';
 import 'package:genzeb/features/transactions/domain/models/transaction_models.dart';
 import 'package:genzeb/features/transactions/presentation/add_transaction_sheet.dart';
-import 'package:genzeb/features/transactions/presentation/category_picker.dart';
+import 'package:genzeb/features/transactions/presentation/transaction_detail_sheet.dart';
 import 'package:genzeb/features/transactions/presentation/transaction_tile.dart';
 
 enum _LedgerFilter { all, income, expense, sms, manual }
+
 enum _LedgerPeriod {
   today,
   yesterday,
@@ -31,6 +33,18 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
   _LedgerFilter _filter = _LedgerFilter.all;
   _LedgerPeriod _period = _LedgerPeriod.thisMonth;
   DateTimeRange? _customRange;
+
+  /// First day of the month shown when [_period] is `thisMonth`; the
+  /// stepper moves it so any past month is one tap away.
+  DateTime _monthAnchor = firstOfMonth(DateTime.now());
+
+  bool get _isCurrentMonth => _monthAnchor == firstOfMonth(DateTime.now());
+
+  void _shiftMonth(int delta) {
+    setState(() {
+      _monthAnchor = DateTime(_monthAnchor.year, _monthAnchor.month + delta, 1);
+    });
+  }
 
   bool _matches(TransactionRecord record) {
     switch (_filter) {
@@ -65,21 +79,20 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
         final weekEnd = weekStart.add(const Duration(days: 7));
         return !day.isBefore(weekStart) && day.isBefore(weekEnd);
       case _LedgerPeriod.thisMonth:
-        return day.year == today.year && day.month == today.month;
+        return day.year == _monthAnchor.year && day.month == _monthAnchor.month;
+      // Trailing windows ending today — a calendar quarter/half-year would
+      // include months that haven't happened yet.
       case _LedgerPeriod.quarter:
-        final quarterStartMonth = ((today.month - 1) ~/ 3) * 3 + 1;
-        final quarterStart = DateTime(today.year, quarterStartMonth, 1);
-        final quarterEnd = DateTime(today.year, quarterStartMonth + 3, 1);
-        return !day.isBefore(quarterStart) && day.isBefore(quarterEnd);
+        final (start, end) = trailingMonths(today, 3);
+        return !day.isBefore(start) && day.isBefore(end);
       case _LedgerPeriod.semiAnnual:
-        final halfStartMonth = today.month <= 6 ? 1 : 7;
-        final halfStart = DateTime(today.year, halfStartMonth, 1);
-        final halfEnd = DateTime(today.year, halfStartMonth + 6, 1);
-        return !day.isBefore(halfStart) && day.isBefore(halfEnd);
+        final (start, end) = trailingMonths(today, 6);
+        return !day.isBefore(start) && day.isBefore(end);
       case _LedgerPeriod.custom:
         final range = _customRange;
         if (range == null) return true;
-        final start = DateTime(range.start.year, range.start.month, range.start.day);
+        final start =
+            DateTime(range.start.year, range.start.month, range.start.day);
         final end = DateTime(
           range.end.year,
           range.end.month,
@@ -116,7 +129,8 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
     final theme = Theme.of(context);
     final transactionsAsync = ref.watch(ledgerTransactionsProvider);
     final institutionOptionsAsync = ref.watch(institutionFilterOptionsProvider);
-    final selectedInstitutionCodes = ref.watch(selectedInstitutionCodesProvider);
+    final selectedInstitutionCodes =
+        ref.watch(selectedInstitutionCodesProvider);
     final safeBottom = MediaQuery.of(context).viewPadding.bottom;
 
     return Scaffold(
@@ -189,7 +203,9 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
                         label: _period == _LedgerPeriod.custom &&
                                 _customRange != null
                             ? '${formatDay(_customRange!.start)}–${formatDay(_customRange!.end)}'
-                            : _periodLabel(_period),
+                            : _period == _LedgerPeriod.thisMonth
+                                ? formatShortMonth(_monthAnchor)
+                                : _periodLabel(_period),
                         active: _period != _LedgerPeriod.all,
                         onTap: _pickPeriod,
                       ),
@@ -197,9 +213,17 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
                   ],
                 ),
               ),
+              if (_period == _LedgerPeriod.thisMonth)
+                MonthStepper(
+                  month: _monthAnchor,
+                  canGoForward: !_isCurrentMonth,
+                  onPrevious: () => _shiftMonth(-1),
+                  onNext: () => _shiftMonth(1),
+                ),
               const SizedBox(height: 4),
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
                 child: Row(
                   children: [
                     Text(
@@ -221,6 +245,16 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
               Expanded(
                 child: records.isEmpty
                     ? _EmptyLedger(
+                        // Filters hiding existing rows is a different story
+                        // from a genuinely empty ledger.
+                        filtered: allRecords.isNotEmpty,
+                        periodLabel: _period == _LedgerPeriod.thisMonth
+                            ? formatMonth(_monthAnchor)
+                            : _periodLabel(_period).toLowerCase(),
+                        onShowAll: () => setState(() {
+                          _period = _LedgerPeriod.all;
+                          _filter = _LedgerFilter.all;
+                        }),
                         onAdd: () => showAddTransactionSheet(context, ref),
                       )
                     : RefreshIndicator(
@@ -372,8 +406,7 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
                 for (final option in options)
                   ListTile(
                     dense: true,
-                    contentPadding:
-                        const EdgeInsets.symmetric(horizontal: 4),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 4),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),
@@ -390,8 +423,7 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
                         ? Icon(Icons.check_circle_rounded,
                             color: theme.colorScheme.primary)
                         : null,
-                    onTap: () =>
-                        Navigator.of(sheetContext).pop(option.value),
+                    onTap: () => Navigator.of(sheetContext).pop(option.value),
                   ),
               ],
             ),
@@ -427,9 +459,9 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
       case _LedgerPeriod.thisMonth:
         return 'Month';
       case _LedgerPeriod.quarter:
-        return 'Quarter';
+        return 'Last 3 months';
       case _LedgerPeriod.semiAnnual:
-        return '6 months';
+        return 'Last 6 months';
       case _LedgerPeriod.all:
         return 'All time';
       case _LedgerPeriod.custom:
@@ -461,9 +493,8 @@ class _FilterButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final color = active
-        ? theme.colorScheme.primary
-        : theme.colorScheme.onSurfaceVariant;
+    final color =
+        active ? theme.colorScheme.primary : theme.colorScheme.onSurfaceVariant;
     return Material(
       color: active
           ? theme.colorScheme.primary.withValues(alpha: 0.1)
@@ -560,7 +591,7 @@ class _GroupedList extends ConsumerWidget {
             padding: const EdgeInsets.only(bottom: 10),
             child: TransactionTile(
               record: item,
-              onTap: () => promptRecategorize(context, ref, item),
+              onTap: () => showTransactionDetail(context, ref, item),
             ),
           ),
         );
@@ -575,8 +606,17 @@ class _GroupedList extends ConsumerWidget {
 }
 
 class _EmptyLedger extends StatelessWidget {
-  const _EmptyLedger({required this.onAdd});
+  const _EmptyLedger({
+    required this.filtered,
+    required this.periodLabel,
+    required this.onShowAll,
+    required this.onAdd,
+  });
 
+  /// True when the ledger has rows but none match the current filters.
+  final bool filtered;
+  final String periodLabel;
+  final VoidCallback onShowAll;
   final VoidCallback onAdd;
 
   @override
@@ -585,12 +625,15 @@ class _EmptyLedger extends StatelessWidget {
     return ListView(
       children: [
         const SizedBox(height: 100),
-        Icon(Icons.swap_vert_rounded,
-            size: 48, color: theme.colorScheme.onSurfaceVariant),
+        Icon(
+          filtered ? Icons.event_busy_rounded : Icons.swap_vert_rounded,
+          size: 48,
+          color: theme.colorScheme.onSurfaceVariant,
+        ),
         const SizedBox(height: 12),
         Center(
           child: Text(
-            'Nothing here yet',
+            filtered ? 'No transactions in $periodLabel' : 'Nothing here yet',
             style: theme.textTheme.titleMedium
                 ?.copyWith(fontWeight: FontWeight.w700),
           ),
@@ -598,7 +641,9 @@ class _EmptyLedger extends StatelessWidget {
         const SizedBox(height: 4),
         Center(
           child: Text(
-            'Add a transaction or sync your SMS.',
+            filtered
+                ? 'Try another month or clear the filters.'
+                : 'Add a transaction or sync your SMS.',
             style: theme.textTheme.bodySmall?.copyWith(
               color: theme.colorScheme.onSurfaceVariant,
             ),
@@ -606,11 +651,17 @@ class _EmptyLedger extends StatelessWidget {
         ),
         const SizedBox(height: 16),
         Center(
-          child: FilledButton.icon(
-            onPressed: onAdd,
-            icon: const Icon(Icons.add_rounded),
-            label: const Text('Add transaction'),
-          ),
+          child: filtered
+              ? FilledButton.tonalIcon(
+                  onPressed: onShowAll,
+                  icon: const Icon(Icons.all_inclusive_rounded),
+                  label: const Text('Show all time'),
+                )
+              : FilledButton.icon(
+                  onPressed: onAdd,
+                  icon: const Icon(Icons.add_rounded),
+                  label: const Text('Add transaction'),
+                ),
         ),
       ],
     );

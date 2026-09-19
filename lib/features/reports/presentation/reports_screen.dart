@@ -10,7 +10,7 @@ import 'package:genzeb/features/ai/application/ai_assistant_service.dart';
 import 'package:genzeb/features/reports/application/report_service.dart';
 import 'package:genzeb/features/transactions/domain/models/categories.dart';
 import 'package:genzeb/features/transactions/domain/models/transaction_models.dart';
-import 'package:genzeb/features/transactions/presentation/category_picker.dart';
+import 'package:genzeb/features/transactions/presentation/transaction_detail_sheet.dart';
 import 'package:genzeb/features/transactions/presentation/transaction_tile.dart';
 import 'package:share_plus/share_plus.dart';
 
@@ -35,6 +35,17 @@ class ReportsScreen extends ConsumerStatefulWidget {
 class _ReportsScreenState extends ConsumerState<ReportsScreen> {
   _ReportPeriod _period = _ReportPeriod.thisMonth;
   DateTimeRange? _customRange;
+
+  /// First day of the month reported when [_period] is `thisMonth`.
+  DateTime _monthAnchor = firstOfMonth(DateTime.now());
+
+  bool get _isCurrentMonth => _monthAnchor == firstOfMonth(DateTime.now());
+
+  void _shiftMonth(int delta) {
+    setState(() {
+      _monthAnchor = DateTime(_monthAnchor.year, _monthAnchor.month + delta, 1);
+    });
+  }
 
   Future<void> _pickDateRange() async {
     final now = DateTime.now();
@@ -69,16 +80,16 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
         final start = today.subtract(Duration(days: today.weekday - 1));
         return (start, start.add(const Duration(days: 7)));
       case _ReportPeriod.thisMonth:
-        final start = DateTime(today.year, today.month, 1);
-        return (start, DateTime(today.year, today.month + 1, 1));
+        return (
+          _monthAnchor,
+          DateTime(_monthAnchor.year, _monthAnchor.month + 1, 1),
+        );
+      // Trailing windows ending today — a calendar quarter/half-year would
+      // report months that haven't happened yet.
       case _ReportPeriod.quarter:
-        final quarterStartMonth = ((today.month - 1) ~/ 3) * 3 + 1;
-        final start = DateTime(today.year, quarterStartMonth, 1);
-        return (start, DateTime(today.year, quarterStartMonth + 3, 1));
+        return trailingMonths(today, 3);
       case _ReportPeriod.semiAnnual:
-        final halfStartMonth = today.month <= 6 ? 1 : 7;
-        final start = DateTime(today.year, halfStartMonth, 1);
-        return (start, DateTime(today.year, halfStartMonth + 6, 1));
+        return trailingMonths(today, 6);
       case _ReportPeriod.all:
         return (
           DateTime(now.year - 3, 1, 1),
@@ -99,6 +110,13 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
     }
   }
 
+  /// A balance line needs points spread over at least a week; otherwise it
+  /// draws a flat line between two receipts and misleads.
+  bool _hasMeaningfulBalanceHistory(List<BalancePoint> series) {
+    if (series.length < 3) return false;
+    return series.last.at.difference(series.first.at).inDays >= 7;
+  }
+
   String _periodLabel(_ReportPeriod period) {
     switch (period) {
       case _ReportPeriod.today:
@@ -110,9 +128,9 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
       case _ReportPeriod.thisMonth:
         return 'Month';
       case _ReportPeriod.quarter:
-        return 'Quarter';
+        return 'Last 3 months';
       case _ReportPeriod.semiAnnual:
-        return '6 months';
+        return 'Last 6 months';
       case _ReportPeriod.all:
         return 'All time';
       case _ReportPeriod.custom:
@@ -348,7 +366,9 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
                       label: _period == _ReportPeriod.custom &&
                               _customRange != null
                           ? '${formatDay(_customRange!.start)}–${formatDay(_customRange!.end)}'
-                          : _periodLabel(_period),
+                          : _period == _ReportPeriod.thisMonth
+                              ? formatShortMonth(_monthAnchor)
+                              : _periodLabel(_period),
                       active: _period != _ReportPeriod.thisMonth,
                       onTap: _pickPeriod,
                     ),
@@ -365,6 +385,13 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
                   ),
                 ],
               ),
+              if (_period == _ReportPeriod.thisMonth)
+                MonthStepper(
+                  month: _monthAnchor,
+                  canGoForward: !_isCurrentMonth,
+                  onPrevious: () => _shiftMonth(-1),
+                  onNext: () => _shiftMonth(1),
+                ),
               const SizedBox(height: 10),
               Text(
                 '${formatDay(start)} – ${formatDay(endExclusive.subtract(const Duration(days: 1)))}'
@@ -414,7 +441,9 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
                       .toList(growable: false),
                 ),
               ),
-              if (_period == _ReportPeriod.thisMonth) ...[
+              if (_period == _ReportPeriod.thisMonth &&
+                  _isCurrentMonth &&
+                  totals.expenseMinor > 0) ...[
                 const SizedBox(height: 10),
                 _RunRateCard(strings: strings, report: report),
               ],
@@ -424,7 +453,7 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
                 periodContext:
                     '${formatDay(start)} to ${formatDay(endExclusive.subtract(const Duration(days: 1)))}',
               ),
-              if (report.balanceSeries.length >= 2) ...[
+              if (_hasMeaningfulBalanceHistory(report.balanceSeries)) ...[
                 const SizedBox(height: 20),
                 SectionHeader(title: strings.balanceOverTime),
                 _BalanceCard(series: report.balanceSeries),
@@ -462,9 +491,10 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
                   Padding(
                     padding: const EdgeInsets.only(bottom: 10),
                     child: TransactionTile(
+                      showDate: true,
                       record: tx,
                       dense: true,
-                      onTap: () => promptRecategorize(context, ref, tx),
+                      onTap: () => showTransactionDetail(context, ref, tx),
                     ),
                   ),
               ],
@@ -580,9 +610,10 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
                     Padding(
                       padding: const EdgeInsets.only(bottom: 10),
                       child: TransactionTile(
+                        showDate: true,
                         record: tx,
                         dense: true,
-                        onTap: () => promptRecategorize(context, ref, tx),
+                        onTap: () => showTransactionDetail(context, ref, tx),
                       ),
                     ),
               ],
@@ -661,9 +692,10 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
                   Padding(
                     padding: const EdgeInsets.only(bottom: 10),
                     child: TransactionTile(
+                      showDate: true,
                       record: tx,
                       dense: true,
-                      onTap: () => promptRecategorize(context, ref, tx),
+                      onTap: () => showTransactionDetail(context, ref, tx),
                     ),
                   ),
               ],
@@ -697,6 +729,7 @@ class _SummaryRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Expanded(
           child: _SummaryTile(
@@ -942,23 +975,35 @@ class _RunRateCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(16),
       ),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(Icons.speed_rounded, size: 18, color: theme.colorScheme.primary),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              '${strings.dailyAverage}: '
-              '${formatCompactEtb(report.dailyAverageExpenseMinor)}',
-              style: theme.textTheme.bodyMedium
-                  ?.copyWith(fontWeight: FontWeight.w600),
-            ),
+          Padding(
+            padding: const EdgeInsets.only(top: 2),
+            child: Icon(Icons.speed_rounded,
+                size: 18, color: theme.colorScheme.primary),
           ),
-          Text(
-            '${strings.projectedTotal}: '
-            '${formatCompactEtb(report.projectedExpenseMinor)}',
-            style: theme.textTheme.bodyMedium?.copyWith(
-              fontWeight: FontWeight.w700,
-              color: theme.colorScheme.primary,
+          const SizedBox(width: 10),
+          // Two figures that don't always fit on one line side by side.
+          Expanded(
+            child: Wrap(
+              spacing: 16,
+              runSpacing: 4,
+              children: [
+                Text(
+                  '${strings.dailyAverage}: '
+                  '${formatCompactEtb(report.dailyAverageExpenseMinor)}',
+                  style: theme.textTheme.bodyMedium
+                      ?.copyWith(fontWeight: FontWeight.w600),
+                ),
+                Text(
+                  '${strings.projectedTotal}: '
+                  '${formatCompactEtb(report.projectedExpenseMinor)}',
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    fontWeight: FontWeight.w700,
+                    color: theme.colorScheme.primary,
+                  ),
+                ),
+              ],
             ),
           ),
         ],
@@ -1465,7 +1510,11 @@ class _TrendCard extends StatelessWidget {
               child: Center(child: Text('—')),
             )
           else
-            MonthlyBarChart(bars: bars, onBarTap: onBarTap),
+            MonthlyBarChart(
+              bars: bars,
+              onBarTap: onBarTap,
+              valueLabel: formatCompactNumber,
+            ),
         ],
       ),
     );

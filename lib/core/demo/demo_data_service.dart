@@ -67,6 +67,9 @@ class DemoDataService {
       required String snippet,
       int? balanceMinor,
     }) async {
+      // The month loop lays out a full calendar month; days still ahead of
+      // us must not appear as history.
+      if (at.isAfter(now)) return;
       final record = TransactionRecord(
         id: 'demo-$id',
         accountId: accountId,
@@ -137,6 +140,33 @@ class DemoDataService {
             '****1120. Balance ETB 62,400.00',
         balanceMinor: 6240000,
       );
+      // Monthly wallet top-up from the bank: two legs, minutes apart, so the
+      // flow engine pairs them as an own transfer — and the wallet stays
+      // positive despite all the telebirr spending below.
+      await add(
+        id: 'topup-out-$m',
+        accountId: 'cbe-main',
+        type: TransactionType.transferOut,
+        amountMinor: 1000000,
+        at: monthAnchor.add(const Duration(days: 4, hours: 10)),
+        categoryId: 'transfer_out',
+        sender: 'CBE',
+        snippet: 'Dear customer, your account ****3489 has been debited with '
+            'ETB 10,000.00 transferred to telebirr 09********2. '
+            'Service charge ETB 5.00',
+      );
+      await add(
+        id: 'topup-in-$m',
+        accountId: 'telebirr-main',
+        type: TransactionType.transferIn,
+        amountMinor: 1000000,
+        at: monthAnchor.add(const Duration(days: 4, hours: 10, minutes: 3)),
+        categoryId: 'transfer_in',
+        sender: 'telebirr',
+        snippet: 'You have received ETB 10,000.00 from CBE account ****3489 '
+            'via telebirr. Your current balance is ETB 10,175.00',
+        balanceMinor: 1017500,
+      );
       await add(
         id: 'dstv-$m',
         accountId: 'telebirr-main',
@@ -185,7 +215,8 @@ class DemoDataService {
         at: monthAnchor.add(const Duration(days: 12, hours: 16)),
         categoryId: 'food',
         sender: 'telebirr',
-        snippet: 'You have paid ETB ${((46000 + m * 8000) / 100).toStringAsFixed(2)} '
+        snippet:
+            'You have paid ETB ${((46000 + m * 8000) / 100).toStringAsFixed(2)} '
             'to Tomoca Coffee via telebirr.',
       );
       await add(

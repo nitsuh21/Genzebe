@@ -85,6 +85,9 @@ class BudgetService {
     final end = DateTime(now.year, now.month + 1, 1);
 
     var transactions = await _ledgerRepository.getTransactions();
+    // Moving money between your own accounts (bank -> wallet top-up) is not
+    // spending; pair the legs the same way Reports does and drop them.
+    final internalIds = ReportService.analyzeFlows(transactions).internalIds;
     if (institutionCodes.isNotEmpty) {
       final accounts = await _ledgerRepository.getAccounts();
       final allowedIds = accounts
@@ -105,6 +108,10 @@ class BudgetService {
       if (tx.occurredAt.isBefore(start) || !tx.occurredAt.isBefore(end)) {
         continue;
       }
+      if (internalIds.contains(tx.id)) continue;
+      // Unconfirmed parses stay out of budgets, matching Reports and the
+      // ledger total.
+      if (tx.reviewStatus == TransactionReviewStatus.pendingReview) continue;
       outflows.add(tx);
     }
     return outflows;
@@ -142,12 +149,12 @@ class BudgetService {
     return sum;
   }
 
-  int _sumForCategories(Map<String, int> spendByCategory, List<String> categories) {
+  int _sumForCategories(
+      Map<String, int> spendByCategory, List<String> categories) {
     var sum = 0;
     for (final category in categories) {
       sum += spendByCategory[category] ?? 0;
     }
     return sum;
   }
-
 }

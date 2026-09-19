@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 
 /// A consistent section header with an optional trailing action.
 class SectionHeader extends StatelessWidget {
@@ -177,6 +178,7 @@ class MonthlyBarChart extends StatelessWidget {
     required this.bars,
     this.height = 150,
     this.onBarTap,
+    this.valueLabel,
   });
 
   final List<MonthlyBar> bars;
@@ -184,6 +186,10 @@ class MonthlyBarChart extends StatelessWidget {
 
   /// Called with the tapped bar's index (e.g. to focus that month).
   final ValueChanged<int>? onBarTap;
+
+  /// Formats a bar's value for the label drawn above it ("28K"). Null draws
+  /// bars only.
+  final String Function(double major)? valueLabel;
 
   @override
   Widget build(BuildContext context) {
@@ -214,11 +220,17 @@ class MonthlyBarChart extends StatelessWidget {
                         _Bar(
                           fraction: bar.incomeMajor / maxValue,
                           color: const Color(0xFF2E9E6B),
+                          label: valueLabel == null || bar.incomeMajor <= 0
+                              ? null
+                              : valueLabel!(bar.incomeMajor),
                         ),
                         const SizedBox(width: 4),
                         _Bar(
                           fraction: bar.expenseMajor / maxValue,
                           color: const Color(0xFFEF6C5A),
+                          label: valueLabel == null || bar.expenseMajor <= 0
+                              ? null
+                              : valueLabel!(bar.expenseMajor),
                         ),
                       ],
                     ),
@@ -337,25 +349,95 @@ class MonthlyBar {
 }
 
 class _Bar extends StatelessWidget {
-  const _Bar({required this.fraction, required this.color});
+  const _Bar({required this.fraction, required this.color, this.label});
 
   final double fraction;
   final Color color;
+  final String? label;
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return LayoutBuilder(
       builder: (context, constraints) {
-        final h = (constraints.maxHeight * fraction.clamp(0.02, 1.0));
-        return Container(
-          width: 9,
-          height: h,
-          decoration: BoxDecoration(
-            color: color,
-            borderRadius: BorderRadius.circular(4),
-          ),
+        // Leave room for the value label above the tallest bar.
+        const labelHeight = 14.0;
+        final usable = label == null
+            ? constraints.maxHeight
+            : constraints.maxHeight - labelHeight;
+        final h = usable * fraction.clamp(0.02, 1.0);
+        return Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (label != null)
+              SizedBox(
+                height: labelHeight,
+                child: Text(
+                  label!,
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    fontSize: 9,
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ),
+            Container(
+              width: 9,
+              height: h,
+              decoration: BoxDecoration(
+                color: color,
+                borderRadius: BorderRadius.circular(4),
+              ),
+            ),
+          ],
         );
       },
+    );
+  }
+}
+
+/// `‹  September 2026  ›` — steps a month-scoped view through history.
+class MonthStepper extends StatelessWidget {
+  const MonthStepper({
+    super.key,
+    required this.month,
+    required this.canGoForward,
+    required this.onPrevious,
+    required this.onNext,
+  });
+
+  final DateTime month;
+  final bool canGoForward;
+  final VoidCallback onPrevious;
+  final VoidCallback onNext;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 8),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          IconButton(
+            tooltip: 'Previous month',
+            onPressed: onPrevious,
+            icon: const Icon(Icons.chevron_left_rounded),
+          ),
+          Expanded(
+            child: Text(
+              DateFormat('MMMM yyyy').format(month),
+              textAlign: TextAlign.center,
+              style: theme.textTheme.titleSmall
+                  ?.copyWith(fontWeight: FontWeight.w700),
+            ),
+          ),
+          IconButton(
+            tooltip: 'Next month',
+            onPressed: canGoForward ? onNext : null,
+            icon: const Icon(Icons.chevron_right_rounded),
+          ),
+        ],
+      ),
     );
   }
 }

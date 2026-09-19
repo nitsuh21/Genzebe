@@ -1,0 +1,19 @@
+{
+  "institution": "hibret",
+  "cases": [
+    {
+      "id": "hibret-credited",
+      "source": "synthetic",
+      "sender": "HIBRET",
+      "body": "Hibret Bank credited ETB 2,000.00",
+      "expect": {
+        "parsed": true,
+        "institution": "hibret",
+        "direction": "in",
+        "amountMinor": 200000,
+        "explicitDirection": true,
+        "autoAccept": true
+      }
+    }
+  ]
+}

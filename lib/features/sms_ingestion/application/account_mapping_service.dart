@@ -73,8 +73,7 @@ class AccountMappingService {
   Future<void> deleteMapping(String senderPattern) async {
     await _ensureLoaded();
     _rules.removeWhere(
-      (rule) =>
-          rule.senderPattern.toLowerCase() == senderPattern.toLowerCase(),
+      (rule) => rule.senderPattern.toLowerCase() == senderPattern.toLowerCase(),
     );
     await _persist();
   }
@@ -84,30 +83,36 @@ class AccountMappingService {
     return List<AccountMapping>.unmodifiable(_rules);
   }
 
+  /// The user-taught mapping for [sender], if any.
+  Future<AccountMapping?> mappingForSender(String sender) async {
+    await _ensureLoaded();
+    for (final rule in _rules) {
+      if (_senderMatchesPattern(sender, rule.senderPattern)) return rule;
+    }
+    return null;
+  }
+
   Future<String> resolveAccountId({
     required SmsMessage sms,
     required ParsedSmsTransaction parsed,
     String defaultAccountId = 'main-wallet',
   }) async {
-    await _ensureLoaded();
-    final sender = sms.sender;
-    for (final rule in _rules) {
-      if (_senderMatchesPattern(sender, rule.senderPattern)) {
-        // The ledger repository is in-memory and resets each launch, while
-        // mappings persist. Re-materialize the mapped account so its
-        // institution code is always available for filters and balances.
-        await _ledgerRepository.upsertAccount(
-          Account(
-            id: rule.accountId,
-            name: rule.accountName,
-            kind: 'bank-account',
-            createdAt: DateTime.now(),
-            institutionCode: rule.institution.name,
-            maskedAccount: parsed.accountNumberHint,
-          ),
-        );
-        return rule.accountId;
-      }
+    final rule = await mappingForSender(sms.sender);
+    if (rule != null) {
+      // The ledger repository is in-memory and resets each launch, while
+      // mappings persist. Re-materialize the mapped account so its
+      // institution code is always available for filters and balances.
+      await _ledgerRepository.upsertAccount(
+        Account(
+          id: rule.accountId,
+          name: rule.accountName,
+          kind: 'bank-account',
+          createdAt: DateTime.now(),
+          institutionCode: rule.institution.name,
+          maskedAccount: parsed.accountNumberHint,
+        ),
+      );
+      return rule.accountId;
     }
 
     final inferredAccountId = '${parsed.institution.name}-main';

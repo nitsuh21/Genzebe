@@ -160,8 +160,7 @@ class _SmsSetupScreenState extends ConsumerState<SmsSetupScreen> {
                     ),
                   ),
                   onPressed: _importing ? null : _loadDemoData,
-                  icon: const Icon(Icons.auto_awesome_motion_rounded,
-                      size: 18),
+                  icon: const Icon(Icons.auto_awesome_motion_rounded, size: 18),
                   label: Text(
                     strings.smsDemo,
                     style: const TextStyle(fontWeight: FontWeight.w700),

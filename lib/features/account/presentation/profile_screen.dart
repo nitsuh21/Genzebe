@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show kReleaseMode;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:genzeb/app/providers.dart';
@@ -51,7 +52,6 @@ class ProfileScreen extends ConsumerWidget {
         const SizedBox(height: 14),
         _StatsStrip(strings: strings),
         const SizedBox(height: 22),
-
         _SectionLabel(strings.yourPlan),
         _PlanRow(
           account: account,
@@ -59,7 +59,6 @@ class ProfileScreen extends ConsumerWidget {
           onTap: () => _showPlansSheet(context, account.planCode, strings),
         ),
         const SizedBox(height: 20),
-
         _SectionLabel(strings.preferences),
         _SettingsCard(
           children: [
@@ -80,7 +79,6 @@ class ProfileScreen extends ConsumerWidget {
           ],
         ),
         const SizedBox(height: 20),
-
         const _SectionLabel('Genzeb AI'),
         _SettingsCard(
           children: [
@@ -95,7 +93,6 @@ class ProfileScreen extends ConsumerWidget {
           ],
         ),
         const SizedBox(height: 20),
-
         _SectionLabel(strings.automation),
         _SettingsCard(
           children: [
@@ -114,7 +111,6 @@ class ProfileScreen extends ConsumerWidget {
           ],
         ),
         const SizedBox(height: 20),
-
         _SectionLabel(strings.dataPrivacy),
         _SettingsCard(
           children: [
@@ -125,30 +121,31 @@ class ProfileScreen extends ConsumerWidget {
               subtitle: 'Your SMS and ledger never leave this device. AI '
                   'receives only an aggregated summary.',
             ),
-            _SettingsTile(
-              icon: Icons.auto_awesome_motion_rounded,
-              iconColor: const Color(0xFFD8589E),
-              title: 'Load demo data',
-              subtitle: 'Fill the app with a realistic sample ledger',
-              onTap: () async {
-                final seeded = await ref.read(demoDataServiceProvider).seed();
-                refreshAppData(ref);
-                if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                        content: Text('Loaded $seeded demo transactions.')),
-                  );
-                }
-              },
-            ),
+            // Sample data is an onboarding aid; in a release build it would
+            // only pollute a real ledger.
+            if (!kReleaseMode)
+              _SettingsTile(
+                icon: Icons.auto_awesome_motion_rounded,
+                iconColor: const Color(0xFFD8589E),
+                title: 'Load demo data',
+                subtitle: 'Fill the app with a realistic sample ledger',
+                onTap: () async {
+                  final seeded = await ref.read(demoDataServiceProvider).seed();
+                  refreshAppData(ref);
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                          content: Text('Loaded $seeded demo transactions.')),
+                    );
+                  }
+                },
+              ),
           ],
         ),
-
         if (account.status == AuthStatus.signedIn) ...[
           const SizedBox(height: 20),
           _SignOutTile(strings: strings),
         ],
-
         const SizedBox(height: 28),
         Center(
           child: Column(
@@ -163,8 +160,8 @@ class ProfileScreen extends ConsumerWidget {
               Text(
                 strings.madeFor,
                 style: theme.textTheme.bodySmall?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant
-                      .withValues(alpha: 0.7),
+                  color:
+                      theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
                 ),
               ),
             ],
@@ -346,11 +343,9 @@ class _StatsStrip extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final transactions =
-        ref.watch(allTransactionsProvider).valueOrNull?.length;
+    final transactions = ref.watch(allTransactionsProvider).valueOrNull?.length;
     final accounts = ref.watch(accountsProvider).valueOrNull?.length;
-    final budgets =
-        ref.watch(budgetOverviewProvider).valueOrNull?.items.length;
+    final budgets = ref.watch(budgetOverviewProvider).valueOrNull?.items.length;
 
     return Row(
       children: [
@@ -823,11 +818,11 @@ class _SettingsCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Theme.of(context).cardTheme.color,
-        borderRadius: BorderRadius.circular(20),
-      ),
+    // Material, not a decorated Container: ListTiles paint their ink on the
+    // nearest Material, so this keeps taps visibly responsive.
+    return Material(
+      color: Theme.of(context).cardTheme.color,
+      borderRadius: BorderRadius.circular(20),
       clipBehavior: Clip.antiAlias,
       child: Column(
         children: [
@@ -1099,7 +1094,7 @@ class SmsOpsPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('SMS sync & review')),
+      appBar: AppBar(title: const Text('SMS sync')),
       body: const SafeArea(child: ReviewQueueScreen()),
     );
   }

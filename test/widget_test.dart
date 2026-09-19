@@ -29,7 +29,8 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
-          ledgerRepositoryProvider.overrideWithValue(InMemoryLedgerRepository()),
+          ledgerRepositoryProvider
+              .overrideWithValue(InMemoryLedgerRepository()),
           budgetRepositoryProvider
               .overrideWithValue(InMemoryBudgetRepository()),
           smsMessageRepositoryProvider
@@ -40,6 +41,13 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('Genzeb'), findsOneWidget);
+    // Offline mode has no name to greet, so the header leads with the
+    // greeting; the nav bar confirms the shell mounted.
+    expect(
+      find.textContaining(RegExp('^Good (morning|afternoon|evening)')),
+      findsOneWidget,
+    );
+    expect(find.text('Home'), findsOneWidget);
+    expect(find.text('Ledger'), findsOneWidget);
   });
 }

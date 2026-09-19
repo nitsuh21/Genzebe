@@ -1,0 +1,64 @@
+{
+  "institution": "awash",
+  "cases": [
+    {
+      "id": "awash-credited-salary",
+      "source": "synthetic",
+      "sender": "AWASH",
+      "body": "Awash Bank credited ETB 1,200.00 salary",
+      "expect": {
+        "parsed": true,
+        "institution": "awash",
+        "direction": "in",
+        "amountMinor": 120000,
+        "category": "salary",
+        "explicitDirection": true,
+        "autoAccept": true
+      }
+    },
+    {
+      "id": "awash-credited-with-salary-and-ref",
+      "source": "synthetic",
+      "sender": "AWASH",
+      "body": "Awash Bank: Credited with ETB 2000.00 salary payment. Ref AXE1234",
+      "expect": {
+        "parsed": true,
+        "direction": "in",
+        "amountMinor": 200000,
+        "category": "salary",
+        "referenceContains": "AXE1234",
+        "explicitDirection": true,
+        "autoAccept": true
+      }
+    },
+    {
+      "id": "awash-first-deposit-equal-to-balance",
+      "source": "synthetic",
+      "sender": "AwashBank",
+      "body": "Awash Bank: your account 0132****901 has been credited with ETB 1,000.00. Available balance ETB 1,000.00",
+      "expect": {
+        "parsed": true,
+        "institution": "awash",
+        "direction": "in",
+        "amountMinor": 100000,
+        "balanceMinor": 100000,
+        "explicitDirection": true,
+        "autoAccept": true
+      }
+    },
+    {
+      "id": "awash-bare-transfer-keyword-goes-to-review",
+      "source": "synthetic",
+      "sender": "AWASH",
+      "body": "Awash Bank transfer of ETB 700.00 processed on 12/07/2026.",
+      "expect": {
+        "parsed": true,
+        "direction": "out",
+        "amountMinor": 70000,
+        "category": "transfer_out",
+        "explicitDirection": false,
+        "autoAccept": false
+      }
+    }
+  ]
+}

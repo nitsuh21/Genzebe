@@ -36,7 +36,8 @@ class Budget {
       name: name ?? this.name,
       categoryIds: categoryIds ?? this.categoryIds,
       institutionCodes: institutionCodes ?? this.institutionCodes,
-      excludedTransactionIds: excludedTransactionIds ?? this.excludedTransactionIds,
+      excludedTransactionIds:
+          excludedTransactionIds ?? this.excludedTransactionIds,
       limitMinor: limitMinor ?? this.limitMinor,
       createdAt: createdAt,
     );

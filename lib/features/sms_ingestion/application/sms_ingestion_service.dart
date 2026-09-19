@@ -87,50 +87,31 @@ class SmsIngestionService {
           parsed: parsed,
         );
 
-    final isExpense = parsed.detectedAmountMinor < 0;
-
-    // A user-taught rule for this merchant beats the keyword heuristics and
-    // is trusted enough to skip the review queue.
-    var categoryId = parsed.categoryHint;
-    var confidence = parsed.confidence;
-    final merchant = extractMerchant(sms.body, isExpense: isExpense);
-    if (merchant != null) {
-      final ruleCategory =
-          await _categoryRules.categoryForMerchant(normalizeMerchant(merchant));
-      if (ruleCategory != null) {
-        categoryId = ruleCategory;
-        confidence = confidence < 0.95 ? 0.95 : confidence;
-      }
-    }
-
-    final type =
-        isExpense ? TransactionType.expense : TransactionType.income;
+    final resolved = await _applyUserKnowledge(sms, parsed);
+    final isExpense = resolved.detectedAmountMinor < 0;
+    final type = isExpense ? TransactionType.expense : TransactionType.income;
     final record = TransactionRecord(
       id: 'sms-${sms.id}',
       accountId: accountId,
       type: type,
-      amount: Money(minorUnits: parsed.detectedAmountMinor.abs()),
+      amount: Money(minorUnits: resolved.detectedAmountMinor.abs()),
       occurredAt: sms.receivedAt,
-      categoryId: categoryId,
+      categoryId: resolved.categoryHint,
       source: TransactionSource.sms,
       smsSender: sms.sender,
       smsSnippet: sms.body,
-      parserConfidence: confidence,
-      // Any successful parse scores >= 0.82 (a currency token is required to
-      // parse and alone yields 0.82), so a 0.8 threshold made the review
-      // queue unreachable. 0.85 routes unknown-sender/terse matches (0.82) to
-      // human review while branded bank formats (>= 0.90) auto-accept.
-      reviewStatus: confidence < 0.85
+      parserConfidence: resolved.confidence,
+      reviewStatus: resolved.confidence < kAutoAcceptConfidence
           ? TransactionReviewStatus.pendingReview
           : TransactionReviewStatus.autoAccepted,
-      statementBalanceMinor: parsed.balanceMinor,
+      statementBalanceMinor: resolved.balanceMinor,
     );
 
     await _ledgerRepository.saveTransaction(record);
     AppLogger.info(
       'sms.ingest',
-      'ingest: parsed sender=${sms.sender} id=${sms.id} amount=${parsed.detectedAmountMinor} '
-          'category=${parsed.categoryHint} confidence=${parsed.confidence.toStringAsFixed(2)} '
+      'ingest: parsed sender=${sms.sender} id=${sms.id} amount=${resolved.detectedAmountMinor} '
+          'category=${resolved.categoryHint} confidence=${resolved.confidence.toStringAsFixed(2)} '
           'account=$accountId',
     );
 
@@ -159,43 +140,101 @@ class SmsIngestionService {
     );
   }
 
+  /// Layers what the user has taught the app on top of the raw parse.
+  ///
+  /// The user is the highest authority: a merchant rule replaces the keyword
+  /// category and is trusted enough to skip review, and a sender the user
+  /// has mapped to an account counts as a recognised institution even when
+  /// no built-in template knows it.
+  Future<ParsedSmsTransaction> _applyUserKnowledge(
+    SmsMessage sms,
+    ParsedSmsTransaction parsed,
+  ) async {
+    final isExpense = parsed.detectedAmountMinor < 0;
+    var evidence = parsed.evidence;
+    var categoryId = parsed.categoryHint;
+    var confidence = parsed.confidence;
+
+    if (evidence != null && !evidence.institutionKnown) {
+      final mapping = await _accountMappingService.mappingForSender(sms.sender);
+      if (mapping != null &&
+          mapping.institution != EthiopianInstitution.unknown) {
+        evidence = evidence.copyWith(institutionKnown: true);
+        confidence = scoreConfidence(evidence);
+      }
+    }
+
+    final merchant = extractMerchant(sms.body, isExpense: isExpense);
+    if (merchant != null) {
+      final ruleCategory =
+          await _categoryRules.categoryForMerchant(normalizeMerchant(merchant));
+      if (ruleCategory != null) {
+        categoryId = ruleCategory;
+        evidence = evidence?.copyWith(specificCategory: true);
+        confidence = confidence < 0.95 ? 0.95 : confidence;
+      }
+    }
+
+    return parsed.copyWith(
+      categoryHint: categoryId,
+      confidence: confidence,
+      evidence: evidence,
+    );
+  }
+
   Future<List<SmsReviewItem>> getReviewQueue() async {
     final messages = await _smsMessageRepository
         .getByStatus(SmsIngestionStatus.pendingReview);
-    return messages
-        .map(
-          (stored) => SmsReviewItem(
-            id: 'review-${stored.sms.id}',
-            smsMessage: stored.sms,
-            parsed: _parser.parse(stored.sms) ??
-                ParsedSmsTransaction(
+    final items = <SmsReviewItem>[];
+    for (final stored in messages) {
+      final parsed = _parser.parse(stored.sms);
+      items.add(
+        SmsReviewItem(
+          id: 'review-${stored.sms.id}',
+          smsMessage: stored.sms,
+          parsed: parsed == null
+              ? ParsedSmsTransaction(
                   detectedAmountMinor: 0,
                   confidence: 0,
                   categoryHint: 'expense',
                   description: stored.sms.body,
                   institution: EthiopianInstitution.unknown,
-                ),
-            status: 'pending',
-          ),
-        )
-        .toList(growable: false);
+                )
+              : await _applyUserKnowledge(stored.sms, parsed),
+          status: 'pending',
+        ),
+      );
+    }
+    return items;
   }
 
+  /// Books a pending parse. The reviewer may correct the category and/or
+  /// flip the direction ([makeExpense]); a flipped row whose category no
+  /// longer fits its direction falls back to the bare income/expense bucket.
   Future<void> approveReviewItem(
     SmsReviewItem item, {
     String? categoryOverride,
+    bool? makeExpense,
   }) async {
     final transactionId = 'sms-${item.smsMessage.id}';
     final existing = await _ledgerRepository.getTransactionById(transactionId);
     if (existing == null) return;
+
+    final wasExpense = existing.type == TransactionType.expense;
+    final isExpense = makeExpense ?? wasExpense;
+    var categoryId = categoryOverride ?? existing.categoryId;
+    if (isExpense != wasExpense && categoryOverride == null) {
+      categoryId = isExpense ? 'expense' : 'income';
+    }
     final updated = existing.copyWith(
-      categoryId: categoryOverride,
+      categoryId: categoryId,
+      type: isExpense ? TransactionType.expense : TransactionType.income,
       reviewStatus: TransactionReviewStatus.autoAccepted,
     );
     if (categoryOverride != null && categoryOverride != existing.categoryId) {
       await learnRuleFromSms(
         body: item.smsMessage.body,
-        isExpense: item.parsed.detectedAmountMinor < 0,
+        isExpense: isExpense,
         categoryId: categoryOverride,
       );
     }
@@ -225,6 +264,26 @@ class SmsIngestionService {
         status: SmsIngestionStatus.rejected,
         parsedTransactionId: 'sms-${item.smsMessage.id}',
         failureReason: reason ?? 'Rejected by reviewer',
+        ingestedAt: DateTime.now(),
+      ),
+    );
+  }
+
+  /// Removes a transaction the user does not want in the ledger. For an
+  /// SMS-derived row the stored message is marked rejected too, so the next
+  /// rebuild-sync honours the decision instead of re-creating the row.
+  Future<void> removeTransaction(String transactionId) async {
+    await _ledgerRepository.deleteTransaction(transactionId);
+    const prefix = 'sms-';
+    if (!transactionId.startsWith(prefix)) return;
+    final stored = await _smsMessageRepository
+        .getById(transactionId.substring(prefix.length));
+    if (stored == null) return;
+    await _smsMessageRepository.save(
+      stored.copyWith(
+        status: SmsIngestionStatus.rejected,
+        parsedTransactionId: transactionId,
+        failureReason: 'Deleted by user',
         ingestedAt: DateTime.now(),
       ),
     );
@@ -263,28 +322,21 @@ class SmsIngestionService {
           message.status != SmsIngestionStatus.pendingReview) {
         continue;
       }
-      final parsed = _parser.parse(message.sms);
-      if (parsed == null) continue;
+      final rawParsed = _parser.parse(message.sms);
+      if (rawParsed == null) continue;
       final transactionId = 'sms-${message.sms.id}';
       final existing =
           await _ledgerRepository.getTransactionById(transactionId);
       if (existing == null) continue;
 
+      final parsed = await _applyUserKnowledge(message.sms, rawParsed);
       final isExpense = parsed.detectedAmountMinor < 0;
-      var categoryId = parsed.categoryHint;
-      final merchant = extractMerchant(message.sms.body, isExpense: isExpense);
-      if (merchant != null) {
-        final ruleCategory = await _categoryRules
-            .categoryForMerchant(normalizeMerchant(merchant));
-        if (ruleCategory != null) categoryId = ruleCategory;
-      }
-      final type =
-          isExpense ? TransactionType.expense : TransactionType.income;
+      final type = isExpense ? TransactionType.expense : TransactionType.income;
 
       final updated = existing.copyWith(
         type: type,
         amount: Money(minorUnits: parsed.detectedAmountMinor.abs()),
-        categoryId: categoryId,
+        categoryId: parsed.categoryHint,
         parserConfidence: parsed.confidence,
         statementBalanceMinor: parsed.balanceMinor,
       );

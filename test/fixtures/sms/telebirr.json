@@ -1,0 +1,181 @@
+{
+  "institution": "telebirr",
+  "cases": [
+    {
+      "id": "telebirr-received-p2p-with-masked-sender",
+      "source": "real",
+      "sender": "Ethio telecom",
+      "body": "Dear Nitsuh You have received ETB 53.00 from Mekuria Solomon(2519****4846) on 02/06/2026 13:14:04. Your transaction number is DF24JC2U3S. Your current E-Money Account balance is ETB 2,828.26. Thank you for using telebirr",
+      "expect": {
+        "parsed": true,
+        "institution": "telebirr",
+        "direction": "in",
+        "amountMinor": 5300,
+        "category": "transfer_in",
+        "balanceMinor": 282826,
+        "referenceContains": "DF24JC2U3S",
+        "merchant": "Mekuria Solomon",
+        "explicitDirection": true,
+        "autoAccept": true
+      }
+    },
+    {
+      "id": "telebirr-airtime-recharge",
+      "source": "real",
+      "sender": "Ethio telecom",
+      "body": "Dear Nitsuh You have recharged ETB 100.00 airtime for 910050569 on 03/06/2026 12:45:39.",
+      "expect": {
+        "parsed": true,
+        "institution": "telebirr",
+        "direction": "out",
+        "amountMinor": 10000,
+        "category": "airtime",
+        "explicitDirection": true,
+        "autoAccept": true
+      }
+    },
+    {
+      "id": "telebirr-airtime-received-mirror-is-ignored",
+      "source": "real",
+      "sender": "ethio telecom",
+      "body": "Dear Customer You have received ETB 100.00 airtime from 251910050569 on 03/06/2026 12:45:39.",
+      "expect": {
+        "parsed": false
+      }
+    },
+    {
+      "id": "telebirr-verification-code-is-ignored",
+      "source": "real",
+      "sender": "Ethio telecom",
+      "body": "Dear Customer, 827103 is your telebirr verification code. Thank you for using telebirr.",
+      "expect": {
+        "parsed": false
+      }
+    },
+    {
+      "id": "telebirr-paid-merchant-via-shortcode-sender",
+      "source": "synthetic",
+      "sender": "127",
+      "body": "You have paid ETB 120.00 to Shoa Supermarket via telebirr. Transaction number ABC123",
+      "expect": {
+        "parsed": true,
+        "institution": "telebirr",
+        "direction": "out",
+        "amountMinor": 12000,
+        "category": "groceries",
+        "referenceContains": "ABC123",
+        "merchant": "Shoa Supermarket",
+        "explicitDirection": true,
+        "autoAccept": true
+      }
+    },
+    {
+      "id": "telebirr-transfer-mentioning-recipient-received-is-expense",
+      "source": "synthetic",
+      "sender": "telebirr",
+      "body": "You have transferred ETB 500.00 to Abebe Kebede (2519****) on 09/07/2026. Abebe Kebede has received the amount. Your current balance is ETB 1,200.00.",
+      "expect": {
+        "parsed": true,
+        "direction": "out",
+        "amountMinor": 50000,
+        "category": "transfer_out",
+        "balanceMinor": 120000,
+        "merchant": "Abebe Kebede",
+        "explicitDirection": true,
+        "autoAccept": true
+      }
+    },
+    {
+      "id": "telebirr-received-from-person",
+      "source": "synthetic",
+      "sender": "telebirr",
+      "body": "You have received ETB 750.00 from Emebet K. via telebirr.",
+      "expect": {
+        "parsed": true,
+        "direction": "in",
+        "amountMinor": 75000,
+        "merchant": "Emebet K",
+        "explicitDirection": true,
+        "autoAccept": true
+      }
+    },
+    {
+      "id": "telebirr-wallet-paid-short",
+      "source": "synthetic",
+      "sender": "TELEBIRR",
+      "body": "Telebirr wallet paid ETB 150.50",
+      "expect": {
+        "parsed": true,
+        "institution": "telebirr",
+        "direction": "out",
+        "amountMinor": 15050,
+        "explicitDirection": true,
+        "autoAccept": true
+      }
+    },
+    {
+      "id": "telebirr-paid-for-taxi-ride",
+      "source": "synthetic",
+      "sender": "TELEBIRR",
+      "body": "Telebirr: paid ETB 80.00 for taxi ride",
+      "expect": {
+        "parsed": true,
+        "direction": "out",
+        "amountMinor": 8000,
+        "category": "transport",
+        "explicitDirection": true,
+        "autoAccept": true
+      }
+    },
+    {
+      "id": "telebirr-paid-for-ride-with-balance",
+      "source": "synthetic",
+      "sender": "TELEBIRR",
+      "body": "Telebirr wallet paid ETB 150.50 for ride. Available balance ETB 600.20",
+      "expect": {
+        "parsed": true,
+        "direction": "out",
+        "amountMinor": 15050,
+        "category": "transport",
+        "balanceMinor": 60020,
+        "autoAccept": true
+      }
+    },
+    {
+      "id": "telebirr-cross-institution-mention-stays-telebirr",
+      "source": "synthetic",
+      "sender": "127",
+      "body": "You have received ETB 200.00 from CBE account transfer via telebirr.",
+      "expect": {
+        "parsed": true,
+        "institution": "telebirr",
+        "direction": "in",
+        "amountMinor": 20000,
+        "autoAccept": true
+      }
+    },
+    {
+      "id": "telebirr-failed-transaction-is-ignored",
+      "source": "synthetic",
+      "sender": "telebirr",
+      "body": "Dear Customer, your transaction of ETB 200.00 to 2519****1234 failed. Please try again.",
+      "expect": {
+        "parsed": false
+      }
+    },
+    {
+      "id": "personal-number-containing-127-is-not-telebirr",
+      "source": "synthetic",
+      "sender": "+251911270000",
+      "body": "You have paid ETB 50.00 to Shoa Supermarket via telebirr.",
+      "expect": {
+        "parsed": true,
+        "institution": "unknown",
+        "direction": "out",
+        "amountMinor": 5000,
+        "explicitDirection": true,
+        "autoAccept": false
+      }
+    }
+  ]
+}

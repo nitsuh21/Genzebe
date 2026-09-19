@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:genzeb/app/providers.dart';
+import 'package:genzeb/design_system/theme.dart';
 import 'package:genzeb/features/account/domain/models/account_models.dart';
 
 /// Sign-in: Google SSO (or a simulated demo sign-in on builds without a
@@ -30,130 +32,134 @@ class AuthScreen extends ConsumerWidget {
     });
 
     return Scaffold(
-      body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [Color(0xFF3D49D6), Color(0xFF6C3DD6), Color(0xFF1B2050)],
+      // Dark hero regardless of theme: force light status-bar icons.
+      body: AnnotatedRegion<SystemUiOverlayStyle>(
+        value: systemOverlayStyleFor(Brightness.dark),
+        child: Container(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [Color(0xFF3D49D6), Color(0xFF6C3DD6), Color(0xFF1B2050)],
+            ),
           ),
-        ),
-        child: SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Align(
-                  alignment: Alignment.topLeft,
-                  child: IconButton(
-                    onPressed: () => Navigator.of(context).maybePop(),
-                    icon: const Icon(Icons.arrow_back_rounded,
-                        color: Colors.white),
+          child: SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Align(
+                    alignment: Alignment.topLeft,
+                    child: IconButton(
+                      onPressed: () => Navigator.of(context).maybePop(),
+                      icon: const Icon(Icons.arrow_back_rounded,
+                          color: Colors.white),
+                    ),
                   ),
-                ),
-                const Spacer(),
-                Center(
-                  child: Container(
-                    width: 76,
-                    height: 76,
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(22),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.25),
-                          blurRadius: 24,
-                          offset: const Offset(0, 8),
+                  const Spacer(),
+                  Center(
+                    child: Container(
+                      width: 76,
+                      height: 76,
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(22),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.25),
+                            blurRadius: 24,
+                            offset: const Offset(0, 8),
+                          ),
+                        ],
+                      ),
+                      alignment: Alignment.center,
+                      child: const Text(
+                        'ገ',
+                        style: TextStyle(
+                          fontSize: 38,
+                          fontWeight: FontWeight.w800,
+                          color: Color(0xFF4E5AE8),
                         ),
-                      ],
+                      ),
                     ),
-                    alignment: Alignment.center,
-                    child: const Text(
-                      'ገ',
-                      style: TextStyle(
-                        fontSize: 38,
+                  ),
+                  const SizedBox(height: 26),
+                  Center(
+                    child: Text(
+                      strings.authWelcome,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 28,
                         fontWeight: FontWeight.w800,
-                        color: Color(0xFF4E5AE8),
+                        letterSpacing: -0.4,
                       ),
                     ),
                   ),
-                ),
-                const SizedBox(height: 26),
-                Center(
-                  child: Text(
-                    strings.authWelcome,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 28,
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: -0.4,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 10),
-                Center(
-                  child: Text(
-                    strings.authSubtitle,
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.82),
-                      fontSize: 14.5,
-                      height: 1.5,
-                    ),
-                  ),
-                ),
-                const Spacer(),
-                _GoogleButton(
-                  busy: account.busy,
-                  label: strings.authGoogle,
-                  onPressed: account.busy
-                      ? null
-                      : () => ref
-                          .read(accountControllerProvider.notifier)
-                          .signInWithGoogle(),
-                ),
-                const SizedBox(height: 12),
-                SizedBox(
-                  width: double.infinity,
-                  height: 52,
-                  child: OutlinedButton(
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: Colors.white,
-                      side: BorderSide(
-                        color: Colors.white.withValues(alpha: 0.55),
-                      ),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16),
+                  const SizedBox(height: 10),
+                  Center(
+                    child: Text(
+                      strings.authSubtitle,
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: Colors.white.withValues(alpha: 0.82),
+                        fontSize: 14.5,
+                        height: 1.5,
                       ),
                     ),
+                  ),
+                  const Spacer(),
+                  _GoogleButton(
+                    busy: account.busy,
+                    label: strings.authGoogle,
                     onPressed: account.busy
                         ? null
                         : () => ref
                             .read(accountControllerProvider.notifier)
-                            .continueWithoutAccount(),
-                    child: Text(
-                      strings.authOffline,
-                      style: const TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w700,
+                            .signInWithGoogle(),
+                  ),
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 52,
+                    child: OutlinedButton(
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: Colors.white,
+                        side: BorderSide(
+                          color: Colors.white.withValues(alpha: 0.55),
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                      ),
+                      onPressed: account.busy
+                          ? null
+                          : () => ref
+                              .read(accountControllerProvider.notifier)
+                              .continueWithoutAccount(),
+                      child: Text(
+                        strings.authOffline,
+                        style: const TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w700,
+                        ),
                       ),
                     ),
                   ),
-                ),
-                const SizedBox(height: 16),
-                Center(
-                  child: Text(
-                    account.backendConfigured
-                        ? strings.authFreeNote
-                        : strings.authDemoNote,
-                    style: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.55),
-                      fontSize: 12,
+                  const SizedBox(height: 16),
+                  Center(
+                    child: Text(
+                      account.backendConfigured
+                          ? strings.authFreeNote
+                          : strings.authDemoNote,
+                      style: TextStyle(
+                        color: Colors.white.withValues(alpha: 0.55),
+                        fontSize: 12,
+                      ),
                     ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ),

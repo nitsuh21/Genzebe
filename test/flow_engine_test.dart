@@ -167,8 +167,7 @@ void main() {
     expect(report.internalMovedMinor, 0);
   });
 
-  test(
-      'coincidental same-amount purchase and credit are NOT a transfer pair',
+  test('coincidental same-amount purchase and credit are NOT a transfer pair',
       () async {
     final ledger = InMemoryLedgerRepository();
     final t = DateTime(2026, 7, 10, 12, 0);

@@ -10,8 +10,9 @@ void main() {
       expect(
         isExpenseMessage(
           'you have transferred etb 500.00 to abebe kebede (2519****) on '
-          '09/07/2026. abebe kebede has received the amount. your current '
-          'balance is etb 1,200.00.'.toLowerCase(),
+                  '09/07/2026. abebe kebede has received the amount. your current '
+                  'balance is etb 1,200.00.'
+              .toLowerCase(),
         ),
         isTrue,
       );

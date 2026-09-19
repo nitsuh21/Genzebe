@@ -20,8 +20,7 @@ class TransactionService {
     required String categoryId,
     bool? makeExpense,
   }) async {
-    final existing =
-        await _ledgerRepository.getTransactionById(transactionId);
+    final existing = await _ledgerRepository.getTransactionById(transactionId);
     if (existing == null) return null;
 
     final currentlyExpense = existing.type == TransactionType.expense ||
@@ -39,8 +38,7 @@ class TransactionService {
       return null;
     }
 
-    final updated =
-        existing.copyWith(categoryId: categoryId, type: newType);
+    final updated = existing.copyWith(categoryId: categoryId, type: newType);
     if (newType != existing.type) {
       // The old ledger entry's sign encodes the old direction — rebuild it.
       final hadEntry =

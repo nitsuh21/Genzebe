@@ -1,4 +1,18 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+
+/// Status-bar icon style that reads against a page of the given brightness
+/// (light page -> dark icons). Screens with their own dark hero (auth) pass
+/// [Brightness.dark] explicitly.
+SystemUiOverlayStyle systemOverlayStyleFor(Brightness pageBrightness) {
+  final base = pageBrightness == Brightness.dark
+      ? SystemUiOverlayStyle.light
+      : SystemUiOverlayStyle.dark;
+  return base.copyWith(
+    statusBarColor: Colors.transparent,
+    systemNavigationBarColor: Colors.transparent,
+  );
+}
 
 ThemeData buildLightTheme() => _buildTheme(Brightness.light);
 
@@ -24,6 +38,9 @@ ThemeData _buildTheme(Brightness brightness) {
       foregroundColor: colorScheme.onSurface,
       elevation: 0,
       scrolledUnderElevation: 0,
+      // A transparent app bar can't infer icon brightness; pin it to the
+      // theme so status-bar text never disappears against the background.
+      systemOverlayStyle: systemOverlayStyleFor(brightness),
     ),
     navigationBarTheme: NavigationBarThemeData(
       backgroundColor: isDark ? const Color(0xFF151B34) : Colors.white,

@@ -29,7 +29,7 @@ SmsIngestionService _buildIngestion(
     ledgerRepository: ledger,
     smsMessageRepository: smsStore,
     accountMappingService: AccountMappingService(ledger),
-      categoryRuleRepository: InMemoryCategoryRuleRepository(),
+    categoryRuleRepository: InMemoryCategoryRuleRepository(),
   );
 }
 
@@ -101,6 +101,57 @@ void main() {
     expect(fixed.categoryId, 'transfer_out');
     final entry = (await ledger.getLedgerEntries()).single;
     expect(entry.delta.minorUnits, -110120);
+  });
+
+  test('approving with a direction flip books it as income', () async {
+    final ledger = InMemoryLedgerRepository();
+    final smsStore = InMemorySmsMessageRepository();
+    final ingestion = _buildIngestion(ledger, smsStore);
+
+    // "received for order" reads as an expense to the keyword fallback; the
+    // reviewer knows it is money in.
+    await ingestion.ingest(
+      sms: SmsMessage(
+        id: 'unknown-2',
+        sender: '8294',
+        body: 'Payment of 150.00 birr received for order #4432.',
+        receivedAt: DateTime(2026, 6, 3, 11, 0),
+      ),
+    );
+    final queue = await ingestion.getReviewQueue();
+    expect(queue, hasLength(1));
+
+    await ingestion.approveReviewItem(queue.first, makeExpense: false);
+
+    final booked = await ledger.getTransactionById('sms-unknown-2');
+    expect(booked!.type, TransactionType.income);
+    // No category was chosen, so the row falls back to the income bucket
+    // rather than keeping an expense category id.
+    expect(booked.categoryId, 'income');
+    expect(booked.reviewStatus, TransactionReviewStatus.autoAccepted);
+    final entry = (await ledger.getLedgerEntries()).single;
+    expect(entry.delta.minorUnits, 15000);
+  });
+
+  test('removing an SMS transaction marks the message rejected', () async {
+    final ledger = InMemoryLedgerRepository();
+    final smsStore = InMemorySmsMessageRepository();
+    final ingestion = _buildIngestion(ledger, smsStore);
+
+    await ingestion.ingest(sms: _lowConfidenceSms);
+    await ingestion.approveReviewItem((await ingestion.getReviewQueue()).first);
+    expect(await ledger.getTransactionById('sms-unknown-1'), isNotNull);
+
+    await ingestion.removeTransaction('sms-unknown-1');
+
+    expect(await ledger.getTransactionById('sms-unknown-1'), isNull);
+    expect(
+      (await smsStore.getById('unknown-1'))!.status,
+      SmsIngestionStatus.rejected,
+    );
+    // The next sync sees the same message again and must not resurrect it.
+    await ingestion.ingest(sms: _lowConfidenceSms);
+    expect(await ledger.getTransactionById('sms-unknown-1'), isNull);
   });
 
   test('rejecting a review item deletes its transaction and ledger entries',

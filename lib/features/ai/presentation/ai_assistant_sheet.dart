@@ -215,7 +215,8 @@ class _Header extends StatelessWidget {
               ),
               borderRadius: BorderRadius.circular(12),
             ),
-            child: const Icon(Icons.auto_awesome_rounded, color: Colors.white, size: 20),
+            child: const Icon(Icons.auto_awesome_rounded,
+                color: Colors.white, size: 20),
           ),
           const SizedBox(width: 12),
           Expanded(

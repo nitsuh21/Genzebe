@@ -3,11 +3,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:genzeb/app/providers.dart';
 import 'package:genzeb/core/utils/formatters.dart';
 import 'package:genzeb/design_system/widgets.dart';
+import 'package:genzeb/features/account/presentation/profile_screen.dart';
 import 'package:genzeb/features/reports/application/report_service.dart';
 import 'package:genzeb/features/transactions/domain/models/categories.dart';
 import 'package:genzeb/features/transactions/presentation/add_transaction_sheet.dart';
-import 'package:genzeb/features/ai/presentation/ai_cleanup_sheet.dart';
-import 'package:genzeb/features/transactions/presentation/category_picker.dart';
+import 'package:genzeb/features/transactions/presentation/transaction_detail_sheet.dart';
 import 'package:genzeb/features/transactions/presentation/transaction_tile.dart';
 
 class DashboardScreen extends ConsumerStatefulWidget {
@@ -19,7 +19,6 @@ class DashboardScreen extends ConsumerStatefulWidget {
 
 class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   bool _syncing = false;
-  bool _showAmounts = false;
 
   Future<void> _forceSync() async {
     setState(() => _syncing = true);
@@ -29,41 +28,31 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     final result =
         await ref.read(syncServiceProvider).forceSyncFromSms(rebuild: true);
     refreshAppData(ref);
-    final aiAvailable =
-        await ref.read(aiAssistantServiceProvider).isAvailable();
     if (!mounted) return;
     setState(() => _syncing = false);
-    final cruise = result.cruiseControl;
-    final cruiseNote = cruise == null || !cruise.aiUsed
-        ? ''
-        : ' • CruiseControl fixed ${cruise.corrected}';
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(
           'Synced ${result.processed} SMS • ${result.newlyParsed} parsed • '
-          '${result.pendingReview} need review$cruiseNote',
+          '${result.pendingReview} need review',
         ),
-        // Manual AI audit remains available for older transactions.
-        action: aiAvailable && result.newlyParsed > 0
-            ? SnackBarAction(
-                label: 'AI check',
-                onPressed: () => showAiCleanupSheet(context),
-              )
-            : null,
       ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     final strings = ref.watch(stringsProvider);
     final insightsAsync = ref.watch(dashboardInsightsProvider);
     final transactionsAsync = ref.watch(ledgerTransactionsProvider);
     final seriesAsync = ref.watch(monthlySeriesProvider);
     final themeMode = ref.watch(themeModeProvider);
     final institutionOptionsAsync = ref.watch(institutionFilterOptionsProvider);
-    final selectedInstitutionCodes = ref.watch(selectedInstitutionCodesProvider);
+    final selectedInstitutionCodes =
+        ref.watch(selectedInstitutionCodesProvider);
+    final showAmounts = !ref.watch(amountsHiddenProvider);
+    final pendingReview =
+        ref.watch(reviewQueueProvider).valueOrNull?.length ?? 0;
 
     return RefreshIndicator(
       onRefresh: () async => refreshAppData(ref),
@@ -118,10 +107,12 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                           (option) => Padding(
                             padding: const EdgeInsets.only(right: 8),
                             child: FilterChip(
-                              selected: selectedInstitutionCodes.contains(option.code),
+                              selected: selectedInstitutionCodes
+                                  .contains(option.code),
                               showCheckmark: false,
                               label: Text(option.label),
-                              onSelected: (_) => toggleInstitutionFilter(ref, option.code),
+                              onSelected: (_) =>
+                                  toggleInstitutionFilter(ref, option.code),
                             ),
                           ),
                         ),
@@ -133,10 +124,9 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
               const SizedBox(height: 12),
               _BalanceHero(
                 insights: insights,
-                showAmounts: _showAmounts,
-                onToggleAmounts: () {
-                  setState(() => _showAmounts = !_showAmounts);
-                },
+                showAmounts: showAmounts,
+                onToggleAmounts: () =>
+                    ref.read(amountsHiddenProvider.notifier).toggle(),
               ),
               const SizedBox(height: 16),
               _QuickActions(
@@ -144,6 +134,15 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                 onAdd: () => showAddTransactionSheet(context, ref),
                 onSync: _syncing ? null : _forceSync,
               ),
+              if (pendingReview > 0) ...[
+                const SizedBox(height: 12),
+                _ReviewNudge(
+                  count: pendingReview,
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute<void>(builder: (_) => const SmsOpsPage()),
+                  ),
+                ),
+              ],
               if (insights.accountCards.isNotEmpty) ...[
                 const SizedBox(height: 20),
                 SectionHeader(title: strings.accounts),
@@ -153,11 +152,10 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                     scrollDirection: Axis.horizontal,
                     itemCount: insights.accountCards.length,
                     separatorBuilder: (_, __) => const SizedBox(width: 12),
-                    itemBuilder: (context, index) =>
-                        _AccountCard(
-                          card: insights.accountCards[index],
-                          showAmounts: _showAmounts,
-                        ),
+                    itemBuilder: (context, index) => _AccountCard(
+                      card: insights.accountCards[index],
+                      showAmounts: showAmounts,
+                    ),
                   ),
                 ),
               ],
@@ -166,15 +164,16 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
               _CashflowCard(series: series),
               const SizedBox(height: 20),
               SectionHeader(title: strings.insights),
-              _InsightsGrid(insights: insights),
+              if (insights.incomeMinor == 0 && insights.expenseMinor == 0)
+                const _QuietMonthCard()
+              else
+                _InsightsGrid(insights: insights),
               const SizedBox(height: 20),
               SectionHeader(
                 title: strings.recentActivity,
-                action: Text(
-                  '${insights.transactionCount} total',
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
-                  ),
+                action: TextButton(
+                  onPressed: () => ref.read(homeTabProvider.notifier).state = 1,
+                  child: Text('See all (${insights.transactionCount})'),
                 ),
               ),
               if (recent.isEmpty)
@@ -186,8 +185,9 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                         child: TransactionTile(
                           record: record,
                           dense: true,
+                          showDate: true,
                           onTap: () =>
-                              promptRecategorize(context, ref, record),
+                              showTransactionDetail(context, ref, record),
                         ),
                       ),
                     ),
@@ -225,6 +225,8 @@ class _Header extends ConsumerWidget {
       ThemeMode.light => Icons.light_mode_rounded,
       ThemeMode.dark => Icons.dark_mode_rounded,
     };
+    final name = displayName?.trim();
+    final hasName = name != null && name.isNotEmpty;
     return Row(
       children: [
         Expanded(
@@ -232,13 +234,13 @@ class _Header extends ConsumerWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                greeting,
+                hasName ? greeting : formatDay(DateTime.now()),
                 style: theme.textTheme.bodyMedium?.copyWith(
                   color: theme.colorScheme.onSurfaceVariant,
                 ),
               ),
               Text(
-                displayName ?? 'Genzeb',
+                hasName ? name : greeting,
                 style: theme.textTheme.headlineSmall?.copyWith(
                   fontWeight: FontWeight.w800,
                 ),
@@ -331,34 +333,41 @@ class _BalanceHero extends ConsumerWidget {
             ),
           ),
           const SizedBox(height: 18),
-          Row(
-            children: [
-              Expanded(
-                child: _HeroStat(
-                  icon: Icons.south_west_rounded,
-                  label: strings.income,
-                  value: showAmounts
-                      ? formatCompactEtb(insights.incomeMinor)
-                      : 'ETB ••••••',
+          if (insights.incomeMinor == 0 && insights.expenseMinor == 0)
+            Text(
+              'No activity yet this month',
+              style:
+                  theme.textTheme.bodyMedium?.copyWith(color: Colors.white70),
+            )
+          else
+            Row(
+              children: [
+                Expanded(
+                  child: _HeroStat(
+                    icon: Icons.south_west_rounded,
+                    label: strings.income,
+                    value: showAmounts
+                        ? formatCompactEtb(insights.incomeMinor)
+                        : 'ETB ••••••',
+                  ),
                 ),
-              ),
-              Container(
-                width: 1,
-                height: 34,
-                color: Colors.white24,
-              ),
-              Expanded(
-                child: _HeroStat(
-                  icon: Icons.north_east_rounded,
-                  label: strings.expense,
-                  value: showAmounts
-                      ? formatCompactEtb(insights.expenseMinor)
-                      : 'ETB ••••••',
-                  alignEnd: true,
+                Container(
+                  width: 1,
+                  height: 34,
+                  color: Colors.white24,
                 ),
-              ),
-            ],
-          ),
+                Expanded(
+                  child: _HeroStat(
+                    icon: Icons.north_east_rounded,
+                    label: strings.expense,
+                    value: showAmounts
+                        ? formatCompactEtb(insights.expenseMinor)
+                        : 'ETB ••••••',
+                    alignEnd: true,
+                  ),
+                ),
+              ],
+            ),
         ],
       ),
     );
@@ -587,7 +596,7 @@ class _CashflowCard extends ConsumerWidget {
               child: Center(child: Text('No data yet')),
             )
           else
-            MonthlyBarChart(bars: bars),
+            MonthlyBarChart(bars: bars, valueLabel: formatCompactNumber),
         ],
       ),
     );
@@ -760,6 +769,79 @@ class _EmptyState extends StatelessWidget {
             onPressed: onAdd,
             icon: const Icon(Icons.add_rounded),
             label: const Text('Add transaction'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// "2 transactions need your review" — the one action the parser cannot
+/// take for the user, surfaced where they will actually see it.
+class _ReviewNudge extends StatelessWidget {
+  const _ReviewNudge({required this.count, required this.onTap});
+
+  final int count;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    const tint = Color(0xFFE8833A);
+    return Material(
+      color: tint.withValues(alpha: 0.12),
+      borderRadius: BorderRadius.circular(16),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          child: Row(
+            children: [
+              const Icon(Icons.rule_rounded, color: tint),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  count == 1
+                      ? '1 transaction needs your review'
+                      : '$count transactions need your review',
+                  style: theme.textTheme.bodyMedium
+                      ?.copyWith(fontWeight: FontWeight.w600),
+                ),
+              ),
+              const Icon(Icons.chevron_right_rounded, color: tint),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _QuietMonthCard extends StatelessWidget {
+  const _QuietMonthCard();
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: theme.cardTheme.color,
+        borderRadius: BorderRadius.circular(18),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.insights_rounded,
+              color: theme.colorScheme.onSurfaceVariant),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              'Insights appear once this month has some activity.',
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
           ),
         ],
       ),

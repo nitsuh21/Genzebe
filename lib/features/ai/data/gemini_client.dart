@@ -17,13 +17,15 @@ class GeminiChatTurn {
 
 /// Thin REST client for Google's Gemini `generateContent` endpoint.
 class GeminiClient {
-  GeminiClient({http.Client? httpClient, this.model = 'gemini-1.5-flash-latest'})
+  GeminiClient(
+      {http.Client? httpClient, this.model = 'gemini-1.5-flash-latest'})
       : _http = httpClient ?? http.Client();
 
   final http.Client _http;
   final String model;
 
-  static const _base = 'https://generativelanguage.googleapis.com/v1beta/models';
+  static const _base =
+      'https://generativelanguage.googleapis.com/v1beta/models';
 
   Future<String> generate({
     required String apiKey,

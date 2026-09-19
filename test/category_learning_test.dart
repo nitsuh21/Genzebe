@@ -96,7 +96,8 @@ void main() {
 
     test('equb goes to savings', () {
       expect(
-        inferCategory(body: 'paid etb 500 for equb contribution', isExpense: true),
+        inferCategory(
+            body: 'paid etb 500 for equb contribution', isExpense: true),
         'savings',
       );
     });

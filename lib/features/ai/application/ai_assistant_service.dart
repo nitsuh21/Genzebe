@@ -143,8 +143,10 @@ class AiAssistantService {
     buffer.writeln('- Income: ${formatMinorEtb(insights.incomeMinor)}');
     buffer.writeln('- Expense: ${formatMinorEtb(insights.expenseMinor)}');
     buffer.writeln('- Net: ${formatMinorEtb(insights.netMinor)}');
-    buffer.writeln('- Total balance: ${formatMinorEtb(insights.totalBalanceMinor)}');
-    buffer.writeln('- Savings rate: ${insights.savingsRate.toStringAsFixed(1)}%');
+    buffer.writeln(
+        '- Total balance: ${formatMinorEtb(insights.totalBalanceMinor)}');
+    buffer
+        .writeln('- Savings rate: ${insights.savingsRate.toStringAsFixed(1)}%');
     buffer.writeln('- Net change vs last month: '
         '${insights.monthNetDeltaPercent.toStringAsFixed(1)}%');
     buffer.writeln('- Transactions tracked: ${insights.transactionCount}');
@@ -184,13 +186,12 @@ class AiAssistantService {
     }
 
     if (scopedTransactions.isNotEmpty) {
-      final inflows = scopedTransactions
-          .where((t) => isInflowType(t.type))
-          .toList();
-      final outflows = scopedTransactions
-          .where((t) => isOutflowType(t.type))
-          .toList();
-      inflows.sort((a, b) => b.amount.minorUnits.compareTo(a.amount.minorUnits));
+      final inflows =
+          scopedTransactions.where((t) => isInflowType(t.type)).toList();
+      final outflows =
+          scopedTransactions.where((t) => isOutflowType(t.type)).toList();
+      inflows
+          .sort((a, b) => b.amount.minorUnits.compareTo(a.amount.minorUnits));
       outflows.sort(
         (a, b) => b.amount.minorUnits.compareTo(a.amount.minorUnits),
       );
@@ -282,8 +283,9 @@ class AiAssistantService {
     if (!latest.fromUser) return null;
     final text = latest.text.toLowerCase();
 
-    final asksBiggest =
-        text.contains('biggest') || text.contains('largest') || text.contains('highest');
+    final asksBiggest = text.contains('biggest') ||
+        text.contains('largest') ||
+        text.contains('highest');
     if (!asksBiggest) return null;
 
     final wantsInflow = text.contains('receive') ||
@@ -316,7 +318,8 @@ class AiAssistantService {
           ? 'I could not find any received (inflow) transaction yet.'
           : 'I could not find any sent/spent (outflow) transaction yet.';
     }
-    candidates.sort((a, b) => b.amount.minorUnits.compareTo(a.amount.minorUnits));
+    candidates
+        .sort((a, b) => b.amount.minorUnits.compareTo(a.amount.minorUnits));
     final top = candidates.first;
     final qualifier = wantsInflow ? 'received' : 'sent/spent';
     return 'Your biggest single $qualifier transaction is '

@@ -1,0 +1,186 @@
+{
+  "institution": "cbe",
+  "cases": [
+    {
+      "id": "cbe-credit-with-balance-and-receipt",
+      "source": "real",
+      "sender": "CBE",
+      "body": "Dear Nitsuh Demissew your Account 1****9722 has been credited with ETB 5000.00. Your Current Balance is ETB 201239.71. Thank you for Banking with CBE! for Reciept https://apps.cbe.com.et:100/BranchReceipt/FT26147S2FCW&17459722",
+      "expect": {
+        "parsed": true,
+        "institution": "cbe",
+        "direction": "in",
+        "amountMinor": 500000,
+        "category": "income",
+        "balanceMinor": 20123971,
+        "referenceContains": "FT26147S2FCW",
+        "explicitDirection": true,
+        "autoAccept": true
+      }
+    },
+    {
+      "id": "cbe-debit-with-itemized-fees-prefers-total",
+      "source": "real",
+      "sender": "CBE",
+      "body": "Dear Nitsuh your Account 1*****9722 has been debited with ETB5,000.00. Service charge of ETB 10.00 and VAT(15%) of ETB1.50 and Disaster Fund (5%) of ETB0.50 with a total of ETB 5012.00. Your Current Balance is ETB 283,760.67. Thank you for Banking with CBE! https://apps.cbe.com.et:100/?id=FT26140YL4N417459722",
+      "expect": {
+        "parsed": true,
+        "institution": "cbe",
+        "direction": "out",
+        "amountMinor": 501200,
+        "category": "fees",
+        "balanceMinor": 28376067,
+        "referenceContains": "FT26140YL4N417459722",
+        "explicitDirection": true,
+        "autoAccept": true
+      }
+    },
+    {
+      "id": "cbe-transfer-no-debited-keyword-total-amount",
+      "source": "real",
+      "sender": "CBE",
+      "body": "Dear  Nitsuh Demissew Mekonnen You have successfully transferred ETB1100.00 from account 1**9722 to account 1**4607 (Nebyou Elias Zewde). Service charge of ETB 1.00 and VAT(15%) of ETB0.15 and Disaster Recovery(5%) of 0.05 with total of ETB1101.20 .Your current balance is ETB89,468.32. Thanks for Banking with CBE. https://mbreciept.cbe.com.et/v2-hfHCxzVQsJzR5",
+      "expect": {
+        "parsed": true,
+        "institution": "cbe",
+        "direction": "out",
+        "amountMinor": 110120,
+        "category": "transfer_out",
+        "balanceMinor": 8946832,
+        "explicitDirection": true,
+        "autoAccept": true
+      }
+    },
+    {
+      "id": "cbe-debited-and-credited-to-beneficiary-is-expense",
+      "source": "synthetic",
+      "sender": "CBE",
+      "body": "Dear customer, your account 1****234 has been debited with ETB 2,000.00 and credited to the beneficiary. Your current balance is ETB 8,000.00",
+      "expect": {
+        "parsed": true,
+        "institution": "cbe",
+        "direction": "out",
+        "amountMinor": 200000,
+        "balanceMinor": 800000,
+        "explicitDirection": true,
+        "autoAccept": true
+      }
+    },
+    {
+      "id": "cbe-plain-credit",
+      "source": "synthetic",
+      "sender": "CBE",
+      "body": "Dear customer, your account 1****234 has been credited with ETB 28,500.00. Your current balance is ETB 30,000.00",
+      "expect": {
+        "parsed": true,
+        "direction": "in",
+        "amountMinor": 2850000,
+        "balanceMinor": 3000000,
+        "explicitDirection": true,
+        "autoAccept": true
+      }
+    },
+    {
+      "id": "cbe-salary-credit",
+      "source": "synthetic",
+      "sender": "CBE",
+      "body": "Dear customer, your account has been credited with ETB 28,500.00 salary payment.",
+      "expect": {
+        "parsed": true,
+        "direction": "in",
+        "amountMinor": 2850000,
+        "category": "salary",
+        "explicitDirection": true,
+        "autoAccept": true
+      }
+    },
+    {
+      "id": "cbe-alert-pos",
+      "source": "synthetic",
+      "sender": "CBE",
+      "body": "CBE Alert: account debited ETB 450.00 at POS",
+      "expect": {
+        "parsed": true,
+        "institution": "cbe",
+        "direction": "out",
+        "amountMinor": 45000,
+        "merchant": "POS",
+        "explicitDirection": true,
+        "autoAccept": true
+      }
+    },
+    {
+      "id": "cbe-debit-supermarket-skips-balance-figure",
+      "source": "synthetic",
+      "sender": "CBE",
+      "body": "CBE: debited ETB 450.00 at supermarket. Bal ETB 9,100.00",
+      "expect": {
+        "parsed": true,
+        "direction": "out",
+        "amountMinor": 45000,
+        "category": "groceries",
+        "balanceMinor": 910000,
+        "merchant": "supermarket",
+        "explicitDirection": true,
+        "autoAccept": true
+      }
+    },
+    {
+      "id": "cbe-transferred-to-your-account-is-income",
+      "source": "synthetic",
+      "sender": "CBE",
+      "body": "ETB 4,000.00 transferred to your savings account 1****120.",
+      "expect": {
+        "parsed": true,
+        "direction": "in",
+        "amountMinor": 400000,
+        "explicitDirection": true,
+        "autoAccept": true
+      }
+    },
+    {
+      "id": "cbe-amharic-income",
+      "source": "synthetic",
+      "sender": "CBE",
+      "body": "CBE: ETB 500.00 ገቢ ሆኗል",
+      "expect": {
+        "parsed": true,
+        "direction": "in",
+        "amountMinor": 50000,
+        "explicitDirection": true,
+        "autoAccept": true
+      }
+    },
+    {
+      "id": "cbe-balance-inquiry-is-not-a-transaction",
+      "source": "synthetic",
+      "sender": "CBE",
+      "body": "Dear customer, your current balance is ETB 12,345.67. Thank you for Banking with CBE!",
+      "expect": {
+        "parsed": false
+      }
+    },
+    {
+      "id": "cbe-failed-transfer-is-ignored",
+      "source": "synthetic",
+      "sender": "CBE",
+      "body": "Dear customer, your transfer of ETB 3,000.00 to account 1****567 was unsuccessful due to insufficient balance.",
+      "expect": {
+        "parsed": false
+      }
+    },
+    {
+      "id": "cbe-first-deposit-equal-to-balance",
+      "source": "synthetic",
+      "sender": "CBE",
+      "body": "Dear customer, your account 1****999 has been credited with ETB 1,000.00. Your current balance is ETB 1,000.00",
+      "expect": {
+        "parsed": true,
+        "direction": "in",
+        "amountMinor": 100000,
+        "balanceMinor": 100000,
+        "autoAccept": true
+      }
+    }
+  ]
+}

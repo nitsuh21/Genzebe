@@ -1,22 +1,42 @@
 import 'package:flutter/material.dart';
 import 'package:genzeb/core/utils/formatters.dart';
 import 'package:genzeb/features/reports/application/report_service.dart';
+import 'package:genzeb/features/sms_ingestion/domain/services/sms_parser.dart';
 import 'package:genzeb/features/transactions/domain/models/categories.dart';
 import 'package:genzeb/features/transactions/domain/models/transaction_models.dart';
+
+/// The name a person recognises a transaction by: the merchant or
+/// counterparty from the SMS, else the manual note, else the category.
+String transactionTitle(TransactionRecord record) {
+  final note = record.note?.trim();
+  if (note != null && note.isNotEmpty) return note;
+  final snippet = record.smsSnippet;
+  if (snippet != null && snippet.trim().isNotEmpty) {
+    final merchant = extractMerchant(
+      snippet,
+      isExpense: isOutflowType(record.type),
+    );
+    if (merchant != null) return merchant;
+  }
+  return categoryInfoFor(record.categoryId).label;
+}
 
 class TransactionTile extends StatelessWidget {
   const TransactionTile({
     super.key,
     required this.record,
-    this.dense = false,
     this.onTap,
+    this.dense = false,
+    this.showDate = false,
   });
 
   final TransactionRecord record;
+  final VoidCallback? onTap;
   final bool dense;
 
-  /// Typically opens the recategorize flow (see `promptRecategorize`).
-  final VoidCallback? onTap;
+  /// Lists grouped by day already show the date in the header; standalone
+  /// lists (Home, report drill-downs) turn this on.
+  final bool showDate;
 
   @override
   Widget build(BuildContext context) {
@@ -27,14 +47,13 @@ class TransactionTile extends StatelessWidget {
     final amountColor =
         isExpense ? const Color(0xFFE25555) : const Color(0xFF2E9E6B);
 
-    final title = record.note?.isNotEmpty == true ? record.note! : info.label;
+    final title = transactionTitle(record);
+    // Don't repeat the category when it is already the title.
     final subtitleParts = <String>[
-      _sourceLabel(record.source),
-      relativeDayLabel(record.occurredAt),
+      if (title != info.label) info.label,
+      _sourceLabel(record),
+      if (showDate) relativeDayLabel(record.occurredAt),
     ];
-    if (record.smsSender != null && record.smsSender!.isNotEmpty) {
-      subtitleParts.insert(1, record.smsSender!);
-    }
 
     final tile = Container(
       padding: EdgeInsets.symmetric(
@@ -116,10 +135,13 @@ class TransactionTile extends StatelessWidget {
     );
   }
 
-  String _sourceLabel(TransactionSource source) {
-    switch (source) {
+  /// "telebirr" / "CBE" for SMS rows (the sender is the account the money
+  /// moved through); "Manual" otherwise.
+  String _sourceLabel(TransactionRecord record) {
+    switch (record.source) {
       case TransactionSource.sms:
-        return 'SMS';
+        final sender = record.smsSender?.trim();
+        return sender == null || sender.isEmpty ? 'SMS' : sender;
       case TransactionSource.manual:
         return 'Manual';
       case TransactionSource.sync:

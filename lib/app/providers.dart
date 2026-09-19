@@ -12,8 +12,6 @@ import 'package:genzeb/features/account/domain/models/account_models.dart';
 import 'package:genzeb/features/account/domain/repositories/account_repository.dart';
 import 'package:genzeb/features/ai/ai_config.dart';
 import 'package:genzeb/features/ai/application/ai_assistant_service.dart';
-import 'package:genzeb/features/ai/application/ai_categorization_service.dart';
-import 'package:genzeb/features/ai/application/cruise_control_service.dart';
 import 'package:genzeb/features/ai/data/gemini_client.dart';
 import 'package:genzeb/features/budget/application/budget_service.dart';
 import 'package:genzeb/features/budget/data/sqflite_budget_repository.dart';
@@ -115,22 +113,6 @@ final aiAssistantServiceProvider = Provider<AiAssistantService>((ref) {
   );
 });
 
-final aiCategorizationServiceProvider =
-    Provider<AiCategorizationService>((ref) {
-  return AiCategorizationService(
-    geminiClient: ref.watch(geminiClientProvider),
-    assistantService: ref.watch(aiAssistantServiceProvider),
-    ledgerRepository: ref.watch(ledgerRepositoryProvider),
-    categoryRuleRepository: ref.watch(categoryRuleRepositoryProvider),
-  );
-});
-
-final cruiseControlServiceProvider = Provider<CruiseControlService>((ref) {
-  return CruiseControlService(
-    categorization: ref.watch(aiCategorizationServiceProvider),
-  );
-});
-
 final aiAvailableProvider = FutureProvider<bool>((ref) {
   ref.watch(dataVersionProvider);
   return ref.watch(aiAssistantServiceProvider).isAvailable();
@@ -188,7 +170,6 @@ final syncServiceProvider = Provider<SyncService>((ref) {
     deviceSmsSource: ref.watch(deviceSmsSourceProvider),
     accountMappingService: ref.watch(accountMappingServiceProvider),
     ledgerRepository: ref.watch(ledgerRepositoryProvider),
-    cruiseControl: ref.watch(cruiseControlServiceProvider),
   );
 });
 
@@ -278,6 +259,37 @@ final stringsProvider = Provider<AppStrings>((ref) {
       ? ui.PlatformDispatcher.instance.locale.languageCode
       : language;
   return resolved == 'am' ? amStrings : enStrings;
+});
+
+/// Which bottom tab HomeShell shows. Exposed so screens can deep-link
+/// ("See all" on Home jumps to the Ledger).
+final homeTabProvider = StateProvider<int>((ref) => 0);
+
+/// One app-wide "hide amounts" switch, persisted so it survives restarts.
+/// Every screen that shows money reads this — a privacy toggle that only
+/// applied to one tab was worse than none.
+class AmountsHiddenController extends StateNotifier<bool> {
+  AmountsHiddenController() : super(true) {
+    _load();
+  }
+
+  static const _prefKey = 'amounts_hidden';
+
+  Future<void> _load() async {
+    final prefs = await SharedPreferences.getInstance();
+    state = prefs.getBool(_prefKey) ?? true;
+  }
+
+  Future<void> toggle() async {
+    state = !state;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_prefKey, state);
+  }
+}
+
+final amountsHiddenProvider =
+    StateNotifierProvider<AmountsHiddenController, bool>((ref) {
+  return AmountsHiddenController();
 });
 
 /// Bumping this version invalidates all derived data providers so the UI
@@ -408,6 +420,8 @@ String _institutionLabelFromCode(String code) {
       return 'Hibret';
     case 'dashen':
       return 'Dashen';
+    case 'unknown':
+      return 'Other';
     default:
       return code.toUpperCase();
   }

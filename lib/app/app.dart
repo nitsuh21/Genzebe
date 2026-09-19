@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:genzeb/app/providers.dart';
 import 'package:genzeb/app/router.dart';
@@ -32,6 +33,12 @@ class GenzebApp extends ConsumerWidget {
       themeMode: ref.watch(themeModeProvider),
       theme: buildLightTheme(),
       darkTheme: buildDarkTheme(),
+      // Pages without an AppBar don't set status-bar icon colours; do it
+      // once here from the resolved theme so every tab reads correctly.
+      builder: (context, child) => AnnotatedRegion<SystemUiOverlayStyle>(
+        value: systemOverlayStyleFor(Theme.of(context).brightness),
+        child: child ?? const SizedBox.shrink(),
+      ),
       home: home,
     );
   }

@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:genzeb/app/providers.dart';
 import 'package:genzeb/core/logging/app_logger.dart';
 import 'package:genzeb/core/utils/formatters.dart';
-import 'package:genzeb/features/ai/presentation/ai_cleanup_sheet.dart';
 import 'package:genzeb/features/sms_ingestion/application/account_mapping_service.dart';
 import 'package:genzeb/features/sms_ingestion/domain/models/sms_models.dart';
 import 'package:genzeb/features/sms_ingestion/domain/repositories/device_sms_source.dart';
@@ -55,12 +54,12 @@ class _ReviewQueueScreenState extends ConsumerState<ReviewQueueScreen> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: const Text('Re-parse history?'),
+        title: const Text('Re-check history?'),
         content: const Text(
-          'Every stored SMS is re-read with the latest parser and your '
-          'learned rules — amounts, directions and categories are '
-          'recalculated. Manual edits without a learned rule may be '
-          'recomputed.',
+          'Every saved message is read again with the latest rules and '
+          'your corrections — amounts, directions and categories are '
+          'recalculated. Category edits you made without teaching a rule '
+          'may be recomputed.',
         ),
         actions: [
           TextButton(
@@ -69,7 +68,7 @@ class _ReviewQueueScreenState extends ConsumerState<ReviewQueueScreen> {
           ),
           FilledButton(
             onPressed: () => Navigator.of(dialogContext).pop(true),
-            child: const Text('Re-parse'),
+            child: const Text('Re-check'),
           ),
         ],
       ),
@@ -150,13 +149,14 @@ class _ReviewQueueScreenState extends ConsumerState<ReviewQueueScreen> {
         padding: EdgeInsets.fromLTRB(16, 12, 16, 28 + safeBottom + 84),
         children: [
           Text(
-            'SMS Automation',
+            'SMS sync',
             style: theme.textTheme.headlineSmall
                 ?.copyWith(fontWeight: FontWeight.w800),
           ),
           const SizedBox(height: 6),
           Text(
-            'Turn bank & wallet SMS into clean transactions, automatically.',
+            'Your bank and wallet messages become transactions here. '
+            'Anything Genzeb is unsure about waits for you below.',
             style: theme.textTheme.bodyMedium?.copyWith(
               color: theme.colorScheme.onSurfaceVariant,
             ),
@@ -180,7 +180,7 @@ class _ReviewQueueScreenState extends ConsumerState<ReviewQueueScreen> {
             child: TextButton.icon(
               onPressed: _syncing ? null : _reparseHistory,
               icon: const Icon(Icons.history_rounded, size: 16),
-              label: const Text('Re-parse history with latest parser'),
+              label: const Text('Re-check history with the latest rules'),
             ),
           ),
           const SizedBox(height: 6),
@@ -189,21 +189,12 @@ class _ReviewQueueScreenState extends ConsumerState<ReviewQueueScreen> {
             pending: reviewCount,
             total: stored.length,
           ),
-          const SizedBox(height: 14),
-          _AiCleanupCard(onTap: () => showAiCleanupSheet(context)),
           const SizedBox(height: 16),
           _CollapsibleCard(
-            icon: Icons.account_tree_outlined,
-            title: 'Institution mapping',
-            subtitle: 'Link SMS senders to your accounts',
-            initiallyExpanded: true,
-            child: const _MappingManager(),
-          ),
-          const SizedBox(height: 12),
-          _CollapsibleCard(
             icon: Icons.rule_rounded,
-            title: 'Pending review',
-            subtitle: 'Low-confidence messages to confirm',
+            title: 'Needs your review',
+            subtitle: 'Confirm what Genzeb was not sure about',
+            initiallyExpanded: true,
             badge: reviewCount > 0 ? '$reviewCount' : null,
             child: reviewAsync.when(
               loading: () => const _LoadingCard(),
@@ -211,20 +202,21 @@ class _ReviewQueueScreenState extends ConsumerState<ReviewQueueScreen> {
               data: (queue) {
                 if (queue.isEmpty) {
                   return const _InfoCard(
-                    text: 'Nothing waiting. Auto-parsed SMS post directly to '
-                        'your ledger.',
+                    text: 'Nothing waiting. Messages Genzeb is sure about '
+                        'go straight to your ledger.',
                   );
                 }
                 return Column(
                   children: queue
                       .map((item) => _ReviewTile(
                             item: item,
-                            onApprove: (categoryOverride) async {
+                            onApprove: (categoryOverride, makeExpense) async {
                               await ref
                                   .read(smsIngestionServiceProvider)
                                   .approveReviewItem(
                                     item,
                                     categoryOverride: categoryOverride,
+                                    makeExpense: makeExpense,
                                   );
                               refreshAppData(ref);
                             },
@@ -242,15 +234,22 @@ class _ReviewQueueScreenState extends ConsumerState<ReviewQueueScreen> {
           ),
           const SizedBox(height: 12),
           _CollapsibleCard(
+            icon: Icons.account_tree_outlined,
+            title: 'Bank senders',
+            subtitle: 'Tell Genzeb which SMS senders are your accounts',
+            child: const _MappingManager(),
+          ),
+          const SizedBox(height: 12),
+          _CollapsibleCard(
             icon: Icons.history_rounded,
-            title: 'Recent activity',
-            subtitle: 'Latest ingested messages',
+            title: 'Messages read',
+            subtitle: 'The latest SMS Genzeb processed',
             child: storedAsync.when(
               loading: () => const _LoadingCard(),
               error: (e, _) => _InfoCard(text: 'Error: $e'),
               data: (items) {
                 if (items.isEmpty) {
-                  return const _InfoCard(text: 'No SMS ingested yet.');
+                  return const _InfoCard(text: 'No messages read yet.');
                 }
                 return Column(
                   children: items
@@ -264,8 +263,8 @@ class _ReviewQueueScreenState extends ConsumerState<ReviewQueueScreen> {
           const SizedBox(height: 12),
           _CollapsibleCard(
             icon: Icons.terminal_rounded,
-            title: 'Diagnostics',
-            subtitle: 'Pipeline logs for troubleshooting',
+            title: 'Advanced',
+            subtitle: 'Logs for troubleshooting',
             child: const _DiagnosticsPanel(),
           ),
         ],
@@ -291,7 +290,7 @@ class _StatStrip extends StatelessWidget {
       children: [
         Expanded(
           child: _StatTile(
-            label: 'Parsed',
+            label: 'Booked',
             value: '$parsed',
             icon: Icons.check_circle_rounded,
             color: const Color(0xFF2E9E6B),
@@ -300,7 +299,7 @@ class _StatStrip extends StatelessWidget {
         const SizedBox(width: 10),
         Expanded(
           child: _StatTile(
-            label: 'Pending',
+            label: 'To review',
             value: '$pending',
             icon: Icons.rule_rounded,
             color: const Color(0xFFE8833A),
@@ -309,7 +308,7 @@ class _StatStrip extends StatelessWidget {
         const SizedBox(width: 10),
         Expanded(
           child: _StatTile(
-            label: 'Ingested',
+            label: 'Messages read',
             value: '$total',
             icon: Icons.sms_rounded,
             color: const Color(0xFF4E5AE8),
@@ -480,7 +479,7 @@ class _SyncCard extends StatelessWidget {
               const Icon(Icons.bolt_rounded, color: Colors.white),
               const SizedBox(width: 8),
               Text(
-                'Force sync & re-parse',
+                'Refresh from SMS',
                 style: theme.textTheme.titleMedium?.copyWith(
                   color: Colors.white,
                   fontWeight: FontWeight.w700,
@@ -490,8 +489,8 @@ class _SyncCard extends StatelessWidget {
           ),
           const SizedBox(height: 6),
           Text(
-            'Re-scan device SMS, re-run the parser, and backfill the ledger '
-            'safely (no duplicates). Or paste SMS manually.',
+            'Read your inbox again and update the ledger — nothing is '
+            'duplicated. You can also paste messages by hand.',
             style: theme.textTheme.bodySmall?.copyWith(color: Colors.white70),
           ),
           const SizedBox(height: 14),
@@ -508,7 +507,7 @@ class _SyncCard extends StatelessWidget {
                             height: 18,
                             child: CircularProgressIndicator(strokeWidth: 2),
                           )
-                        : const Text('Force Sync'),
+                        : const Text('Refresh now'),
                   ),
                 ),
               ),
@@ -522,79 +521,13 @@ class _SyncCard extends StatelessWidget {
                   ),
                   child: const Padding(
                     padding: EdgeInsets.symmetric(vertical: 4),
-                    child: Text('Import SMS'),
+                    child: Text('Paste SMS'),
                   ),
                 ),
               ),
             ],
           ),
         ],
-      ),
-    );
-  }
-}
-
-class _AiCleanupCard extends StatelessWidget {
-  const _AiCleanupCard({required this.onTap});
-
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(20),
-        child: Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(
-              color: theme.colorScheme.primary.withValues(alpha: 0.4),
-            ),
-            color: theme.colorScheme.primary.withValues(alpha: 0.06),
-          ),
-          child: Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(9),
-                decoration: BoxDecoration(
-                  color: theme.colorScheme.primary.withValues(alpha: 0.14),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Icon(
-                  Icons.auto_fix_high_rounded,
-                  color: theme.colorScheme.primary,
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'AI category cleanup',
-                      style: theme.textTheme.titleSmall?.copyWith(
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      'Let Genzeb AI fix wrong categories and income/expense '
-                      'mix-ups. You approve every change.',
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const Icon(Icons.chevron_right_rounded),
-            ],
-          ),
-        ),
       ),
     );
   }
@@ -614,11 +547,9 @@ class _MappingManagerState extends ConsumerState<_MappingManager> {
   List<String> _availableSenders = const [];
   bool _loadingSenders = false;
 
-  @override
-  void initState() {
-    super.initState();
-    _loadSenderCandidates();
-  }
+  /// Loaded on demand (refresh button) so opening the page never triggers
+  /// the SMS permission dialog by surprise.
+  bool _sendersRequested = false;
 
   @override
   void dispose() {
@@ -692,7 +623,10 @@ class _MappingManagerState extends ConsumerState<_MappingManager> {
   }
 
   Future<void> _loadSenderCandidates() async {
-    setState(() => _loadingSenders = true);
+    setState(() {
+      _loadingSenders = true;
+      _sendersRequested = true;
+    });
     final permission =
         await ref.read(deviceSmsSourceProvider).ensurePermission();
     if (!mounted) return;
@@ -811,7 +745,10 @@ class _MappingManagerState extends ConsumerState<_MappingManager> {
           ] else if (!_loadingSenders) ...[
             const SizedBox(height: 6),
             Text(
-              'No inbox senders found yet. Check SMS permission and refresh.',
+              _sendersRequested
+                  ? 'No senders found in your inbox. Check SMS permission '
+                      'and refresh.'
+                  : 'Tap the refresh button to pick a sender from your inbox.',
               style: theme.textTheme.labelSmall?.copyWith(
                 color: theme.colorScheme.onSurfaceVariant,
               ),
@@ -926,7 +863,9 @@ class _ReviewTile extends StatefulWidget {
   });
 
   final SmsReviewItem item;
-  final ValueChanged<String?> onApprove;
+
+  /// (category override, direction override) — null means "as parsed".
+  final void Function(String? categoryOverride, bool? makeExpense) onApprove;
   final VoidCallback onReject;
 
   @override
@@ -935,13 +874,26 @@ class _ReviewTile extends StatefulWidget {
 
 class _ReviewTileState extends State<_ReviewTile> {
   String? _categoryOverride;
+  bool? _expenseOverride;
 
   SmsReviewItem get item => widget.item;
+
+  bool get _isExpense =>
+      _expenseOverride ?? item.parsed.detectedAmountMinor < 0;
+
+  /// Tapping the Expense/Income pill flips the direction; the category
+  /// falls back to the bare bucket because category ids are per-direction.
+  void _flipDirection() {
+    setState(() {
+      _expenseOverride = !_isExpense;
+      _categoryOverride = _isExpense ? 'expense' : 'income';
+    });
+  }
 
   Future<void> _pickCategory() async {
     final selected = await showCategoryPicker(
       context,
-      isExpense: item.parsed.detectedAmountMinor < 0,
+      isExpense: _isExpense,
       current: _categoryOverride ?? item.parsed.categoryHint,
     );
     if (selected != null) {
@@ -952,9 +904,10 @@ class _ReviewTileState extends State<_ReviewTile> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final info =
-        categoryInfoFor(_categoryOverride ?? item.parsed.categoryHint);
+    final info = categoryInfoFor(_categoryOverride ?? item.parsed.categoryHint);
     final amount = item.parsed.detectedAmountMinor.abs();
+    final directionColor =
+        _isExpense ? const Color(0xFFEF6C5A) : const Color(0xFF2E9E6B);
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.all(14),
@@ -965,66 +918,48 @@ class _ReviewTileState extends State<_ReviewTile> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // Header: sender + direction + amount. The category chip gets its
+          // own line below so long sender IDs or labels can never push the
+          // amount off-screen.
           Row(
             children: [
-              Text(
-                item.smsMessage.sender,
-                style: theme.textTheme.labelMedium?.copyWith(
-                  fontWeight: FontWeight.w600,
+              Expanded(
+                child: Text(
+                  item.smsMessage.sender,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.labelMedium?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
               ),
               const SizedBox(width: 8),
-              // Tappable: fix the category before approving; the correction
-              // is remembered for this merchant on future syncs.
+              // Tappable: flip income/expense when the parser read it wrong.
               InkWell(
-                onTap: _pickCategory,
+                onTap: _flipDirection,
                 borderRadius: BorderRadius.circular(999),
                 child: Container(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 9, vertical: 3),
+                  margin: const EdgeInsets.only(right: 8),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                   decoration: BoxDecoration(
-                    color: info.color.withValues(alpha: 0.14),
+                    color: directionColor.withValues(alpha: 0.14),
                     borderRadius: BorderRadius.circular(999),
                   ),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(info.icon, color: info.color, size: 14),
-                      const SizedBox(width: 5),
                       Text(
-                        info.label,
-                        style: theme.textTheme.labelSmall?.copyWith(
-                          color: info.color,
+                        _isExpense ? 'Expense' : 'Income',
+                        style: TextStyle(
+                          fontSize: 11,
                           fontWeight: FontWeight.w700,
+                          color: directionColor,
                         ),
                       ),
-                      const SizedBox(width: 2),
-                      Icon(Icons.arrow_drop_down_rounded,
-                          color: info.color, size: 16),
+                      Icon(Icons.swap_horiz_rounded,
+                          size: 14, color: directionColor),
                     ],
-                  ),
-                ),
-              ),
-              const Spacer(),
-              Container(
-                margin: const EdgeInsets.only(right: 8),
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                decoration: BoxDecoration(
-                  color: (item.parsed.detectedAmountMinor < 0
-                          ? const Color(0xFFEF6C5A)
-                          : const Color(0xFF2E9E6B))
-                      .withValues(alpha: 0.14),
-                  borderRadius: BorderRadius.circular(999),
-                ),
-                child: Text(
-                  item.parsed.detectedAmountMinor < 0 ? 'Expense' : 'Income',
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w700,
-                    color: item.parsed.detectedAmountMinor < 0
-                        ? const Color(0xFFEF6C5A)
-                        : const Color(0xFF2E9E6B),
                   ),
                 ),
               ),
@@ -1035,6 +970,40 @@ class _ReviewTileState extends State<_ReviewTile> {
               ),
             ],
           ),
+          const SizedBox(height: 6),
+          // Tappable: fix the category before approving; the correction
+          // is remembered for this merchant on future syncs.
+          Align(
+            alignment: Alignment.centerLeft,
+            child: InkWell(
+              onTap: _pickCategory,
+              borderRadius: BorderRadius.circular(999),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
+                decoration: BoxDecoration(
+                  color: info.color.withValues(alpha: 0.14),
+                  borderRadius: BorderRadius.circular(999),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(info.icon, color: info.color, size: 14),
+                    const SizedBox(width: 5),
+                    Text(
+                      info.label,
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        color: info.color,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(width: 2),
+                    Icon(Icons.arrow_drop_down_rounded,
+                        color: info.color, size: 16),
+                  ],
+                ),
+              ),
+            ),
+          ),
           const SizedBox(height: 8),
           Text(
             item.smsMessage.body,
@@ -1043,8 +1012,12 @@ class _ReviewTileState extends State<_ReviewTile> {
             style: theme.textTheme.bodySmall,
           ),
           const SizedBox(height: 6),
+          // Why this landed here, so the user knows what to double-check.
           Text(
-            'Confidence ${(item.parsed.confidence * 100).toStringAsFixed(0)}%',
+            [
+              'Confidence ${(item.parsed.confidence * 100).toStringAsFixed(0)}%',
+              ...?item.parsed.evidence?.reviewReasons,
+            ].join(' • '),
             style: theme.textTheme.labelSmall?.copyWith(
               color: theme.colorScheme.onSurfaceVariant,
             ),
@@ -1059,7 +1032,8 @@ class _ReviewTileState extends State<_ReviewTile> {
               ),
               const SizedBox(width: 8),
               FilledButton(
-                onPressed: () => widget.onApprove(_categoryOverride),
+                onPressed: () =>
+                    widget.onApprove(_categoryOverride, _expenseOverride),
                 child: const Text('Approve'),
               ),
             ],
