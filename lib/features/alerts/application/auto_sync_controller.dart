@@ -84,7 +84,9 @@ class AutoSyncController {
           incremental: true,
           requestPermission: false,
         );
-        if (result.smsPermissionState != SmsPermissionState.granted) break;
+        final granted = result.smsPermissionState == SmsPermissionState.granted;
+        _setStatus(_current.copyWith(smsAccessOff: !granted));
+        if (!granted) break;
         _setStatus(_current.copyWith(lastSyncedAt: DateTime.now()));
         final alerts = await _alertService.recordFromSync(result);
         if (result.newTransactions.isNotEmpty) _onDataChanged();
@@ -107,14 +109,26 @@ class AutoSyncController {
 }
 
 class AutoSyncStatus {
-  const AutoSyncStatus({this.running = false, this.lastSyncedAt});
+  const AutoSyncStatus({
+    this.running = false,
+    this.lastSyncedAt,
+    this.smsAccessOff = false,
+  });
 
   final bool running;
   final DateTime? lastSyncedAt;
 
-  AutoSyncStatus copyWith({bool? running, DateTime? lastSyncedAt}) =>
+  /// SMS permission is missing: nothing can sync until the user allows it.
+  final bool smsAccessOff;
+
+  AutoSyncStatus copyWith({
+    bool? running,
+    DateTime? lastSyncedAt,
+    bool? smsAccessOff,
+  }) =>
       AutoSyncStatus(
         running: running ?? this.running,
         lastSyncedAt: lastSyncedAt ?? this.lastSyncedAt,
+        smsAccessOff: smsAccessOff ?? this.smsAccessOff,
       );
 }

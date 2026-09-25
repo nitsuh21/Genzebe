@@ -440,9 +440,11 @@ class _QuickActions extends ConsumerWidget {
           child: Text(
             busy
                 ? 'Checking your bank messages…'
-                : last == null
-                    ? 'Syncs automatically when bank messages arrive'
-                    : 'Synced automatically · ${relativeDayLabel(last)} ${formatTime(last)}',
+                : (auto?.smsAccessOff ?? false)
+                    ? 'SMS access is off — tap Sync SMS to allow it'
+                    : last == null
+                        ? 'Syncs automatically when bank messages arrive'
+                        : 'Synced automatically · ${relativeDayLabel(last)} ${formatTime(last)}',
             style: Theme.of(context).textTheme.labelSmall?.copyWith(
                   color: Theme.of(context).colorScheme.onSurfaceVariant,
                 ),

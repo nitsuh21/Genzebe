@@ -118,21 +118,23 @@ class _InAppAlertHostState extends ConsumerState<InAppAlertHost>
   @override
   Widget build(BuildContext context) {
     final alert = _current;
-    final topInset = MediaQuery.of(context).viewPadding.top;
     return Stack(
       children: [
         widget.child,
+        // Bottom, just above the tab bar: the top of the screen is where
+        // the SMS app's own heads-up for the very same message appears,
+        // which would hide this banner exactly when it matters.
         if (alert != null)
           AnimatedPositioned(
             duration: const Duration(milliseconds: 320),
             curve: Curves.easeOutCubic,
             left: 12,
             right: 12,
-            top: _visible ? topInset + 8 : -160,
+            bottom: _visible ? 12 : -160,
             child: GestureDetector(
               onTap: _onTap,
               onVerticalDragEnd: (details) {
-                if ((details.primaryVelocity ?? 0) < 0) _hide();
+                if ((details.primaryVelocity ?? 0) > 0) _hide();
               },
               child: _AlertBanner(alert: alert, more: _more),
             ),
