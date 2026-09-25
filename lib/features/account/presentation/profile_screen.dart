@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart' show kReleaseMode;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:genzeb/app/providers.dart';
+import 'package:genzeb/core/config/app_config.dart';
 import 'package:genzeb/core/l10n/app_strings.dart';
 import 'package:genzeb/features/account/domain/models/account_models.dart';
 import 'package:genzeb/features/ai/presentation/ai_assistant_sheet.dart';
@@ -53,13 +54,16 @@ class ProfileScreen extends ConsumerWidget {
         const SizedBox(height: 14),
         _StatsStrip(strings: strings),
         const SizedBox(height: 22),
-        _SectionLabel(strings.yourPlan),
-        _PlanRow(
-          account: account,
-          strings: strings,
-          onTap: () => _showPlansSheet(context, account.planCode, strings),
-        ),
-        const SizedBox(height: 20),
+        // Plans, Plus and the AI assistant are hidden while sign-in is off.
+        if (AppConfig.accountsEnabled) ...[
+          _SectionLabel(strings.yourPlan),
+          _PlanRow(
+            account: account,
+            strings: strings,
+            onTap: () => _showPlansSheet(context, account.planCode, strings),
+          ),
+          const SizedBox(height: 20),
+        ],
         _SectionLabel(strings.preferences),
         _SettingsCard(
           children: [
@@ -79,28 +83,30 @@ class ProfileScreen extends ConsumerWidget {
             ),
           ],
         ),
-        const SizedBox(height: 20),
-        const _SectionLabel('Genzeb AI'),
-        _SettingsCard(
-          children: [
-            // A Plus perk: free users see what it is and where to get it,
-            // never the assistant itself.
-            _SettingsTile(
-              icon: Icons.auto_awesome_rounded,
-              iconColor: const Color(0xFF8E63D8),
-              title: 'AI assistant',
-              subtitle: aiEntitled
-                  ? 'Ask about spending, budgets and plans'
-                  : 'Included with Genzeb Plus',
-              trailingWidget: aiEntitled
-                  ? _StatusDot(ready: aiAvailable ?? false)
-                  : const _PlusBadge(),
-              onTap: aiEntitled
-                  ? () => showAiAssistant(context)
-                  : () => _showPlansSheet(context, account.planCode, strings),
-            ),
-          ],
-        ),
+        if (AppConfig.accountsEnabled) ...[
+          const SizedBox(height: 20),
+          const _SectionLabel('Genzeb AI'),
+          _SettingsCard(
+            children: [
+              // A Plus perk: free users see what it is and where to get it,
+              // never the assistant itself.
+              _SettingsTile(
+                icon: Icons.auto_awesome_rounded,
+                iconColor: const Color(0xFF8E63D8),
+                title: 'AI assistant',
+                subtitle: aiEntitled
+                    ? 'Ask about spending, budgets and plans'
+                    : 'Included with Genzeb Plus',
+                trailingWidget: aiEntitled
+                    ? _StatusDot(ready: aiAvailable ?? false)
+                    : const _PlusBadge(),
+                onTap: aiEntitled
+                    ? () => showAiAssistant(context)
+                    : () => _showPlansSheet(context, account.planCode, strings),
+              ),
+            ],
+          ),
+        ],
         const SizedBox(height: 20),
         _SectionLabel(strings.automation),
         _SettingsCard(
@@ -151,7 +157,8 @@ class ProfileScreen extends ConsumerWidget {
               ),
           ],
         ),
-        if (account.status == AuthStatus.signedIn) ...[
+        if (AppConfig.accountsEnabled &&
+            account.status == AuthStatus.signedIn) ...[
           const SizedBox(height: 20),
           _AccountActions(strings: strings),
         ],
@@ -233,7 +240,9 @@ class _ProfileHero extends ConsumerWidget {
           Text(
             signedIn
                 ? profile.email
-                : 'No account needed · sign in for Plus features',
+                : AppConfig.accountsEnabled
+                    ? 'No account needed · sign in for Plus features'
+                    : 'Private by design · everything stays on this phone',
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             textAlign: TextAlign.center,
@@ -272,7 +281,7 @@ class _ProfileHero extends ConsumerWidget {
                 ],
               ),
             )
-          else
+          else if (AppConfig.accountsEnabled)
             FilledButton(
               style: FilledButton.styleFrom(
                 backgroundColor: Colors.white,

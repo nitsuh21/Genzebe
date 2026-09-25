@@ -73,4 +73,22 @@ void main() {
     final app = tester.widget<MaterialApp>(find.byType(MaterialApp));
     expect(app.themeMode, ThemeMode.light);
   });
+
+  testWidgets('sign-in and subscriptions are hidden', (tester) async {
+    SharedPreferences.setMockInitialValues({
+      'intro_seen': true,
+      'sms_setup_done': true,
+    });
+    await tester.pumpWidget(_app());
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Profile'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Continue with Google'), findsNothing);
+    expect(find.text('Your plan'), findsNothing);
+    expect(find.text('AI assistant'), findsNothing);
+    expect(find.text('Delete account'), findsNothing);
+    expect(find.textContaining('everything stays on this phone'),
+        findsOneWidget);
+  });
 }

@@ -41,8 +41,18 @@ class AppConfig {
   /// the AI assistant is a Plus perk that free builds must not expose.
   static String get geminiApiKey => _geminiApiKey;
 
+  /// Master switch for sign-in and everything behind it (plans, Plus, AI,
+  /// account deletion). Off for the first Play release: the app is fully
+  /// local, never initialises Supabase and never touches the network. The
+  /// code stays; build with `--dart-define=GENZEB_ACCOUNTS=true` to bring it
+  /// back (and restore INTERNET in AndroidManifest.xml).
+  static const bool accountsEnabled =
+      bool.fromEnvironment('GENZEB_ACCOUNTS', defaultValue: false);
+
   static bool get isBackendConfigured =>
-      _supabaseUrl.trim().isNotEmpty && _supabaseAnonKey.trim().isNotEmpty;
+      accountsEnabled &&
+      _supabaseUrl.trim().isNotEmpty &&
+      _supabaseAnonKey.trim().isNotEmpty;
 
   static bool get isGoogleSignInConfigured =>
       isBackendConfigured && _googleServerClientId.trim().isNotEmpty;

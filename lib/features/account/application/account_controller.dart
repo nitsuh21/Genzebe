@@ -27,10 +27,11 @@ class AccountController extends StateNotifier<AccountState> {
   Future<void> _restore() async {
     final repository = _repository;
     if (repository == null) {
-      // No backend: still run the full onboarding/sign-in journey, restoring
-      // whichever choice (demo sign-in or offline) was made before.
+      // No backend: a debug build with accounts on but no keys can still
+      // exercise the signed-in UI with the demo identity.
       final prefs = await SharedPreferences.getInstance();
-      if (prefs.getBool(_demoSignedInPref) ?? false) {
+      if (AppConfig.accountsEnabled &&
+          (prefs.getBool(_demoSignedInPref) ?? false)) {
         state = state.copyWith(
           status: AuthStatus.signedIn,
           profile: _demoProfile,
@@ -85,6 +86,7 @@ class AccountController extends StateNotifier<AccountState> {
   );
 
   Future<bool> signInWithGoogle() async {
+    if (!AppConfig.accountsEnabled) return false;
     final repository = _repository;
     if (repository == null) {
       final prefs = await SharedPreferences.getInstance();

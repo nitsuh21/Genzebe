@@ -12,11 +12,10 @@ Fixed in code on 2026-09-25:
 - [x] **AI assistant is gated to Genzeb Plus** (`aiEntitledProvider`); Plus is not purchasable, so no release user can reach Gemini. The privacy policy and Data safety answers below assume no AI traffic. Revisit both before Plus launches.
 - [x] **`learning_base.json` export** runs only in debug builds (`kReleaseMode` guard).
 - [x] **Personal SMS are never stored**: sync ingests only recognised bank/wallet senders, and a one-time cleanup removes personal messages older versions stored.
-- [x] **In-app account deletion**: Profile → Delete account (signed-in users) calls the `delete_my_account` RPC.
+- [x] **Sign-in and subscriptions switched off** (`AppConfig.accountsEnabled`, build flag `GENZEB_ACCOUNTS`). No accounts means Play's account-deletion requirement doesn't apply, and the release manifest drops INTERNET. (The in-app deletion flow + `delete_my_account` migration are kept for when accounts return.)
 
 Still open:
-- [ ] **Apply `supabase/migrations/0002_delete_my_account.sql`** to the production Supabase project. Until then, Delete account shows an error.
-- [ ] **Web link for account deletion** ([requirement](https://support.google.com/googleplay/android-developer/answer/13327111)): publish the privacy policy (its account-deletion section tells users how to delete in-app or by email) and give that URL in Play Console → App content → Data deletion.
+- [ ] Only when accounts return: apply `supabase/migrations/0002_delete_my_account.sql` and add the account-deletion web link ([requirement](https://support.google.com/googleplay/android-developer/answer/13327111)).
 - [ ] Replace `CONTACT_EMAIL` in `docs/privacy-policy.html` and publish it (see §9).
 - [ ] Create the upload keystore and `android/key.properties` (§1). Without it the bundle is debug-signed and Play rejects it.
 - [ ] Fix the local toolchain: `flutter doctor` reports a missing `cmdline-tools` component and unknown license status. Install "Android SDK Command-line Tools" in Android Studio → SDK Manager, then run `flutter doctor --android-licenses`. Without them, `flutter build appbundle` exits 1 with "failed to strip debug symbols" even though the `.aab` builds.
@@ -81,23 +80,15 @@ Suggested copy: *"Genzeb reads SMS from your bank and mobile-money wallet (e.g. 
 
 Must match `docs/privacy-policy.html`. Data that is processed only on the device and never sent off it doesn't count as "collected" ([Data safety guidance](https://support.google.com/googleplay/android-developer/answer/10787469)).
 
+Sign-in is switched off for this release (`AppConfig.accountsEnabled = false`) and the release build has **no INTERNET permission**, so:
+
 | Question | Answer |
 |---|---|
-| Does the app collect or share any required user data types? | Yes (only the optional account data below) |
-| Is all collected data encrypted in transit? | Yes (HTTPS to Supabase / Google) |
-| Can users request that data be deleted? | Yes (in-app request + email CONTACT_EMAIL) |
-| Data **shared** with third parties | None. Supabase is a service provider acting on our behalf, which isn't "sharing" |
+| Does the app collect or share any required user data types? | **No** |
+| Is all collected data encrypted in transit? | Not applicable (nothing is transmitted) |
+| Can users request that data be deleted? | Not applicable — all data is on-device; uninstalling or clearing app data deletes it |
 
-| Data type | Collected? | Optional? | Purpose | Notes |
-|---|---|---|---|---|
-| Personal info → Email address | Yes | Optional (sign-in only) | Account management | Supabase |
-| Personal info → Name | Yes | Optional | Account management | From Google profile |
-| Personal info → User IDs | Yes | Optional | Account management | Supabase user ID |
-| Personal info → Other (profile picture URL) | Yes | Optional | Account management | From Google profile |
-| Financial info → Purchase history | Yes, once the paid plan launches | Optional | Account management / app functionality | Plan/subscription status only |
-| Messages → SMS or MMS | **No** | — | — | Processed on-device only |
-| Financial info → other (transactions, balances) | **No** | — | — | Stored on-device only |
-| Location, contacts, photos, audio, calendar, app activity, device IDs, crash logs, diagnostics | **No** | — | — | No analytics/crash SDKs |
+SMS messages and financial records are processed and stored on-device only, so they are not "collected". If sign-in is turned back on, restore the account-data rows (email, name, user ID, profile picture; Supabase as service provider) and the account-deletion answers.
 
 Also: no advertising ID. The manifest strips `com.google.android.gms.permission.AD_ID`, so answer "No" to advertising ID use under Policy → App content → Advertising ID.
 

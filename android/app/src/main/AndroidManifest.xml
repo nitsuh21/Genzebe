@@ -6,8 +6,12 @@
          SMS permissions declaration — see docs/play-store-submission.md. -->
     <uses-permission android:name="android.permission.READ_SMS" />
     <uses-permission android:name="android.permission.RECEIVE_SMS" />
-    <!-- INTERNET: optional Google sign-in / Supabase account for paid plan. -->
-    <uses-permission android:name="android.permission.INTERNET" />
+    <!-- No INTERNET in release: sign-in/plans are switched off
+         (AppConfig.accountsEnabled) and nothing else uses the network, so
+         SMS-derived data provably cannot leave the phone. The remove marker
+         also strips it if a plugin merges it; debug/profile manifests add it
+         back for Flutter tooling. Restore this line when accounts return. -->
+    <uses-permission android:name="android.permission.INTERNET" tools:node="remove" />
 
     <!-- Defensive removals: nothing below is used. If a plugin update ever
          merges one of these, the build strips it so the shipped permission

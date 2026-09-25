@@ -5,7 +5,7 @@
 **Stack:** Flutter 3 / Dart, sqflite (on-device ledger), Riverpod, Supabase (optional Google sign-in, plans, account deletion), Gemini (chat assistant, Plus-only)
 
 ## Next Step
-> Cut the review queue (249 items on the dev phone, all from recognised senders): with the owner's OK, export real bank/wallet SMS from the phone, add them to `test/fixtures/sms/`, and fix the parser until the corpus is green (issue #1). Play launch blockers are listed in `docs/play-store-submission.md` §0 (upload keystore, apply `supabase/migrations/0002_delete_my_account.sql`, host the privacy policy, rotate the old Gemini key).
+> Cut the review queue (249 items on the dev phone, all from recognised senders): with the owner's OK, export real bank/wallet SMS from the phone, add them to `test/fixtures/sms/`, and fix the parser until the corpus is green (issue #1). Play launch blockers are listed in `docs/play-store-submission.md` §0 (upload keystore, host the privacy policy, rotate the old Gemini key).
 
 ## Built So Far
 - Play-readiness pass (2026-09-25): no login required (sign-in optional, in Profile, for Plus); registry of 38 Ethiopian banks + wallets with auto-detected accounts and brand monograms (manual sender mapping removed); sync reads only recognised financial senders and purges personal SMS stored by old versions; auto-sync on launch/resume/incoming bank SMS; in-app money in/out alerts (banner + bell inbox); AI assistant gated to Genzeb Plus; light theme default; in-app account deletion; release signing via key.properties, R8, target SDK 36; privacy policy + Play checklist in `docs/`; offline startup no longer blocks on Supabase.
@@ -22,7 +22,7 @@
 - Review queue is still large on real data: messages from recognised senders without an explicit direction phrase. Needs real samples (issue #1).
 - Numeric shortcodes seen on the dev phone are unclassified: 251994, 830, 9923, 131, 605, 8202, 994, 810, 824 — plus `apollo` (possibly BoA's Apollo). Only `127` (telebirr) is mapped.
 - Awash/BOA/Dashen/Hibret and all newly added institutions' fixtures are synthetic.
-- Genzeb Plus is not purchasable yet, so the AI assistant is unreachable in release builds (intended).
+- Sign-in, plans/Plus and the AI assistant are switched off (`AppConfig.accountsEnabled`, `--dart-define=GENZEB_ACCOUNTS=true` to re-enable; also restore INTERNET in the manifest). Release has no INTERNET permission.
 - `flutter build appbundle` exits 1 locally ("failed to strip debug symbols") until Android cmdline-tools are installed; the .aab itself builds.
 
 ## Services & Billing
@@ -39,3 +39,4 @@ Required config keys: see `env.example.json` (`SUPABASE_URL`, `SUPABASE_ANON_KEY
 ## Decisions Log
 - 2026-09-19: Removed AI (Gemini) from SMS extraction entirely — categorization/direction/institution are now deterministic + user rules + review queue. Reason: Gemini quota/billing blockers, key exposure in APK, and SMS text was leaving the device. Chat assistant kept for now.
 - 2026-09-25: Play-readiness. Login optional (no sign-in wall); AI chat kept but gated to the Plus plan and its key removed from the bundle; manual sender mapping replaced by a built-in institution registry; bank logos replaced by brand-coloured monograms (trademark / Play impersonation risk).
+- 2026-09-25: Sign-in and subscription UI switched off for v1 (code kept behind `accountsEnabled`); release drops INTERNET. Supabase unused until Plus launches.
