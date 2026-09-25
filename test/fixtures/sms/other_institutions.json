@@ -1,0 +1,72 @@
+{
+  "institution": "various",
+  "cases": [
+    {
+      "id": "wegagen-debit-books-under-wegagen",
+      "source": "synthetic",
+      "sender": "Wegagen",
+      "body": "Dear Customer, your account 01****5678 has been debited with ETB 1,200.00 on 20/09/2026. Available balance ETB 8,450.00. Wegagen Bank",
+      "expect": {
+        "parsed": true,
+        "institution": "wegagen",
+        "direction": "out",
+        "amountMinor": 120000,
+        "balanceMinor": 845000,
+        "explicitDirection": true,
+        "autoAccept": true
+      }
+    },
+    {
+      "id": "coopbank-credit-books-under-coop-not-oromia",
+      "source": "synthetic",
+      "sender": "Coopbank",
+      "body": "Your account 10****321 has been credited with ETB 3,000.00. Balance ETB 5,210.50. Cooperative Bank of Oromia",
+      "expect": {
+        "parsed": true,
+        "institution": "coop",
+        "direction": "in",
+        "amountMinor": 300000,
+        "balanceMinor": 521050,
+        "explicitDirection": true,
+        "autoAccept": true
+      }
+    },
+    {
+      "id": "mpesa-received-books-under-mpesa",
+      "source": "synthetic",
+      "sender": "M-PESA",
+      "body": "Confirmed. You have received ETB 750.00 from Hana T. on 21/9/26. New M-PESA balance is ETB 1,020.00.",
+      "expect": {
+        "parsed": true,
+        "institution": "mpesa",
+        "direction": "in",
+        "amountMinor": 75000,
+        "explicitDirection": true,
+        "autoAccept": true
+      }
+    },
+    {
+      "id": "cbebirr-is-its-own-wallet",
+      "source": "synthetic",
+      "sender": "CBEBirr",
+      "body": "You have sent ETB 200.00 to Dawit M. Your CBE Birr balance is ETB 340.00.",
+      "expect": {
+        "parsed": true,
+        "institution": "cbebirr",
+        "direction": "out",
+        "amountMinor": 20000,
+        "explicitDirection": true,
+        "autoAccept": true
+      }
+    },
+    {
+      "id": "bank-promo-without-money-movement-is-ignored",
+      "source": "synthetic",
+      "sender": "ZemenBank",
+      "body": "Enjoy 10% cashback at partner stores this holiday season with your Zemen card!",
+      "expect": {
+        "parsed": false
+      }
+    }
+  ]
+}

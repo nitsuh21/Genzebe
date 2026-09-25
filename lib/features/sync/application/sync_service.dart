@@ -1,11 +1,12 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:flutter/foundation.dart' show kReleaseMode;
 import 'package:genzeb/core/logging/app_logger.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:genzeb/features/sms_ingestion/application/sms_ingestion_service.dart';
-import 'package:genzeb/features/sms_ingestion/application/account_mapping_service.dart';
+import 'package:genzeb/features/sms_ingestion/domain/models/institutions.dart';
 import 'package:genzeb/features/sms_ingestion/domain/models/sms_models.dart';
 import 'package:genzeb/features/sms_ingestion/domain/repositories/device_sms_source.dart';
 import 'package:genzeb/features/sms_ingestion/domain/repositories/sms_message_repository.dart';
@@ -20,10 +21,12 @@ class ForceSyncResult {
     required this.duplicates,
     required this.failed,
     required this.deviceFetched,
-    required this.deviceMatchedMappings,
+    required this.deviceFinancial,
     required this.importedCount,
-    required this.mappingRuleCount,
     required this.smsPermissionState,
+    required this.newTransactions,
+    required this.institutionsFound,
+    required this.wasIncremental,
   });
 
   final int processed;
@@ -31,63 +34,83 @@ class ForceSyncResult {
   final int pendingReview;
   final int duplicates;
   final int failed;
+
+  /// Every inbox message read in the window.
   final int deviceFetched;
-  final int deviceMatchedMappings;
+
+  /// The subset sent by a recognised bank or wallet — the only ones ingested.
+  final int deviceFinancial;
   final int importedCount;
-  final int mappingRuleCount;
   final SmsPermissionState smsPermissionState;
+
+  /// Transactions this run created (booked or waiting for review).
+  final List<TransactionRecord> newTransactions;
+
+  /// Institutions seen in the inbox window.
+  final Set<EthiopianInstitution> institutionsFound;
+
+  /// True for a resume/incoming-SMS refresh that followed an earlier sync.
+  final bool wasIncremental;
 }
 
+/// Reads the inbox and books every message from a recognised Ethiopian bank
+/// or wallet. There is no setup step: whichever institutions appear in the
+/// inbox are synced, each into its own account. Messages from anyone else
+/// (people, OTP services, promos) are skipped before they are stored.
 class SyncService {
   SyncService({
     required SmsMessageRepository smsMessageRepository,
     required SmsIngestionService smsIngestionService,
     required DeviceSmsSource deviceSmsSource,
-    required AccountMappingService accountMappingService,
     LedgerRepository? ledgerRepository,
   })  : _smsMessageRepository = smsMessageRepository,
         _smsIngestionService = smsIngestionService,
         _deviceSmsSource = deviceSmsSource,
-        _accountMappingService = accountMappingService,
         _ledgerRepository = ledgerRepository;
 
   final SmsMessageRepository _smsMessageRepository;
   final SmsIngestionService _smsIngestionService;
   final DeviceSmsSource _deviceSmsSource;
-  final AccountMappingService _accountMappingService;
   final LedgerRepository? _ledgerRepository;
+
+  static const _lastSyncPref = 'sms_last_sync_at';
+  static const _cleanupPref = 'sms_non_financial_cleanup_v1';
+
+  /// How far back the first sync reads.
+  static const historyWindow = Duration(days: 365 * 2);
+
+  /// Overlap on incremental syncs, so a message the SMS provider wrote late
+  /// is still picked up. Already-ingested ids are skipped cheaply.
+  static const _incrementalOverlap = Duration(days: 2);
 
   Future<ForceSyncResult> forceSyncFromSms({
     String? importedRawPayload,
-    bool syncAllMappings = true,
-    Set<String>? selectedMappingSenderPatterns,
     bool rebuild = false,
+    bool incremental = false,
+    bool requestPermission = true,
   }) async {
     if (rebuild) await _clearSmsDerivedData();
-    final since = DateTime.now().subtract(const Duration(days: 365 * 2));
-    final mappings = await _accountMappingService.getMappings();
-    final normalizedSelection = selectedMappingSenderPatterns
-            ?.map((pattern) => pattern.toLowerCase())
-            .toSet() ??
-        const <String>{};
-    final activeMappings = mappings.where((mapping) {
-      if (syncAllMappings) return true;
-      return normalizedSelection.contains(mapping.senderPattern.toLowerCase());
-    }).toList(growable: false);
-    final permissionState = await _deviceSmsSource.ensurePermission();
+    await _purgeNonFinancialMessagesOnce();
+
+    final prefs = await SharedPreferences.getInstance();
+    final lastSyncMillis = prefs.getInt(_lastSyncPref);
+    final isIncremental = incremental && !rebuild && lastSyncMillis != null;
+    final now = DateTime.now();
+    final since = isIncremental
+        ? DateTime.fromMillisecondsSinceEpoch(lastSyncMillis)
+            .subtract(_incrementalOverlap)
+        : now.subtract(historyWindow);
+
+    final permissionState = requestPermission
+        ? await _deviceSmsSource.ensurePermission()
+        : await _deviceSmsSource.currentPermission();
     final fetchedDeviceMessages = permissionState == SmsPermissionState.granted
-        ? await _deviceSmsSource.fetchRecentMessages(
-            since: since,
-          )
+        ? await _deviceSmsSource.fetchRecentMessages(since: since)
         : const <SmsMessage>[];
-    final deviceMessages = fetchedDeviceMessages.where((message) {
-      if (mappings.isEmpty) return true;
-      if (activeMappings.isEmpty) return false;
-      final sender = message.sender;
-      return activeMappings.any(
-        (rule) => _senderMatchesPattern(sender, rule.senderPattern),
-      );
-    }).toList(growable: false);
+    final deviceMessages = fetchedDeviceMessages
+        .where((message) => isFinancialSender(message.sender))
+        .toList(growable: false);
+    // Pasted messages are the user's explicit choice; ingest them as-is.
     final importedMessages = _parseImportedPayload(importedRawPayload);
     final allMessages = <SmsMessage>[
       ...deviceMessages,
@@ -96,20 +119,33 @@ class SyncService {
     AppLogger.info(
       'sync.force',
       'forceSyncFromSms: fetchedDevice=${fetchedDeviceMessages.length}, '
-          'mappedDevice=${deviceMessages.length}, imported=${importedMessages.length}, '
-          'mappingRules=${mappings.length}, activeRules=${activeMappings.length}, '
-          'syncAllMappings=$syncAllMappings, permission=$permissionState, since=$since',
+          'financial=${deviceMessages.length}, imported=${importedMessages.length}, '
+          'incremental=$isIncremental, permission=$permissionState, since=$since',
     );
+
     var duplicates = 0;
     var failed = 0;
+    final created = <TransactionRecord>[];
+    final institutions = <EthiopianInstitution>{};
     for (final message in allMessages) {
-      await _smsIngestionService.ingest(sms: message);
+      final institution = institutionForSender(message.sender);
+      if (institution != EthiopianInstitution.unknown) {
+        institutions.add(institution);
+      }
+      final record = await _smsIngestionService.ingest(sms: message);
+      if (record != null) {
+        created.add(record);
+        continue;
+      }
       final stored = await _smsMessageRepository.getById(message.id);
       if (stored == null) continue;
       if (stored.status == SmsIngestionStatus.duplicate) duplicates += 1;
       if (stored.status == SmsIngestionStatus.failed) failed += 1;
     }
 
+    if (permissionState == SmsPermissionState.granted) {
+      await prefs.setInt(_lastSyncPref, now.millisecondsSinceEpoch);
+    }
     await _maybeExportLearningBase();
 
     final allStored = await _smsMessageRepository.getAll();
@@ -126,18 +162,46 @@ class SyncService {
       duplicates: duplicates,
       failed: failed,
       deviceFetched: fetchedDeviceMessages.length,
-      deviceMatchedMappings: deviceMessages.length,
+      deviceFinancial: deviceMessages.length,
       importedCount: importedMessages.length,
-      mappingRuleCount: activeMappings.length,
       smsPermissionState: permissionState,
+      newTransactions: List.unmodifiable(created),
+      institutionsFound: Set.unmodifiable(institutions),
+      wasIncremental: isIncremental,
     );
   }
 
-  /// One-time export of every stored SMS with its parse result to
-  /// learning_base.json in the app documents directory — a corpus for
-  /// studying how real Ethiopian receipts should be categorized (fees,
-  /// debits, credits, transfers). Runs once, entirely on-device.
+  /// Earlier versions ingested the WHOLE inbox when no sender mapping
+  /// existed, filling the review queue (and the database) with personal
+  /// messages. Drop everything from unrecognised senders that the user
+  /// hasn't explicitly kept; rejected rows stay so rejections are honoured.
+  Future<void> _purgeNonFinancialMessagesOnce() async {
+    final prefs = await SharedPreferences.getInstance();
+    if (prefs.getBool(_cleanupPref) ?? false) return;
+    final stored = await _smsMessageRepository.getAll();
+    var removed = 0;
+    for (final message in stored) {
+      if (isFinancialSender(message.sms.sender)) continue;
+      if (message.status == SmsIngestionStatus.parsed ||
+          message.status == SmsIngestionStatus.rejected) {
+        continue;
+      }
+      // Pasted messages ('imported-…') were the user's explicit choice.
+      if (message.sms.id.startsWith('imported-')) continue;
+      final txId = message.parsedTransactionId;
+      if (txId != null) await _ledgerRepository?.deleteTransaction(txId);
+      await _smsMessageRepository.delete(message.sms.id);
+      removed += 1;
+    }
+    await prefs.setBool(_cleanupPref, true);
+    AppLogger.info('sync.cleanup', 'Removed $removed non-financial messages');
+  }
+
+  /// Debug-only export of every stored SMS with its parse result to
+  /// learning_base.json in the app documents directory — the corpus used to
+  /// grow the parser fixtures. Never runs in a release build.
   Future<void> _maybeExportLearningBase() async {
+    if (kReleaseMode) return;
     try {
       final prefs = await SharedPreferences.getInstance();
       if (prefs.getBool('learning_base_exported_v1') ?? false) return;
@@ -235,20 +299,5 @@ class SyncService {
         receivedAt: now.subtract(Duration(minutes: index)),
       );
     }).toList(growable: false);
-  }
-
-  bool _senderMatchesPattern(String sender, String pattern) {
-    final lowerSender = sender.toLowerCase();
-    final lowerPattern = pattern.toLowerCase();
-    if (lowerSender.contains(lowerPattern)) return true;
-
-    final normalizedSender = _normalizeSenderToken(lowerSender);
-    final normalizedPattern = _normalizeSenderToken(lowerPattern);
-    if (normalizedPattern.isEmpty) return false;
-    return normalizedSender.contains(normalizedPattern);
-  }
-
-  String _normalizeSenderToken(String value) {
-    return value.replaceAll(RegExp(r'[^a-z0-9]'), '');
   }
 }

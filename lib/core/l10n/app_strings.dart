@@ -18,12 +18,7 @@ class AppStrings {
     required this.onbSlide2Body,
     required this.onbSlide3Title,
     required this.onbSlide3Body,
-    required this.authWelcome,
-    required this.authSubtitle,
     required this.authGoogle,
-    required this.authOffline,
-    required this.authFreeNote,
-    required this.authDemoNote,
     required this.smsTitle,
     required this.smsBody,
     required this.smsPoint1Title,
@@ -82,6 +77,12 @@ class AppStrings {
     required this.other,
     required this.noSpendingPeriod,
     required this.share,
+    required this.alertsTitle,
+    required this.alertMoneyIn,
+    required this.alertMoneyOut,
+    required this.alertNeedsReview,
+    required this.alertsEmpty,
+    required this.alertsMarkRead,
   });
 
   final String navHome;
@@ -100,12 +101,7 @@ class AppStrings {
   final String onbSlide3Title;
   final String onbSlide3Body;
 
-  final String authWelcome;
-  final String authSubtitle;
   final String authGoogle;
-  final String authOffline;
-  final String authFreeNote;
-  final String authDemoNote;
 
   final String smsTitle;
   final String smsBody;
@@ -167,6 +163,12 @@ class AppStrings {
   final String other;
   final String noSpendingPeriod;
   final String share;
+  final String alertsTitle;
+  final String alertMoneyIn;
+  final String alertMoneyOut;
+  final String alertNeedsReview;
+  final String alertsEmpty;
+  final String alertsMarkRead;
 }
 
 const enStrings = AppStrings(
@@ -180,32 +182,30 @@ const enStrings = AppStrings(
   onbGetStarted: 'Get started',
   onbSlide1Title: 'Your SMS is already\na ledger',
   onbSlide1Body:
-      'CBE, Telebirr, Awash, Abyssinia — every birr you move arrives as a '
-      'text. Genzeb reads them and builds your money history automatically.',
+      'CBE, telebirr, Awash, Dashen, Abyssinia and every other Ethiopian bank '
+      'and wallet confirm each birr by text. Genzeb turns those into your '
+      'money history automatically.',
   onbSlide2Title: 'See where every\nbirr goes',
   onbSlide2Body:
       'Spending by category, monthly trends, budgets that warn you before '
       'you overshoot — not after.',
-  onbSlide3Title: 'Private. Smart.\nFree.',
+  onbSlide3Title: 'Private. Free.\nNo sign-up.',
   onbSlide3Body:
-      'Everything stays on your phone. Ask Genzeb AI about your money '
-      'anytime. No fees, no ads, no card required.',
-  authWelcome: 'Welcome to Genzeb',
-  authSubtitle: 'One account, and your free plan is ready.\n'
-      'Your financial data always stays on your phone.',
+      'Everything stays on your phone and no account is needed. No fees, '
+      'no ads, no card required.',
   authGoogle: 'Continue with Google',
-  authOffline: 'Continue offline',
-  authFreeNote: 'Free forever · No card required',
-  authDemoNote: 'Preview build — sign-in uses a demo account',
   smsTitle: 'Connect your SMS',
-  smsBody: 'Ethiopian banks and Telebirr confirm every transaction by SMS. '
-      'Genzeb reads those messages to build your ledger automatically.',
-  smsPoint1Title: 'Only money messages matter',
-  smsPoint1Body: 'OTPs and personal texts are ignored by the parser.',
+  smsBody: 'Genzeb reads SMS from Ethiopian banks and wallets to record '
+      'your transactions automatically and alert you when money moves in or '
+      'out of your accounts.',
+  smsPoint1Title: 'Only bank and wallet messages',
+  smsPoint1Body: 'Texts from people, OTP codes and promotions are skipped '
+      'and never stored.',
   smsPoint2Title: 'Nothing leaves your phone',
   smsPoint2Body: 'Messages are processed and stored on this device only.',
   smsPoint3Title: 'You stay in control',
-  smsPoint3Body: 'Uncertain matches wait for your approval in Review.',
+  smsPoint3Body: 'Uncertain matches wait for your approval in Review. You '
+      'can turn SMS access off anytime in Android settings.',
   smsAllow: 'Allow SMS access & import',
   smsDemo: 'Explore with demo data',
   smsLater: 'Maybe later',
@@ -256,6 +256,13 @@ const enStrings = AppStrings(
   other: 'Other',
   noSpendingPeriod: 'No spending in this period.',
   share: 'Share',
+  alertsTitle: 'Notifications',
+  alertMoneyIn: 'Money in',
+  alertMoneyOut: 'Money out',
+  alertNeedsReview: 'Needs your review',
+  alertsEmpty: 'Money in and money out alerts will appear here as your bank '
+      'and wallet messages arrive.',
+  alertsMarkRead: 'Mark all read',
 );
 
 const amStrings = AppStrings(
@@ -268,24 +275,21 @@ const amStrings = AppStrings(
   onbNext: 'ቀጣይ',
   onbGetStarted: 'ጀምር',
   onbSlide1Title: 'የእርስዎ SMS ራሱ\nመዝገብ ነው',
-  onbSlide1Body: 'ሲቢኢ፣ ቴሌብር፣ አዋሽ፣ አቢሲኒያ — እያንዳንዱ ብር በጽሑፍ መልዕክት ይደርሳል። '
-      'ገንዘብ መልዕክቶቹን አንብቦ የገንዘብዎን ታሪክ በራስ-ሰር ይገነባል።',
+  onbSlide1Body: 'ሲቢኢ፣ ቴሌብር፣ አዋሽ፣ ዳሽን፣ አቢሲኒያ እና ሌሎች የኢትዮጵያ ባንኮችና ዋሌቶች '
+      'እያንዳንዱን ብር በጽሑፍ መልዕክት ያረጋግጣሉ። ገንዘብ መልዕክቶቹን አንብቦ የገንዘብዎን ታሪክ '
+      'በራስ-ሰር ይገነባል።',
   onbSlide2Title: 'እያንዳንዱ ብር የት\nእንደሚሄድ ይወቁ',
   onbSlide2Body: 'ወጪ በምድብ፣ ወርሃዊ አዝማሚያዎች፣ እና ከመብዛቱ በፊት የሚያስጠነቅቁ በጀቶች።',
-  onbSlide3Title: 'የግል። ብልህ።\nነፃ።',
-  onbSlide3Body: 'ሁሉም መረጃ በስልክዎ ላይ ይቀራል። ስለ ገንዘብዎ የገንዘብ AIን በማንኛውም ጊዜ '
-      'ይጠይቁ። ክፍያ የለም፣ ማስታወቂያ የለም።',
-  authWelcome: 'እንኳን ወደ ገንዘብ በደህና መጡ',
-  authSubtitle: 'አንድ መለያ ብቻ — ነፃ እቅድዎ ዝግጁ ነው።\nየገንዘብ መረጃዎ ሁልጊዜ በስልክዎ ላይ ይቀራል።',
+  onbSlide3Title: 'የግል። ነፃ።\nመመዝገብ አያስፈልግም።',
+  onbSlide3Body: 'ሁሉም መረጃ በስልክዎ ላይ ይቀራል፤ መለያ አያስፈልግም። ክፍያ የለም፣ '
+      'ማስታወቂያ የለም።',
   authGoogle: 'በGoogle ይቀጥሉ',
-  authOffline: 'ያለ መለያ ይቀጥሉ',
-  authFreeNote: 'ለዘላለም ነፃ · ካርድ አያስፈልግም',
-  authDemoNote: 'የሙከራ ግንባታ — መግቢያው የናሙና መለያ ይጠቀማል',
   smsTitle: 'SMSዎን ያገናኙ',
   smsBody: 'የኢትዮጵያ ባንኮች እና ቴሌብር እያንዳንዱን ግብይት በSMS ያረጋግጣሉ። ገንዘብ እነዚህን '
       'መልዕክቶች አንብቦ መዝገብዎን በራስ-ሰር ይገነባል።',
-  smsPoint1Title: 'የገንዘብ መልዕክቶች ብቻ',
-  smsPoint1Body: 'የማረጋገጫ ኮዶች እና የግል መልዕክቶች ችላ ይባላሉ።',
+  smsPoint1Title: 'የባንክና የዋሌት መልዕክቶች ብቻ',
+  smsPoint1Body: 'ከሰዎች የሚመጡ መልዕክቶች፣ የማረጋገጫ ኮዶች እና ማስታወቂያዎች ችላ ይባላሉ፤ '
+      'አይቀመጡም።',
   smsPoint2Title: 'ምንም ከስልክዎ አይወጣም',
   smsPoint2Body: 'መልዕክቶች በዚህ መሣሪያ ላይ ብቻ ይታያሉ እና ይቀመጣሉ።',
   smsPoint3Title: 'ቁጥጥሩ የእርስዎ ነው',
@@ -340,4 +344,10 @@ const amStrings = AppStrings(
   other: 'ሌላ',
   noSpendingPeriod: 'በዚህ ጊዜ ውስጥ ወጪ የለም።',
   share: 'አጋራ',
+  alertsTitle: 'ማሳወቂያዎች',
+  alertMoneyIn: 'ገቢ ገንዘብ',
+  alertMoneyOut: 'ወጪ ገንዘብ',
+  alertNeedsReview: 'ግምገማ ያስፈልገዋል',
+  alertsEmpty: 'የባንክና የዋሌት መልዕክቶች ሲደርሱ የገቢና የወጪ ማሳወቂያዎች እዚህ ይታያሉ።',
+  alertsMarkRead: 'ሁሉንም እንደተነበበ ምልክት አድርግ',
 );

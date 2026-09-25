@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:genzeb/features/sms_ingestion/application/account_mapping_service.dart';
+import 'package:genzeb/features/sms_ingestion/application/account_resolver.dart';
 import 'package:genzeb/features/sms_ingestion/application/sms_ingestion_service.dart';
 import 'package:genzeb/features/sms_ingestion/data/in_memory_category_rule_repository.dart';
 import 'package:genzeb/features/sms_ingestion/data/in_memory_sms_message_repository.dart';
@@ -18,6 +18,14 @@ class _FakeDeviceSmsSource implements DeviceSmsSource {
   Future<SmsPermissionState> ensurePermission() async {
     return SmsPermissionState.granted;
   }
+
+  @override
+  Future<SmsPermissionState> currentPermission() async {
+    return SmsPermissionState.granted;
+  }
+
+  @override
+  Stream<SmsMessage> incomingMessages() => const Stream.empty();
 
   @override
   Future<List<SmsMessage>> fetchRecentMessages({DateTime? since}) async {
@@ -58,29 +66,18 @@ void main() {
   test('force sync is idempotent for seeded device SMS', () async {
     final ledger = InMemoryLedgerRepository();
     final smsStore = InMemorySmsMessageRepository();
-    final accountMapping = AccountMappingService(ledger);
     final ingestion = SmsIngestionService(
-      parser: SmsParserEngine(
-        const [
-          CbeSmsParserTemplate(),
-          AwashSmsParserTemplate(),
-          TelebirrSmsParserTemplate(),
-          BoaSmsParserTemplate(),
-          HibretSmsParserTemplate(),
-          DashenSmsParserTemplate(),
-          GenericAmountParserTemplate(),
-        ],
-      ),
+      parser: buildDefaultSmsParserEngine(),
       ledgerRepository: ledger,
       smsMessageRepository: smsStore,
-      accountMappingService: accountMapping,
+      accountResolver: AccountResolver(ledger),
       categoryRuleRepository: InMemoryCategoryRuleRepository(),
     );
     final sync = SyncService(
       smsMessageRepository: smsStore,
       smsIngestionService: ingestion,
       deviceSmsSource: _FakeDeviceSmsSource(),
-      accountMappingService: accountMapping,
+      ledgerRepository: ledger,
     );
 
     final first = await sync.forceSyncFromSms();

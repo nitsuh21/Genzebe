@@ -1,0 +1,8 @@
+# Copy to android/key.properties (gitignored) and fill in real values.
+# NEVER commit key.properties or the keystore file.
+# storeFile is resolved relative to the android/ directory, or use an
+# absolute path to a keystore kept outside the repo (recommended).
+storePassword=CHANGE_ME
+keyPassword=CHANGE_ME
+keyAlias=upload
+storeFile=/absolute/path/outside/repo/genzeb-upload-keystore.jks

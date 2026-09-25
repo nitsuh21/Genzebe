@@ -22,6 +22,7 @@ class ProfileScreen extends ConsumerWidget {
     final strings = ref.watch(stringsProvider);
     final themeMode = ref.watch(themeModeProvider);
     final language = ref.watch(appLanguageProvider);
+    final aiEntitled = ref.watch(aiEntitledProvider);
     final aiAvailable = ref.watch(aiAvailableProvider).valueOrNull;
     final pendingReview = ref.watch(reviewQueueProvider).valueOrNull?.length;
 
@@ -82,13 +83,21 @@ class ProfileScreen extends ConsumerWidget {
         const _SectionLabel('Genzeb AI'),
         _SettingsCard(
           children: [
+            // A Plus perk: free users see what it is and where to get it,
+            // never the assistant itself.
             _SettingsTile(
               icon: Icons.auto_awesome_rounded,
               iconColor: const Color(0xFF8E63D8),
               title: 'AI assistant',
-              subtitle: 'Ask about spending, budgets and plans',
-              trailingWidget: _StatusDot(ready: aiAvailable ?? false),
-              onTap: () => showAiAssistant(context),
+              subtitle: aiEntitled
+                  ? 'Ask about spending, budgets and plans'
+                  : 'Included with Genzeb Plus',
+              trailingWidget: aiEntitled
+                  ? _StatusDot(ready: aiAvailable ?? false)
+                  : const _PlusBadge(),
+              onTap: aiEntitled
+                  ? () => showAiAssistant(context)
+                  : () => _showPlansSheet(context, account.planCode, strings),
             ),
           ],
         ),
@@ -100,7 +109,7 @@ class ProfileScreen extends ConsumerWidget {
               icon: Icons.sms_outlined,
               iconColor: const Color(0xFF2E9E6B),
               title: 'SMS sync & review',
-              subtitle: 'Import, mappings and the review queue',
+              subtitle: 'Banks found, refresh and the review queue',
               trailingWidget: (pendingReview ?? 0) > 0
                   ? _CountBadge(count: pendingReview!)
                   : null,
@@ -118,8 +127,8 @@ class ProfileScreen extends ConsumerWidget {
               icon: Icons.phonelink_lock_outlined,
               iconColor: Color(0xFF4AA3B5),
               title: 'Private by design',
-              subtitle: 'Your SMS and ledger never leave this device. AI '
-                  'receives only an aggregated summary.',
+              subtitle: 'Your SMS and ledger never leave this device. No '
+                  'account needed.',
             ),
             // Sample data is an onboarding aid; in a release build it would
             // only pollute a real ledger.
@@ -144,14 +153,14 @@ class ProfileScreen extends ConsumerWidget {
         ),
         if (account.status == AuthStatus.signedIn) ...[
           const SizedBox(height: 20),
-          _SignOutTile(strings: strings),
+          _AccountActions(strings: strings),
         ],
         const SizedBox(height: 28),
         Center(
           child: Column(
             children: [
               Text(
-                'Genzeb · v0.2.0',
+                'Genzeb · v1.0.0',
                 style: theme.textTheme.bodySmall?.copyWith(
                   color: theme.colorScheme.onSurfaceVariant,
                 ),
@@ -224,9 +233,7 @@ class _ProfileHero extends ConsumerWidget {
           Text(
             signedIn
                 ? profile.email
-                : (account.backendConfigured
-                    ? 'Sign in to activate your free plan'
-                    : 'Using Genzeb offline — everything still works'),
+                : 'No account needed · sign in for Plus features',
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             textAlign: TextAlign.center,
@@ -959,13 +966,42 @@ class _CountBadge extends StatelessWidget {
   }
 }
 
-class _SignOutTile extends ConsumerWidget {
-  const _SignOutTile({required this.strings});
+class _PlusBadge extends StatelessWidget {
+  const _PlusBadge();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [Color(0xFF8E63D8), Color(0xFF4E5AE8)],
+        ),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: const Text(
+        'PLUS',
+        style: TextStyle(
+          color: Colors.white,
+          fontSize: 11,
+          fontWeight: FontWeight.w800,
+          letterSpacing: 0.4,
+        ),
+      ),
+    );
+  }
+}
+
+/// Sign out and delete account. Deletion is required by Google Play for any
+/// app that lets users create an account.
+class _AccountActions extends ConsumerWidget {
+  const _AccountActions({required this.strings});
 
   final AppStrings strings;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final busy = ref.watch(accountControllerProvider).busy;
     return _SettingsCard(
       children: [
         _SettingsTile(
@@ -975,20 +1011,64 @@ class _SignOutTile extends ConsumerWidget {
           subtitle: 'Your on-device data stays on this phone',
           destructive: true,
           onTap: () async {
-            final confirmed = await _showSignOutSheet(context, strings);
+            final confirmed = await _showConfirmSheet(
+              context,
+              icon: Icons.logout_rounded,
+              title: '${strings.signOut}?',
+              body: 'Your transactions and budgets stay safely on this '
+                  'device. You can sign back in anytime.',
+              confirmLabel: strings.signOut,
+            );
             if (confirmed == true) {
               await ref.read(accountControllerProvider.notifier).signOut();
             }
           },
+        ),
+        _SettingsTile(
+          icon: Icons.person_remove_outlined,
+          iconColor: const Color(0xFFE25555),
+          title: 'Delete account',
+          subtitle: 'Removes your Genzeb account and plan',
+          destructive: true,
+          onTap: busy
+              ? null
+              : () async {
+                  final confirmed = await _showConfirmSheet(
+                    context,
+                    icon: Icons.person_remove_outlined,
+                    title: 'Delete your account?',
+                    body: 'Your Genzeb account, profile and plan are '
+                        'permanently deleted. Transactions on this phone '
+                        'are not affected — they never left it — and the '
+                        'app keeps working without an account.',
+                    confirmLabel: 'Delete account',
+                  );
+                  if (confirmed != true) return;
+                  final deleted = await ref
+                      .read(accountControllerProvider.notifier)
+                      .deleteAccount();
+                  if (deleted && context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                          content: Text('Your account was deleted.')),
+                    );
+                  }
+                },
         ),
       ],
     );
   }
 }
 
-/// Branded sign-out confirmation: a bottom sheet in the app's own design
+/// Branded destructive confirmation: a bottom sheet in the app's own design
 /// language instead of the stock Android dialog.
-Future<bool?> _showSignOutSheet(BuildContext context, AppStrings strings) {
+Future<bool?> _showConfirmSheet(
+  BuildContext context, {
+  required IconData icon,
+  required String title,
+  required String body,
+  required String confirmLabel,
+}) {
   return showModalBottomSheet<bool>(
     context: context,
     useSafeArea: true,
@@ -1007,23 +1087,18 @@ Future<bool?> _showSignOutSheet(BuildContext context, AppStrings strings) {
                 color: const Color(0xFFE25555).withValues(alpha: 0.12),
                 borderRadius: BorderRadius.circular(18),
               ),
-              child: const Icon(
-                Icons.logout_rounded,
-                color: Color(0xFFE25555),
-                size: 26,
-              ),
+              child: Icon(icon, color: const Color(0xFFE25555), size: 26),
             ),
             const SizedBox(height: 14),
             Text(
-              '${strings.signOut}?',
+              title,
               style: theme.textTheme.titleLarge?.copyWith(
                 fontWeight: FontWeight.w800,
               ),
             ),
             const SizedBox(height: 8),
             Text(
-              'Your transactions and budgets stay safely on this device. '
-              'You can sign back in anytime.',
+              body,
               textAlign: TextAlign.center,
               style: theme.textTheme.bodyMedium?.copyWith(
                 color: theme.colorScheme.onSurfaceVariant,
@@ -1044,7 +1119,7 @@ Future<bool?> _showSignOutSheet(BuildContext context, AppStrings strings) {
                 ),
                 onPressed: () => Navigator.of(sheetContext).pop(true),
                 child: Text(
-                  strings.signOut,
+                  confirmLabel,
                   style: const TextStyle(fontWeight: FontWeight.w700),
                 ),
               ),

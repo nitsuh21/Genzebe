@@ -61,6 +61,12 @@ class SupabaseAccountRepository implements AccountRepository {
   }
 
   @override
+  Future<void> deleteAccount() async {
+    await _client.rpc<void>('delete_my_account');
+    await signOut();
+  }
+
+  @override
   Future<String> fetchPlanCode(String userId) async {
     try {
       final row = await _client

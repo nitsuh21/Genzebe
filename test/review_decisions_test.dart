@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:genzeb/features/sms_ingestion/application/account_mapping_service.dart';
+import 'package:genzeb/features/sms_ingestion/application/account_resolver.dart';
 import 'package:genzeb/features/sms_ingestion/application/sms_ingestion_service.dart';
 import 'package:genzeb/features/sms_ingestion/data/in_memory_category_rule_repository.dart';
 import 'package:genzeb/features/sms_ingestion/data/in_memory_sms_message_repository.dart';
@@ -15,20 +15,10 @@ SmsIngestionService _buildIngestion(
   InMemorySmsMessageRepository smsStore,
 ) {
   return SmsIngestionService(
-    parser: SmsParserEngine(
-      const [
-        CbeSmsParserTemplate(),
-        AwashSmsParserTemplate(),
-        TelebirrSmsParserTemplate(),
-        BoaSmsParserTemplate(),
-        HibretSmsParserTemplate(),
-        DashenSmsParserTemplate(),
-        GenericAmountParserTemplate(),
-      ],
-    ),
+    parser: buildDefaultSmsParserEngine(),
     ledgerRepository: ledger,
     smsMessageRepository: smsStore,
-    accountMappingService: AccountMappingService(ledger),
+    accountResolver: AccountResolver(ledger),
     categoryRuleRepository: InMemoryCategoryRuleRepository(),
   );
 }

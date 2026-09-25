@@ -11,6 +11,10 @@ import 'package:genzeb/features/account/data/supabase_account_repository.dart';
 import 'package:genzeb/features/account/domain/models/account_models.dart';
 import 'package:genzeb/features/account/domain/repositories/account_repository.dart';
 import 'package:genzeb/features/ai/ai_config.dart';
+import 'package:genzeb/features/alerts/application/auto_sync_controller.dart';
+import 'package:genzeb/features/alerts/application/money_alert_service.dart';
+import 'package:genzeb/features/alerts/data/money_alert_repositories.dart';
+import 'package:genzeb/features/alerts/domain/money_alert.dart';
 import 'package:genzeb/features/ai/application/ai_assistant_service.dart';
 import 'package:genzeb/features/ai/data/gemini_client.dart';
 import 'package:genzeb/features/budget/application/budget_service.dart';
@@ -18,7 +22,7 @@ import 'package:genzeb/features/budget/data/sqflite_budget_repository.dart';
 import 'package:genzeb/features/budget/domain/models/budget.dart';
 import 'package:genzeb/features/budget/domain/repositories/budget_repository.dart';
 import 'package:genzeb/features/reports/application/report_service.dart';
-import 'package:genzeb/features/sms_ingestion/application/account_mapping_service.dart';
+import 'package:genzeb/features/sms_ingestion/application/account_resolver.dart';
 import 'package:genzeb/features/sms_ingestion/application/sms_ingestion_service.dart';
 import 'package:genzeb/features/sms_ingestion/data/android_device_sms_source.dart';
 import 'package:genzeb/features/sms_ingestion/data/sqflite_category_rule_repository.dart';
@@ -26,6 +30,7 @@ import 'package:genzeb/features/sms_ingestion/data/sqflite_sms_message_repositor
 import 'package:genzeb/features/sms_ingestion/domain/repositories/category_rule_repository.dart';
 import 'package:genzeb/features/sms_ingestion/domain/repositories/device_sms_source.dart';
 import 'package:genzeb/features/sms_ingestion/domain/repositories/sms_message_repository.dart';
+import 'package:genzeb/features/sms_ingestion/domain/models/institutions.dart';
 import 'package:genzeb/features/sms_ingestion/domain/models/sms_models.dart';
 import 'package:genzeb/features/sms_ingestion/domain/services/sms_parser.dart';
 import 'package:genzeb/features/sync/application/sync_service.dart';
@@ -59,14 +64,13 @@ final accountControllerProvider =
   return AccountController(repository: ref.watch(accountRepositoryProvider));
 });
 
-/// Whether the one-time SMS setup step of onboarding has been completed
-/// (null while loading from disk).
+/// A persisted one-time flag (null while loading from disk).
 class OnboardingFlagController extends StateNotifier<bool?> {
-  OnboardingFlagController() : super(null) {
+  OnboardingFlagController(this._prefKey) : super(null) {
     _load();
   }
 
-  static const _prefKey = 'sms_setup_done';
+  final String _prefKey;
 
   Future<void> _load() async {
     final prefs = await SharedPreferences.getInstance();
@@ -80,9 +84,16 @@ class OnboardingFlagController extends StateNotifier<bool?> {
   }
 }
 
+/// The intro slides have been seen (first launch only).
+final introSeenProvider =
+    StateNotifierProvider<OnboardingFlagController, bool?>((ref) {
+  return OnboardingFlagController('intro_seen');
+});
+
+/// The one-time SMS setup step has been completed.
 final smsSetupDoneProvider =
     StateNotifierProvider<OnboardingFlagController, bool?>((ref) {
-  return OnboardingFlagController();
+  return OnboardingFlagController('sms_setup_done');
 });
 
 final ledgerRepositoryProvider = Provider<LedgerRepository>((ref) {
@@ -113,8 +124,16 @@ final aiAssistantServiceProvider = Provider<AiAssistantService>((ref) {
   );
 });
 
-final aiAvailableProvider = FutureProvider<bool>((ref) {
+/// The AI assistant is a Genzeb Plus perk: free users never reach Gemini,
+/// whatever keys the build carries.
+final aiEntitledProvider = Provider<bool>((ref) {
+  final account = ref.watch(accountControllerProvider);
+  return account.status == AuthStatus.signedIn && account.plan.includesAi;
+});
+
+final aiAvailableProvider = FutureProvider<bool>((ref) async {
   ref.watch(dataVersionProvider);
+  if (!ref.watch(aiEntitledProvider)) return false;
   return ref.watch(aiAssistantServiceProvider).isAvailable();
 });
 
@@ -135,22 +154,12 @@ final deviceSmsSourceProvider = Provider<DeviceSmsSource>((ref) {
   return AndroidDeviceSmsSource();
 });
 
-final accountMappingServiceProvider = Provider<AccountMappingService>((ref) {
-  return AccountMappingService(ref.watch(ledgerRepositoryProvider));
+final accountResolverProvider = Provider<AccountResolver>((ref) {
+  return AccountResolver(ref.watch(ledgerRepositoryProvider));
 });
 
 final smsParserEngineProvider = Provider<SmsParserEngine>((ref) {
-  return SmsParserEngine(
-    const [
-      CbeSmsParserTemplate(),
-      AwashSmsParserTemplate(),
-      TelebirrSmsParserTemplate(),
-      BoaSmsParserTemplate(),
-      HibretSmsParserTemplate(),
-      DashenSmsParserTemplate(),
-      GenericAmountParserTemplate(),
-    ],
-  );
+  return buildDefaultSmsParserEngine();
 });
 
 final smsIngestionServiceProvider = Provider<SmsIngestionService>((ref) {
@@ -158,7 +167,7 @@ final smsIngestionServiceProvider = Provider<SmsIngestionService>((ref) {
     parser: ref.watch(smsParserEngineProvider),
     ledgerRepository: ref.watch(ledgerRepositoryProvider),
     smsMessageRepository: ref.watch(smsMessageRepositoryProvider),
-    accountMappingService: ref.watch(accountMappingServiceProvider),
+    accountResolver: ref.watch(accountResolverProvider),
     categoryRuleRepository: ref.watch(categoryRuleRepositoryProvider),
   );
 });
@@ -168,9 +177,38 @@ final syncServiceProvider = Provider<SyncService>((ref) {
     smsMessageRepository: ref.watch(smsMessageRepositoryProvider),
     smsIngestionService: ref.watch(smsIngestionServiceProvider),
     deviceSmsSource: ref.watch(deviceSmsSourceProvider),
-    accountMappingService: ref.watch(accountMappingServiceProvider),
     ledgerRepository: ref.watch(ledgerRepositoryProvider),
   );
+});
+
+final moneyAlertRepositoryProvider = Provider<MoneyAlertRepository>((ref) {
+  return SqfliteMoneyAlertRepository(ref.watch(appDatabaseProvider));
+});
+
+final moneyAlertServiceProvider = Provider<MoneyAlertService>((ref) {
+  return MoneyAlertService(ref.watch(moneyAlertRepositoryProvider));
+});
+
+/// App-lifetime auto-sync (launch, resume, incoming bank SMS).
+final autoSyncControllerProvider = Provider<AutoSyncController>((ref) {
+  final controller = AutoSyncController(
+    syncService: ref.watch(syncServiceProvider),
+    alertService: ref.watch(moneyAlertServiceProvider),
+    deviceSmsSource: ref.watch(deviceSmsSourceProvider),
+    onDataChanged: () => ref.read(dataVersionProvider.notifier).state++,
+  );
+  ref.onDispose(controller.dispose);
+  return controller;
+});
+
+final moneyAlertsProvider = FutureProvider<List<MoneyAlert>>((ref) {
+  ref.watch(dataVersionProvider);
+  return ref.watch(moneyAlertServiceProvider).getAll();
+});
+
+final unreadAlertCountProvider = Provider<int>((ref) {
+  final alerts = ref.watch(moneyAlertsProvider).valueOrNull ?? const [];
+  return alerts.where((alert) => !alert.isRead).length;
 });
 
 final demoDataServiceProvider = Provider<DemoDataService>((ref) {
@@ -195,13 +233,16 @@ final reportServiceProvider = Provider<ReportService>((ref) {
   );
 });
 
-/// Theme choice, persisted so it survives app restarts.
+/// Theme choice, persisted so it survives app restarts. Light by default;
+/// dark (or following the system) is an explicit choice in Profile.
 class ThemeModeController extends StateNotifier<ThemeMode> {
-  ThemeModeController() : super(ThemeMode.system) {
+  ThemeModeController() : super(ThemeMode.light) {
     _load();
   }
 
-  static const _prefKey = 'theme_mode';
+  // v2: the old key mostly held "system" from the Home toggle; everyone
+  // starts on the new light default once.
+  static const _prefKey = 'theme_mode_v2';
 
   Future<void> _load() async {
     final prefs = await SharedPreferences.getInstance();
@@ -209,7 +250,7 @@ class ThemeModeController extends StateNotifier<ThemeMode> {
     if (stored == null) return;
     state = ThemeMode.values.firstWhere(
       (mode) => mode.name == stored,
-      orElse: () => ThemeMode.system,
+      orElse: () => ThemeMode.light,
     );
   }
 
@@ -332,7 +373,7 @@ final institutionFilterOptionsProvider =
     options.add(
       InstitutionFilterOption(
         code: code,
-        label: _institutionLabelFromCode(code),
+        label: institutionInfoForCode(code).shortName,
       ),
     );
   }
@@ -405,24 +446,3 @@ final storedSmsProvider = FutureProvider<List<StoredSmsMessage>>((ref) {
   ref.watch(dataVersionProvider);
   return ref.watch(smsMessageRepositoryProvider).getAll();
 });
-
-String _institutionLabelFromCode(String code) {
-  switch (code) {
-    case 'cbe':
-      return 'CBE';
-    case 'awash':
-      return 'Awash';
-    case 'telebirr':
-      return 'Telebirr';
-    case 'boa':
-      return 'Abyssinia';
-    case 'hibret':
-      return 'Hibret';
-    case 'dashen':
-      return 'Dashen';
-    case 'unknown':
-      return 'Other';
-    default:
-      return code.toUpperCase();
-  }
-}

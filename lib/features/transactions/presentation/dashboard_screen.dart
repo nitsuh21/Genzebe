@@ -2,8 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:genzeb/app/providers.dart';
 import 'package:genzeb/core/utils/formatters.dart';
+import 'package:genzeb/design_system/institution_avatar.dart';
 import 'package:genzeb/design_system/widgets.dart';
 import 'package:genzeb/features/account/presentation/profile_screen.dart';
+import 'package:genzeb/features/alerts/presentation/alert_widgets.dart';
+import 'package:genzeb/features/sms_ingestion/domain/repositories/device_sms_source.dart';
 import 'package:genzeb/features/reports/application/report_service.dart';
 import 'package:genzeb/features/transactions/domain/models/categories.dart';
 import 'package:genzeb/features/transactions/presentation/add_transaction_sheet.dart';
@@ -20,21 +23,25 @@ class DashboardScreen extends ConsumerStatefulWidget {
 class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   bool _syncing = false;
 
+  /// Incremental refresh — the same one that runs on launch and resume.
+  /// It never rebuilds history, so review decisions are never undone.
   Future<void> _forceSync() async {
     setState(() => _syncing = true);
-    // Home sync is a full rebuild: SMS-derived data is cleared and the whole
-    // inbox re-parsed with the current parser + learned rules, so history is
-    // always up to date with the latest fixes. Manual entries survive.
-    final result =
-        await ref.read(syncServiceProvider).forceSyncFromSms(rebuild: true);
+    final permission =
+        await ref.read(deviceSmsSourceProvider).ensurePermission();
+    await ref.read(autoSyncControllerProvider).refresh();
     refreshAppData(ref);
     if (!mounted) return;
     setState(() => _syncing = false);
+    final pending = ref.read(reviewQueueProvider).valueOrNull?.length ?? 0;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(
-          'Synced ${result.processed} SMS • ${result.newlyParsed} parsed • '
-          '${result.pendingReview} need review',
+          permission != SmsPermissionState.granted
+              ? 'Allow SMS access to sync your bank messages.'
+              : pending > 0
+                  ? 'Up to date · $pending waiting for your review'
+                  : 'Up to date',
         ),
       ),
     );
@@ -46,7 +53,6 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     final insightsAsync = ref.watch(dashboardInsightsProvider);
     final transactionsAsync = ref.watch(ledgerTransactionsProvider);
     final seriesAsync = ref.watch(monthlySeriesProvider);
-    final themeMode = ref.watch(themeModeProvider);
     final institutionOptionsAsync = ref.watch(institutionFilterOptionsProvider);
     final selectedInstitutionCodes =
         ref.watch(selectedInstitutionCodesProvider);
@@ -73,15 +79,6 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                     ?.displayName
                     ?.split(' ')
                     .first,
-                themeMode: themeMode,
-                onCycleTheme: () {
-                  final next = switch (themeMode) {
-                    ThemeMode.system => ThemeMode.light,
-                    ThemeMode.light => ThemeMode.dark,
-                    ThemeMode.dark => ThemeMode.system,
-                  };
-                  ref.read(themeModeProvider.notifier).setMode(next);
-                },
               ),
               const SizedBox(height: 16),
               institutionOptionsAsync.when(
@@ -200,14 +197,8 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
 }
 
 class _Header extends ConsumerWidget {
-  const _Header({
-    required this.themeMode,
-    required this.onCycleTheme,
-    this.displayName,
-  });
+  const _Header({this.displayName});
 
-  final ThemeMode themeMode;
-  final VoidCallback onCycleTheme;
   final String? displayName;
 
   @override
@@ -220,11 +211,6 @@ class _Header extends ConsumerWidget {
         : hour < 18
             ? strings.goodAfternoon
             : strings.goodEvening;
-    final icon = switch (themeMode) {
-      ThemeMode.system => Icons.brightness_auto_rounded,
-      ThemeMode.light => Icons.light_mode_rounded,
-      ThemeMode.dark => Icons.dark_mode_rounded,
-    };
     final name = displayName?.trim();
     final hasName = name != null && name.isNotEmpty;
     return Row(
@@ -248,11 +234,7 @@ class _Header extends ConsumerWidget {
             ],
           ),
         ),
-        IconButton.filledTonal(
-          onPressed: onCycleTheme,
-          icon: Icon(icon),
-          tooltip: 'Toggle theme',
-        ),
+        const AlertBellButton(),
       ],
     );
   }
@@ -523,15 +505,7 @@ class _AccountCard extends StatelessWidget {
         children: [
           Row(
             children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: theme.colorScheme.primaryContainer,
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Icon(Icons.account_balance_rounded,
-                    size: 18, color: theme.colorScheme.onPrimaryContainer),
-              ),
+              InstitutionAvatar.forCode(card.institutionCode, size: 34),
               const Spacer(),
               Icon(Icons.contactless_rounded,
                   color: theme.colorScheme.onSurfaceVariant, size: 18),

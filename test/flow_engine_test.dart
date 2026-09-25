@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:genzeb/features/reports/application/report_service.dart';
-import 'package:genzeb/features/sms_ingestion/application/account_mapping_service.dart';
+import 'package:genzeb/features/sms_ingestion/application/account_resolver.dart';
 import 'package:genzeb/features/sms_ingestion/application/sms_ingestion_service.dart';
 import 'package:genzeb/features/sms_ingestion/data/in_memory_category_rule_repository.dart';
 import 'package:genzeb/features/sms_ingestion/data/in_memory_sms_message_repository.dart';
@@ -47,7 +47,7 @@ Future<ReportService> _service(InMemoryLedgerRepository ledger) async {
     parser: SmsParserEngine(const [GenericAmountParserTemplate()]),
     ledgerRepository: ledger,
     smsMessageRepository: InMemorySmsMessageRepository(),
-    accountMappingService: AccountMappingService(ledger),
+    accountResolver: AccountResolver(ledger),
     categoryRuleRepository: InMemoryCategoryRuleRepository(),
   );
   return ReportService(ledger, ingestion);

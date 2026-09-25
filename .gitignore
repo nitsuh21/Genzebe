@@ -46,3 +46,9 @@ app.*.map.json
 
 # Local backend config with real keys — never commit (copy env.example.json).
 env.json
+
+# Release signing — never commit the upload key or its credentials
+# (android/key.properties.example is the committed template).
+key.properties
+*.jks
+*.keystore

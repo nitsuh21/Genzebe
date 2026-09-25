@@ -1,86 +1,14 @@
 import 'dart:math' as math;
 
+import 'package:genzeb/features/sms_ingestion/domain/models/institutions.dart';
 import 'package:genzeb/features/sms_ingestion/domain/models/sms_models.dart';
+
+export 'package:genzeb/features/sms_ingestion/domain/models/institutions.dart'
+    show institutionForSender, inferInstitutionFromSignature, isFinancialSender;
 
 abstract class SmsParserTemplate {
   bool canParse(SmsMessage sms);
   ParsedSmsTransaction? parse(SmsMessage sms);
-}
-
-// ---------------------------------------------------------------------------
-// Sender identification
-// ---------------------------------------------------------------------------
-
-/// Alphanumeric sender IDs each institution is known to use. Matched as a
-/// substring of the letters in the sender, so "CBE", "CBE Birr" and
-/// "CBEBirr" all resolve to CBE.
-const Map<EthiopianInstitution, List<String>> kInstitutionSenderKeywords = {
-  EthiopianInstitution.cbe: ['cbe', 'commercial bank'],
-  EthiopianInstitution.awash: ['awash'],
-  // Ethio telecom delivers telebirr receipts under its own sender name too.
-  EthiopianInstitution.telebirr: [
-    'telebirr',
-    'tele birr',
-    'ethio telecom',
-    'ethiotelecom',
-  ],
-  EthiopianInstitution.boa: ['abyssinia', 'boa'],
-  EthiopianInstitution.hibret: ['hibret', 'united bank'],
-  EthiopianInstitution.dashen: ['dashen'],
-};
-
-/// Purely numeric shortcodes. Matched EXACTLY: a personal number that happens
-/// to contain "127" must never be filed as telebirr.
-const Map<EthiopianInstitution, List<String>> kInstitutionShortcodes = {
-  EthiopianInstitution.telebirr: ['127'],
-};
-
-/// Resolves the institution behind an SMS sender ID, or `unknown`.
-EthiopianInstitution institutionForSender(String sender) {
-  final lowered = sender.trim().toLowerCase();
-  final letters = lowered.replaceAll(RegExp(r'[^a-z ]'), '').trim();
-  if (letters.isEmpty) {
-    final digits = lowered.replaceAll(RegExp(r'[^0-9]'), '');
-    for (final entry in kInstitutionShortcodes.entries) {
-      if (entry.value.contains(digits)) return entry.key;
-    }
-    return EthiopianInstitution.unknown;
-  }
-  for (final entry in kInstitutionSenderKeywords.entries) {
-    if (entry.value.any(letters.contains)) return entry.key;
-  }
-  return EthiopianInstitution.unknown;
-}
-
-/// Sign-off phrases an institution puts in its OWN receipts. Only used when
-/// the sender is unrecognised; a mere mention of another bank inside a
-/// message ("from CBE account") deliberately does not count.
-const Map<EthiopianInstitution, List<String>> _institutionSignatures = {
-  EthiopianInstitution.cbe: [
-    'thank you for banking with cbe',
-    'thanks for banking with cbe',
-    'cbe.com.et',
-  ],
-  EthiopianInstitution.telebirr: [
-    'thank you for using telebirr',
-    'e-money account',
-    'telebirr wallet',
-  ],
-  EthiopianInstitution.awash: [
-    'thank you for banking with awash',
-    'awash bank'
-  ],
-  EthiopianInstitution.boa: ['bank of abyssinia', 'abyssinia bank'],
-  EthiopianInstitution.hibret: ['hibret bank'],
-  EthiopianInstitution.dashen: ['dashen bank'],
-};
-
-/// Best-effort institution for a message from an unrecognised sender.
-EthiopianInstitution inferInstitutionFromSignature(String lowered) {
-  for (final entry in _institutionSignatures.entries) {
-    if (entry.value.any(lowered.contains)) return entry.key;
-  }
-  return EthiopianInstitution.unknown;
 }
 
 // ---------------------------------------------------------------------------
@@ -184,8 +112,8 @@ abstract class _InstitutionTemplate implements SmsParserTemplate {
   bool canParse(SmsMessage sms) {
     // Sender-only: matching on the body misfiles cross-institution messages
     // (a telebirr receipt mentioning "from CBE account" is NOT a CBE
-    // transaction). Unknown senders fall through to the generic template
-    // and the review queue, where the user can map the sender once.
+    // transaction). Sync only reads registered senders; the generic
+    // template exists for messages the user pastes by hand.
     return institutionForSender(sms.sender) == institution;
   }
 
@@ -273,6 +201,40 @@ class HibretSmsParserTemplate extends _InstitutionTemplate {
 
 class DashenSmsParserTemplate extends _InstitutionTemplate {
   const DashenSmsParserTemplate() : super(EthiopianInstitution.dashen);
+}
+
+/// Any other registered bank or wallet (Wegagen, NIB, M-PESA, ...). Uses the
+/// shared extraction; the institution comes from the sender ID. Listed after
+/// the institution-specific templates so those keep precedence.
+class KnownInstitutionParserTemplate extends _InstitutionTemplate {
+  const KnownInstitutionParserTemplate() : super(EthiopianInstitution.unknown);
+
+  @override
+  bool canParse(SmsMessage sms) => isFinancialSender(sms.sender);
+
+  @override
+  ParsedSmsTransaction? parse(SmsMessage sms) {
+    return super
+        .parse(sms)
+        ?.copyWith(institution: institutionForSender(sms.sender));
+  }
+}
+
+/// The production template order. Tests use this too, so the corpus always
+/// exercises exactly what ships.
+SmsParserEngine buildDefaultSmsParserEngine() {
+  return SmsParserEngine(
+    const [
+      CbeSmsParserTemplate(),
+      AwashSmsParserTemplate(),
+      TelebirrSmsParserTemplate(),
+      BoaSmsParserTemplate(),
+      HibretSmsParserTemplate(),
+      DashenSmsParserTemplate(),
+      KnownInstitutionParserTemplate(),
+      GenericAmountParserTemplate(),
+    ],
+  );
 }
 
 class SmsParserEngine {

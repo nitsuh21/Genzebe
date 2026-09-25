@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:genzeb/core/config/app_config.dart';
 import 'package:genzeb/core/logging/app_logger.dart';
@@ -17,7 +19,6 @@ class AccountController extends StateNotifier<AccountState> {
     _restore();
   }
 
-  static const _localModePref = 'account_local_mode';
   static const _demoSignedInPref = 'account_demo_signed_in';
 
   /// Null when the backend isn't configured — the app then runs local-only.
@@ -34,10 +35,8 @@ class AccountController extends StateNotifier<AccountState> {
           status: AuthStatus.signedIn,
           profile: _demoProfile,
         );
-      } else if (prefs.getBool(_localModePref) ?? false) {
-        state = state.copyWith(status: AuthStatus.localOnly);
       } else {
-        state = state.copyWith(status: AuthStatus.signedOut);
+        state = state.copyWith(status: AuthStatus.localOnly);
       }
       return;
     }
@@ -49,22 +48,32 @@ class AccountController extends StateNotifier<AccountState> {
     try {
       final profile = await repository.restoreSession();
       if (profile != null) {
-        final planCode = await repository.fetchPlanCode(profile.id);
-        state = state.copyWith(
-          status: AuthStatus.signedIn,
-          profile: profile,
-          planCode: planCode,
-        );
+        // Never hold the splash screen on the network: an expired token
+        // offline makes the client retry for a long time. Show the app now
+        // on the free plan and upgrade the plan when the backend answers.
+        state = state.copyWith(status: AuthStatus.signedIn, profile: profile);
+        unawaited(_refreshPlan(repository, profile.id));
         return;
       }
     } catch (error) {
       AppLogger.info('auth', 'Session restore failed: $error');
     }
-    final prefs = await SharedPreferences.getInstance();
-    final choseLocal = prefs.getBool(_localModePref) ?? false;
-    state = state.copyWith(
-      status: choseLocal ? AuthStatus.localOnly : AuthStatus.signedOut,
-    );
+    // No account is required: without a session the app simply runs on
+    // this device. Sign-in is offered in Profile for plans and backup.
+    state = state.copyWith(status: AuthStatus.localOnly);
+  }
+
+  static const _planTimeout = Duration(seconds: 8);
+
+  Future<void> _refreshPlan(AccountRepository repository, String userId) async {
+    try {
+      final planCode =
+          await repository.fetchPlanCode(userId).timeout(_planTimeout);
+      if (!mounted || state.profile?.id != userId) return;
+      state = state.copyWith(planCode: planCode);
+    } catch (error) {
+      AppLogger.info('auth', 'Plan refresh skipped: $error');
+    }
   }
 
   /// Demo identity used when the build has no backend configured, so the
@@ -79,7 +88,6 @@ class AccountController extends StateNotifier<AccountState> {
     final repository = _repository;
     if (repository == null) {
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setBool(_localModePref, false);
       await prefs.setBool(_demoSignedInPref, true);
       state = state.copyWith(
         status: AuthStatus.signedIn,
@@ -97,15 +105,12 @@ class AccountController extends StateNotifier<AccountState> {
         state = state.copyWith(busy: false); // cancelled, not an error
         return false;
       }
-      final planCode = await repository.fetchPlanCode(profile.id);
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setBool(_localModePref, false);
       state = state.copyWith(
         status: AuthStatus.signedIn,
         profile: profile,
-        planCode: planCode,
         busy: false,
       );
+      unawaited(_refreshPlan(repository, profile.id));
       return true;
     } catch (error) {
       AppLogger.info('auth', 'Google sign-in failed: $error');
@@ -121,27 +126,46 @@ class AccountController extends StateNotifier<AccountState> {
     }
   }
 
-  /// "Explore offline": everything on-device works; account features wait.
-  Future<void> continueWithoutAccount() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool(_localModePref, true);
-    state = state.copyWith(status: AuthStatus.localOnly, clearError: true);
-  }
-
   Future<void> signOut() async {
     try {
       await _repository?.signOut();
     } catch (error) {
       AppLogger.info('auth', 'Sign-out error (ignored): $error');
     }
+    await _toLocalOnly();
+  }
+
+  /// Deletes the account on the backend (Play's account-deletion
+  /// requirement). On-device data is untouched — it never left the phone —
+  /// and the app keeps working without an account. Returns false on failure
+  /// with the reason in [AccountState.error].
+  Future<bool> deleteAccount() async {
+    final repository = _repository;
+    state = state.copyWith(busy: true, clearError: true);
+    try {
+      await repository?.deleteAccount();
+      await _toLocalOnly();
+      return true;
+    } catch (error) {
+      AppLogger.info('auth', 'Account deletion failed: $error');
+      state = state.copyWith(
+        busy: false,
+        error: 'Could not delete your account. Check your connection and '
+            'try again.',
+      );
+      return false;
+    }
+  }
+
+  Future<void> _toLocalOnly() async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool(_localModePref, false);
     await prefs.setBool(_demoSignedInPref, false);
     state = state.copyWith(
-      status: AuthStatus.signedOut,
+      status: AuthStatus.localOnly,
       clearProfile: true,
       planCode: PlanCatalog.freemiumCode,
       clearError: true,
+      busy: false,
     );
   }
 

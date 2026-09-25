@@ -437,6 +437,7 @@ class ReportService {
         title: account.name,
         subtitle: account.institutionCode ?? account.kind,
         balanceMinor: balances[account.id] ?? 0,
+        institutionCode: account.institutionCode,
       );
     }).toList(growable: false);
   }
@@ -745,10 +746,12 @@ class AccountInsightCard {
     required this.title,
     required this.subtitle,
     required this.balanceMinor,
+    this.institutionCode,
   });
 
   final String id;
   final String title;
   final String subtitle;
   final int balanceMinor;
+  final String? institutionCode;
 }

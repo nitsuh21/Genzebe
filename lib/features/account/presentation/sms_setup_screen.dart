@@ -32,11 +32,16 @@ class _SmsSetupScreenState extends ConsumerState<SmsSetupScreen> {
           ),
         );
       } else {
+        final banks = result.institutionsFound.length;
         messenger.showSnackBar(
           SnackBar(
             content: Text(
-              'Imported ${result.newlyParsed} transactions'
-              '${result.pendingReview > 0 ? ' · ${result.pendingReview} waiting for your review' : ''}.',
+              banks == 0
+                  ? 'No bank or wallet messages found yet — new ones will '
+                      'appear automatically.'
+                  : 'Found $banks bank${banks == 1 ? '' : 's'}/wallets · '
+                      '${result.newTransactions.length} transactions'
+                      '${result.pendingReview > 0 ? ' · ${result.pendingReview} waiting for your review' : ''}.',
             ),
           ),
         );
@@ -69,115 +74,127 @@ class _SmsSetupScreenState extends ConsumerState<SmsSetupScreen> {
     final theme = Theme.of(context);
     final strings = ref.watch(stringsProvider);
     return Scaffold(
+      // Scrolls on short screens; on tall ones the spacers keep the layout.
       body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Spacer(),
-              Container(
-                width: 64,
-                height: 64,
-                decoration: BoxDecoration(
-                  color: theme.colorScheme.primaryContainer,
-                  borderRadius: BorderRadius.circular(18),
-                ),
-                child: Icon(
-                  Icons.sms_outlined,
-                  color: theme.colorScheme.primary,
-                  size: 30,
-                ),
+        child: LayoutBuilder(
+          builder: (context, constraints) => SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
+            child: ConstrainedBox(
+              constraints: BoxConstraints(
+                minHeight: constraints.maxHeight - 40,
               ),
-              const SizedBox(height: 24),
-              Text(
-                strings.smsTitle,
-                style: theme.textTheme.headlineMedium?.copyWith(
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-              const SizedBox(height: 12),
-              Text(
-                strings.smsBody,
-                style: theme.textTheme.bodyLarge?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
-                  height: 1.5,
-                ),
-              ),
-              const SizedBox(height: 24),
-              _PrivacyPoint(
-                icon: Icons.account_balance_outlined,
-                title: strings.smsPoint1Title,
-                body: strings.smsPoint1Body,
-              ),
-              _PrivacyPoint(
-                icon: Icons.phonelink_lock_outlined,
-                title: strings.smsPoint2Title,
-                body: strings.smsPoint2Body,
-              ),
-              _PrivacyPoint(
-                icon: Icons.fact_check_outlined,
-                title: strings.smsPoint3Title,
-                body: strings.smsPoint3Body,
-              ),
-              const Spacer(flex: 2),
-              SizedBox(
-                width: double.infinity,
-                height: 54,
-                child: FilledButton(
-                  onPressed: _importing ? null : _connectAndImport,
-                  style: FilledButton.styleFrom(
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
+              child: IntrinsicHeight(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Spacer(),
+                    Container(
+                      width: 64,
+                      height: 64,
+                      decoration: BoxDecoration(
+                        color: theme.colorScheme.primaryContainer,
+                        borderRadius: BorderRadius.circular(18),
+                      ),
+                      child: Icon(
+                        Icons.sms_outlined,
+                        color: theme.colorScheme.primary,
+                        size: 30,
+                      ),
                     ),
-                  ),
-                  child: _importing
-                      ? const SizedBox(
-                          width: 22,
-                          height: 22,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2.4,
-                            color: Colors.white,
-                          ),
-                        )
-                      : Text(
-                          strings.smsAllow,
-                          style: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w700,
+                    const SizedBox(height: 24),
+                    Text(
+                      strings.smsTitle,
+                      style: theme.textTheme.headlineMedium?.copyWith(
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      strings.smsBody,
+                      style: theme.textTheme.bodyLarge?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                        height: 1.5,
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    _PrivacyPoint(
+                      icon: Icons.account_balance_outlined,
+                      title: strings.smsPoint1Title,
+                      body: strings.smsPoint1Body,
+                    ),
+                    _PrivacyPoint(
+                      icon: Icons.phonelink_lock_outlined,
+                      title: strings.smsPoint2Title,
+                      body: strings.smsPoint2Body,
+                    ),
+                    _PrivacyPoint(
+                      icon: Icons.fact_check_outlined,
+                      title: strings.smsPoint3Title,
+                      body: strings.smsPoint3Body,
+                    ),
+                    const Spacer(flex: 2),
+                    SizedBox(
+                      width: double.infinity,
+                      height: 54,
+                      child: FilledButton(
+                        onPressed: _importing ? null : _connectAndImport,
+                        style: FilledButton.styleFrom(
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16),
                           ),
                         ),
-                ),
-              ),
-              const SizedBox(height: 10),
-              SizedBox(
-                width: double.infinity,
-                height: 50,
-                child: OutlinedButton.icon(
-                  style: OutlinedButton.styleFrom(
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
+                        child: _importing
+                            ? const SizedBox(
+                                width: 22,
+                                height: 22,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2.4,
+                                  color: Colors.white,
+                                ),
+                              )
+                            : Text(
+                                strings.smsAllow,
+                                style: const TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                      ),
                     ),
-                  ),
-                  onPressed: _importing ? null : _loadDemoData,
-                  icon: const Icon(Icons.auto_awesome_motion_rounded, size: 18),
-                  label: Text(
-                    strings.smsDemo,
-                    style: const TextStyle(fontWeight: FontWeight.w700),
-                  ),
+                    const SizedBox(height: 10),
+                    SizedBox(
+                      width: double.infinity,
+                      height: 50,
+                      child: OutlinedButton.icon(
+                        style: OutlinedButton.styleFrom(
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                        ),
+                        onPressed: _importing ? null : _loadDemoData,
+                        icon: const Icon(Icons.auto_awesome_motion_rounded,
+                            size: 18),
+                        label: Text(
+                          strings.smsDemo,
+                          style: const TextStyle(fontWeight: FontWeight.w700),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Center(
+                      child: TextButton(
+                        onPressed: _importing
+                            ? null
+                            : () => ref
+                                .read(smsSetupDoneProvider.notifier)
+                                .markDone(),
+                        child: Text(strings.smsLater),
+                      ),
+                    ),
+                  ],
                 ),
               ),
-              const SizedBox(height: 4),
-              Center(
-                child: TextButton(
-                  onPressed: _importing
-                      ? null
-                      : () =>
-                          ref.read(smsSetupDoneProvider.notifier).markDone(),
-                  child: Text(strings.smsLater),
-                ),
-              ),
-            ],
+            ),
           ),
         ),
       ),

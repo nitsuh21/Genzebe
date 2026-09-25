@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:genzeb/app/providers.dart';
 import 'package:genzeb/features/account/presentation/profile_screen.dart';
+import 'package:genzeb/features/alerts/presentation/in_app_alert_host.dart';
 import 'package:genzeb/features/budget/presentation/budget_screen.dart';
 import 'package:genzeb/features/reports/presentation/reports_screen.dart';
 import 'package:genzeb/features/transactions/presentation/dashboard_screen.dart';
@@ -19,19 +20,22 @@ class HomeShell extends ConsumerWidget {
 
     return Scaffold(
       // IndexedStack keeps every tab alive, so filters and scroll positions
-      // survive switching tabs instead of resetting on each visit.
-      body: SafeArea(
-        top: true,
-        bottom: false,
-        child: IndexedStack(
-          index: index,
-          children: const [
-            DashboardScreen(),
-            TransactionsScreen(),
-            BudgetScreen(),
-            ReportsScreen(),
-            ProfileScreen(),
-          ],
+      // survive switching tabs instead of resetting on each visit. The alert
+      // host keeps the ledger synced and shows money in/out banners.
+      body: InAppAlertHost(
+        child: SafeArea(
+          top: true,
+          bottom: false,
+          child: IndexedStack(
+            index: index,
+            children: const [
+              DashboardScreen(),
+              TransactionsScreen(),
+              BudgetScreen(),
+              ReportsScreen(),
+              ProfileScreen(),
+            ],
+          ),
         ),
       ),
       bottomNavigationBar: SafeArea(

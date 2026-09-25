@@ -14,12 +14,17 @@ class GenzebApp extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final account = ref.watch(accountControllerProvider);
+    final introSeen = ref.watch(introSeenProvider);
     final smsSetupDone = ref.watch(smsSetupDoneProvider);
 
+    // No sign-in step: intro slides (first launch), SMS setup, then home.
+    // Signing in is optional and lives in Profile.
     final Widget home;
-    if (account.status == AuthStatus.initializing || smsSetupDone == null) {
+    if (account.status == AuthStatus.initializing ||
+        introSeen == null ||
+        smsSetupDone == null) {
       home = const _SplashScreen();
-    } else if (account.status == AuthStatus.signedOut) {
+    } else if (!introSeen && !smsSetupDone) {
       home = const OnboardingScreen();
     } else if (!smsSetupDone) {
       home = const SmsSetupScreen();

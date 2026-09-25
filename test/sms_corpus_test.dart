@@ -6,20 +6,10 @@ import 'package:genzeb/features/sms_ingestion/domain/models/sms_models.dart';
 import 'package:genzeb/features/sms_ingestion/domain/services/sms_parser.dart';
 
 /// Table-driven parser spec: every case in test/fixtures/sms/*.json runs
-/// through the production engine (same template order as providers.dart).
+/// through the production engine (buildDefaultSmsParserEngine — the exact template order that ships).
 /// See test/fixtures/sms/README.md for the case format.
 void main() {
-  final engine = SmsParserEngine(
-    const [
-      CbeSmsParserTemplate(),
-      AwashSmsParserTemplate(),
-      TelebirrSmsParserTemplate(),
-      BoaSmsParserTemplate(),
-      HibretSmsParserTemplate(),
-      DashenSmsParserTemplate(),
-      GenericAmountParserTemplate(),
-    ],
-  );
+  final engine = buildDefaultSmsParserEngine();
 
   final dir = Directory('test/fixtures/sms');
   final files = dir

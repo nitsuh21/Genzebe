@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:genzeb/features/sms_ingestion/domain/models/institutions.dart';
+import 'package:genzeb/features/sms_ingestion/domain/models/sms_models.dart';
 import 'package:genzeb/core/utils/formatters.dart';
 import 'package:genzeb/features/reports/application/report_service.dart';
 import 'package:genzeb/features/sms_ingestion/domain/services/sms_parser.dart';
@@ -141,7 +143,11 @@ class TransactionTile extends StatelessWidget {
     switch (record.source) {
       case TransactionSource.sms:
         final sender = record.smsSender?.trim();
-        return sender == null || sender.isEmpty ? 'SMS' : sender;
+        if (sender == null || sender.isEmpty) return 'SMS';
+        final institution = institutionForSender(sender);
+        return institution == EthiopianInstitution.unknown
+            ? sender
+            : institutionInfo(institution).shortName;
       case TransactionSource.manual:
         return 'Manual';
       case TransactionSource.sync:

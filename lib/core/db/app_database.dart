@@ -9,7 +9,7 @@ class AppDatabase {
   static final AppDatabase instance = AppDatabase._();
 
   static const _databaseName = 'genzebet.db';
-  static const _databaseVersion = 6;
+  static const _databaseVersion = 7;
 
   Database? _db;
   Future<Database>? _opening;
@@ -89,6 +89,24 @@ class AppDatabase {
 
     await _createSmsMessagesTable(db);
     await _createCategoryRulesTable(db);
+    await _createMoneyAlertsTable(db);
+  }
+
+  Future<void> _createMoneyAlertsTable(Database db) async {
+    await db.execute('''
+      CREATE TABLE money_alerts (
+        id TEXT PRIMARY KEY,
+        transactionId TEXT NOT NULL,
+        isIncome INTEGER NOT NULL,
+        amountMinor INTEGER NOT NULL,
+        institutionCode TEXT,
+        counterparty TEXT,
+        needsReview INTEGER NOT NULL,
+        occurredAt TEXT NOT NULL,
+        createdAt TEXT NOT NULL,
+        isRead INTEGER NOT NULL DEFAULT 0
+      )
+    ''');
   }
 
   Future<void> _createCategoryRulesTable(Database db) async {
@@ -148,6 +166,9 @@ class AppDatabase {
     }
     if (oldVersion < 6) {
       await _createCategoryRulesTable(db);
+    }
+    if (oldVersion < 7) {
+      await _createMoneyAlertsTable(db);
     }
   }
 }

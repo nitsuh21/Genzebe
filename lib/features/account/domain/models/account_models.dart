@@ -2,11 +2,8 @@ enum AuthStatus {
   /// Restoring session / waiting on first auth check.
   initializing,
 
-  /// No session and the user hasn't opted into offline mode yet.
-  signedOut,
-
-  /// Using the app without an account (chosen explicitly, or the build has
-  /// no backend configured). Everything on-device works normally.
+  /// Using the app without an account — the default. Everything works on
+  /// this device; signing in only adds plan features (AI, backup).
   localOnly,
 
   signedIn,
@@ -86,6 +83,7 @@ class PlanInfo {
     required this.priceLabel,
     required this.available,
     required this.perks,
+    this.includesAi = false,
   });
 
   final String code;
@@ -94,6 +92,9 @@ class PlanInfo {
   final String priceLabel;
   final bool available;
   final List<String> perks;
+
+  /// Unlocks the Genzeb AI assistant.
+  final bool includesAi;
 }
 
 /// Plan catalog shown in the app. The authoritative subscription row lives in
@@ -108,11 +109,12 @@ class PlanCatalog {
     PlanInfo(
       code: freemiumCode,
       name: 'Freemium',
-      tagline: 'Everything you need to track your money',
+      tagline: 'Everything you need to track your money — no account needed',
       priceLabel: 'Free',
       available: true,
       perks: [
-        'Automatic SMS transaction tracking',
+        'Automatic tracking for every Ethiopian bank and wallet',
+        'Money in / money out alerts',
         'Budgets, reports and insights',
         'All data stored on your device',
       ],
@@ -120,12 +122,14 @@ class PlanCatalog {
     PlanInfo(
       code: 'plus',
       name: 'Genzeb Plus',
-      tagline: 'AI insights and cloud backup',
+      tagline: 'Sign in for AI insights, backup and analytics',
       priceLabel: 'Coming soon',
       available: false,
+      includesAi: true,
       perks: [
-        'Built-in AI assistant, no key needed',
+        'Genzeb AI assistant for spending questions',
         'Encrypted cloud backup and restore',
+        'Advanced analytics across months',
         'Multi-device sync',
       ],
     ),

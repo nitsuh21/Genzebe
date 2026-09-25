@@ -2,7 +2,7 @@ import 'dart:convert';
 
 import 'package:crypto/crypto.dart';
 import 'package:genzeb/core/logging/app_logger.dart';
-import 'package:genzeb/features/sms_ingestion/application/account_mapping_service.dart';
+import 'package:genzeb/features/sms_ingestion/application/account_resolver.dart';
 import 'package:genzeb/features/sms_ingestion/domain/models/sms_models.dart';
 import 'package:genzeb/features/sms_ingestion/domain/repositories/category_rule_repository.dart';
 import 'package:genzeb/features/sms_ingestion/domain/repositories/sms_message_repository.dart';
@@ -16,21 +16,23 @@ class SmsIngestionService {
     required SmsParserEngine parser,
     required LedgerRepository ledgerRepository,
     required SmsMessageRepository smsMessageRepository,
-    required AccountMappingService accountMappingService,
+    required AccountResolver accountResolver,
     required CategoryRuleRepository categoryRuleRepository,
   })  : _parser = parser,
         _ledgerRepository = ledgerRepository,
         _smsMessageRepository = smsMessageRepository,
-        _accountMappingService = accountMappingService,
+        _accountResolver = accountResolver,
         _categoryRules = categoryRuleRepository;
 
   final SmsParserEngine _parser;
   final LedgerRepository _ledgerRepository;
   final SmsMessageRepository _smsMessageRepository;
-  final AccountMappingService _accountMappingService;
+  final AccountResolver _accountResolver;
   final CategoryRuleRepository _categoryRules;
 
-  Future<void> ingest({
+  /// Returns the transaction this message created, or null when it created
+  /// none (already processed, duplicate, or not a money movement).
+  Future<TransactionRecord?> ingest({
     required SmsMessage sms,
     String? accountIdOverride,
   }) async {
@@ -42,7 +44,7 @@ class SmsIngestionService {
     final existingById = await _smsMessageRepository.getById(sms.id);
     if (existingById != null &&
         existingById.status != SmsIngestionStatus.pending) {
-      return;
+      return null;
     }
 
     final existingByHash = await _smsMessageRepository.getByHash(hash);
@@ -60,7 +62,7 @@ class SmsIngestionService {
         'sms.ingest',
         'ingest: duplicate sender=${sms.sender} id=${sms.id}',
       );
-      return;
+      return null;
     }
 
     final parsed = _parser.parse(sms);
@@ -78,11 +80,11 @@ class SmsIngestionService {
         'sms.ingest',
         'ingest: parse_failed sender=${sms.sender} id=${sms.id}',
       );
-      return;
+      return null;
     }
 
     final accountId = accountIdOverride ??
-        await _accountMappingService.resolveAccountId(
+        await _accountResolver.resolveAccountId(
           sms: sms,
           parsed: parsed,
         );
@@ -125,7 +127,7 @@ class SmsIngestionService {
           ingestedAt: DateTime.now(),
         ),
       );
-      return;
+      return record;
     }
 
     await _appendLedgerIfMissing(record);
@@ -138,14 +140,13 @@ class SmsIngestionService {
         ingestedAt: DateTime.now(),
       ),
     );
+    return record;
   }
 
   /// Layers what the user has taught the app on top of the raw parse.
   ///
   /// The user is the highest authority: a merchant rule replaces the keyword
-  /// category and is trusted enough to skip review, and a sender the user
-  /// has mapped to an account counts as a recognised institution even when
-  /// no built-in template knows it.
+  /// category and is trusted enough to skip review.
   Future<ParsedSmsTransaction> _applyUserKnowledge(
     SmsMessage sms,
     ParsedSmsTransaction parsed,
@@ -154,15 +155,6 @@ class SmsIngestionService {
     var evidence = parsed.evidence;
     var categoryId = parsed.categoryHint;
     var confidence = parsed.confidence;
-
-    if (evidence != null && !evidence.institutionKnown) {
-      final mapping = await _accountMappingService.mappingForSender(sms.sender);
-      if (mapping != null &&
-          mapping.institution != EthiopianInstitution.unknown) {
-        evidence = evidence.copyWith(institutionKnown: true);
-        confidence = scoreConfidence(evidence);
-      }
-    }
 
     final merchant = extractMerchant(sms.body, isExpense: isExpense);
     if (merchant != null) {

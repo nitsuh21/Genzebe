@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:genzeb/app/providers.dart';
-import 'package:genzeb/features/account/presentation/auth_screen.dart';
 
 class _Slide {
   const _Slide({
@@ -17,7 +16,8 @@ class _Slide {
   final String body;
 }
 
-/// First-launch onboarding: swipeable story slides, then sign-in.
+/// First-launch onboarding: swipeable story slides, then SMS setup. No
+/// account is needed to use the app.
 class OnboardingScreen extends ConsumerStatefulWidget {
   const OnboardingScreen({super.key});
 
@@ -35,15 +35,13 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
     super.dispose();
   }
 
-  void _openAuth() {
-    Navigator.of(context).push(
-      MaterialPageRoute<void>(builder: (_) => const AuthScreen()),
-    );
+  void _finish() {
+    ref.read(introSeenProvider.notifier).markDone();
   }
 
   void _next(int slideCount) {
     if (_page == slideCount - 1) {
-      _openAuth();
+      _finish();
       return;
     }
     _controller.nextPage(
@@ -95,7 +93,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                   ),
                   const Spacer(),
                   TextButton(
-                    onPressed: _openAuth,
+                    onPressed: _finish,
                     child: Text(strings.onbSkip),
                   ),
                 ],

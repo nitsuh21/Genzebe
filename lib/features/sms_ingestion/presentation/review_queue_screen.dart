@@ -3,7 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:genzeb/app/providers.dart';
 import 'package:genzeb/core/logging/app_logger.dart';
 import 'package:genzeb/core/utils/formatters.dart';
-import 'package:genzeb/features/sms_ingestion/application/account_mapping_service.dart';
+import 'package:genzeb/design_system/institution_avatar.dart';
+import 'package:genzeb/features/sms_ingestion/domain/models/institutions.dart';
 import 'package:genzeb/features/sms_ingestion/domain/models/sms_models.dart';
 import 'package:genzeb/features/sms_ingestion/domain/repositories/device_sms_source.dart';
 import 'package:genzeb/features/transactions/domain/models/categories.dart';
@@ -20,16 +21,11 @@ class ReviewQueueScreen extends ConsumerStatefulWidget {
 class _ReviewQueueScreenState extends ConsumerState<ReviewQueueScreen> {
   bool _syncing = false;
 
-  Future<void> _runForceSync({
-    String? payload,
-    required bool syncAllMappings,
-    required Set<String> selectedMappingSenderPatterns,
-  }) async {
+  Future<void> _runForceSync({String? payload}) async {
     setState(() => _syncing = true);
     final result = await ref.read(syncServiceProvider).forceSyncFromSms(
           importedRawPayload: payload,
-          syncAllMappings: syncAllMappings,
-          selectedMappingSenderPatterns: selectedMappingSenderPatterns,
+          incremental: payload == null,
         );
     refreshAppData(ref);
     if (!mounted) return;
@@ -41,10 +37,13 @@ class _ReviewQueueScreenState extends ConsumerState<ReviewQueueScreen> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(
-          'Device ${result.deviceMatchedMappings}/${result.deviceFetched} '
-          '(rules ${result.mappingRuleCount}) • imported ${result.importedCount} • '
-          'processed ${result.processed} • parsed ${result.newlyParsed} • '
-          'pending ${result.pendingReview} • dup ${result.duplicates} • failed ${result.failed}',
+          result.newTransactions.isEmpty
+              ? 'Up to date — no new bank or wallet transactions.'
+              : '${result.newTransactions.length} new transaction'
+                  '${result.newTransactions.length == 1 ? '' : 's'} from '
+                  '${result.institutionsFound.length} bank'
+                  '${result.institutionsFound.length == 1 ? '' : 's'}/wallets'
+                  '${result.pendingReview > 0 ? ' · ${result.pendingReview} to review' : ''}.',
         ),
       ),
     );
@@ -92,16 +91,6 @@ class _ReviewQueueScreenState extends ConsumerState<ReviewQueueScreen> {
     );
   }
 
-  Future<void> _openAndRunForceSync({String? payload}) async {
-    final selection = await _openSyncSelectionDialog(context, ref);
-    if (!mounted || selection == null) return;
-    await _runForceSync(
-      payload: payload,
-      syncAllMappings: selection.syncAllMappings,
-      selectedMappingSenderPatterns: selection.selectedMappingSenderPatterns,
-    );
-  }
-
   Future<void> _showPermissionDialog(BuildContext context) async {
     await showDialog<void>(
       context: context,
@@ -109,8 +98,8 @@ class _ReviewQueueScreenState extends ConsumerState<ReviewQueueScreen> {
         return AlertDialog(
           title: const Text('SMS permission required'),
           content: const Text(
-            'Genzeb needs SMS permission to read your device inbox for '
-            'mapping and force sync. Please allow SMS access in Settings.',
+            'Genzeb needs SMS permission to read messages from your banks '
+            'and wallets. Please allow SMS access in Settings.',
           ),
           actions: [
             TextButton(
@@ -164,7 +153,7 @@ class _ReviewQueueScreenState extends ConsumerState<ReviewQueueScreen> {
           const SizedBox(height: 16),
           _SyncCard(
             syncing: _syncing,
-            onForceSync: _syncing ? null : () => _openAndRunForceSync(),
+            onForceSync: _syncing ? null : () => _runForceSync(),
             onImport: _syncing
                 ? null
                 : () async {
@@ -172,7 +161,7 @@ class _ReviewQueueScreenState extends ConsumerState<ReviewQueueScreen> {
                     if (!mounted || payload == null || payload.trim().isEmpty) {
                       return;
                     }
-                    await _openAndRunForceSync(payload: payload);
+                    await _runForceSync(payload: payload);
                   },
           ),
           const SizedBox(height: 6),
@@ -234,10 +223,11 @@ class _ReviewQueueScreenState extends ConsumerState<ReviewQueueScreen> {
           ),
           const SizedBox(height: 12),
           _CollapsibleCard(
-            icon: Icons.account_tree_outlined,
-            title: 'Bank senders',
-            subtitle: 'Tell Genzeb which SMS senders are your accounts',
-            child: const _MappingManager(),
+            icon: Icons.account_balance_outlined,
+            title: 'Banks & wallets found',
+            subtitle: 'Synced automatically from your inbox',
+            initiallyExpanded: true,
+            child: const _InstitutionsFound(),
           ),
           const SizedBox(height: 12),
           _CollapsibleCard(
@@ -533,325 +523,57 @@ class _SyncCard extends StatelessWidget {
   }
 }
 
-class _MappingManager extends ConsumerStatefulWidget {
-  const _MappingManager();
+/// Every bank and wallet Genzeb has seen in the inbox. Nothing to set up:
+/// a new institution appears here the first time one of its messages does.
+class _InstitutionsFound extends ConsumerWidget {
+  const _InstitutionsFound();
 
   @override
-  ConsumerState<_MappingManager> createState() => _MappingManagerState();
-}
-
-class _MappingManagerState extends ConsumerState<_MappingManager> {
-  final _senderController = TextEditingController();
-  final _accountController = TextEditingController();
-  EthiopianInstitution _institution = EthiopianInstitution.cbe;
-  List<String> _availableSenders = const [];
-  bool _loadingSenders = false;
-
-  /// Loaded on demand (refresh button) so opening the page never triggers
-  /// the SMS permission dialog by surprise.
-  bool _sendersRequested = false;
-
-  @override
-  void dispose() {
-    _senderController.dispose();
-    _accountController.dispose();
-    super.dispose();
-  }
-
-  Future<void> _save() async {
-    final sender = _senderController.text.trim();
-    final account = _accountController.text.trim();
-    if (sender.isEmpty || account.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Enter both sender and account.')),
-      );
-      return;
-    }
-    await ref.read(accountMappingServiceProvider).saveMapping(
-          AccountMapping(
-            senderPattern: sender,
-            accountId: account.toLowerCase().replaceAll(' ', '-'),
-            accountName: account,
-            institution: _institution,
-          ),
-        );
-    refreshAppData(ref);
-    if (!mounted) return;
-    _senderController.clear();
-    _accountController.clear();
-    setState(() {});
-  }
-
-  Future<void> _deleteMapping(String senderPattern) async {
-    await ref.read(accountMappingServiceProvider).deleteMapping(senderPattern);
-    refreshAppData(ref);
-    if (!mounted) return;
-    setState(() {});
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Deleted mapping for "$senderPattern".')),
-    );
-  }
-
-  Future<void> _showPermissionDialog(BuildContext context) async {
-    await showDialog<void>(
-      context: context,
-      builder: (dialogContext) {
-        return AlertDialog(
-          title: const Text('SMS permission required'),
-          content: const Text(
-            'Genzeb needs SMS permission to read your device inbox for '
-            'mapping and force sync. Please allow SMS access in Settings.',
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(dialogContext).pop(),
-              child: const Text('Close'),
-            ),
-            FilledButton(
-              onPressed: () async {
-                await openAppSettings();
-                if (dialogContext.mounted) {
-                  Navigator.of(dialogContext).pop();
-                }
-              },
-              child: const Text('Open Settings'),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
-  Future<void> _loadSenderCandidates() async {
-    setState(() {
-      _loadingSenders = true;
-      _sendersRequested = true;
-    });
-    final permission =
-        await ref.read(deviceSmsSourceProvider).ensurePermission();
-    if (!mounted) return;
-    if (permission != SmsPermissionState.granted) {
-      setState(() {
-        _availableSenders = const [];
-        _loadingSenders = false;
-      });
-      await _showPermissionDialog(context);
-      return;
-    }
-    final twoYearsAgo = DateTime.now().subtract(const Duration(days: 365 * 2));
-    final messages = await ref
-        .read(deviceSmsSourceProvider)
-        .fetchRecentMessages(since: twoYearsAgo);
-    final counts = <String, int>{};
-    for (final message in messages) {
-      final sender = message.sender.trim();
-      if (sender.isEmpty) continue;
-      counts.update(sender, (value) => value + 1, ifAbsent: () => 1);
-    }
-    final sorted = counts.entries.toList()
-      ..sort((a, b) {
-        final byCount = b.value.compareTo(a.value);
-        if (byCount != 0) return byCount;
-        return a.key.toLowerCase().compareTo(b.key.toLowerCase());
-      });
-    if (!mounted) return;
-    setState(() {
-      _availableSenders = sorted.map((entry) => entry.key).toList();
-      _loadingSenders = false;
-    });
-  }
-
-  @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: theme.cardTheme.color,
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Pick sender from your real SMS inbox and map it to institution/account.',
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
+    final accounts = ref.watch(accountsProvider).valueOrNull ?? const [];
+    final found = <InstitutionInfo>[];
+    for (final account in accounts) {
+      final info = institutionInfoForCode(account.institutionCode);
+      if (info.id == EthiopianInstitution.unknown) continue;
+      if (found.any((f) => f.id == info.id)) continue;
+      found.add(info);
+    }
+    found.sort((a, b) => a.name.compareTo(b.name));
+    if (found.isEmpty) {
+      return _InfoCard(
+        text: 'No bank or wallet messages yet. Genzeb recognises '
+            '${kInstitutions.length} Ethiopian banks and wallets — CBE, '
+            'telebirr, Awash, Dashen, Abyssinia, M-PESA and more.',
+      );
+    }
+    return Wrap(
+      spacing: 10,
+      runSpacing: 10,
+      children: [
+        for (final info in found)
+          Container(
+            padding: const EdgeInsets.fromLTRB(6, 6, 12, 6),
+            decoration: BoxDecoration(
+              color: theme.colorScheme.surfaceContainerHighest
+                  .withValues(alpha: 0.5),
+              borderRadius: BorderRadius.circular(999),
             ),
-          ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(
-                child: Autocomplete<String>(
-                  optionsBuilder: (value) {
-                    final query = value.text.trim().toLowerCase();
-                    if (query.isEmpty) {
-                      return _availableSenders.take(12);
-                    }
-                    return _availableSenders.where(
-                      (sender) => sender.toLowerCase().contains(query),
-                    );
-                  },
-                  onSelected: (selection) {
-                    _senderController.text = selection;
-                  },
-                  fieldViewBuilder:
-                      (context, controller, focusNode, onEditingComplete) {
-                    if (controller.text != _senderController.text) {
-                      controller.value = _senderController.value;
-                    }
-                    return TextField(
-                      controller: controller,
-                      focusNode: focusNode,
-                      onEditingComplete: onEditingComplete,
-                      onChanged: (value) {
-                        _senderController.value = TextEditingValue(
-                          text: value,
-                          selection:
-                              TextSelection.collapsed(offset: value.length),
-                        );
-                      },
-                      decoration: const InputDecoration(
-                        labelText: 'Sender pattern',
-                        hintText: 'Search sender (e.g. CBE, AWASH)',
-                      ),
-                    );
-                  },
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                InstitutionAvatar(info: info, size: 26),
+                const SizedBox(width: 8),
+                Text(
+                  info.shortName,
+                  style: theme.textTheme.labelLarge
+                      ?.copyWith(fontWeight: FontWeight.w700),
                 ),
-              ),
-              const SizedBox(width: 8),
-              IconButton.filledTonal(
-                onPressed: _loadingSenders ? null : _loadSenderCandidates,
-                tooltip: 'Refresh senders',
-                icon: _loadingSenders
-                    ? const SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Icon(Icons.refresh_rounded),
-              ),
-            ],
-          ),
-          if (_availableSenders.isNotEmpty) ...[
-            const SizedBox(height: 6),
-            Text(
-              '${_availableSenders.length} sender(s) found in last 2 years',
-              style: theme.textTheme.labelSmall?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
-            ),
-          ] else if (!_loadingSenders) ...[
-            const SizedBox(height: 6),
-            Text(
-              _sendersRequested
-                  ? 'No senders found in your inbox. Check SMS permission '
-                      'and refresh.'
-                  : 'Tap the refresh button to pick a sender from your inbox.',
-              style: theme.textTheme.labelSmall?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
-            ),
-          ],
-          const SizedBox(height: 10),
-          TextField(
-            controller: _accountController,
-            decoration: const InputDecoration(
-              labelText: 'Account name',
-              hintText: 'e.g. CBE Main',
+              ],
             ),
           ),
-          const SizedBox(height: 10),
-          DropdownButtonFormField<EthiopianInstitution>(
-            initialValue: _institution,
-            decoration: const InputDecoration(labelText: 'Institution'),
-            items: EthiopianInstitution.values
-                .where((i) => i != EthiopianInstitution.unknown)
-                .map(
-                  (i) => DropdownMenuItem(
-                    value: i,
-                    child: Text(_institutionLabel(i)),
-                  ),
-                )
-                .toList(growable: false),
-            onChanged: (value) {
-              if (value == null) return;
-              setState(() => _institution = value);
-            },
-          ),
-          const SizedBox(height: 12),
-          SizedBox(
-            width: double.infinity,
-            child: FilledButton.icon(
-              onPressed: _save,
-              icon: const Icon(Icons.add_link_rounded),
-              label: const Text('Save mapping'),
-            ),
-          ),
-          FutureBuilder<List<AccountMapping>>(
-            future: ref.read(accountMappingServiceProvider).getMappings(),
-            builder: (context, snapshot) {
-              final mappings = snapshot.data ?? const <AccountMapping>[];
-              if (mappings.isEmpty) return const SizedBox.shrink();
-              return Column(
-                children: [
-                  const Divider(height: 26),
-                  ...mappings.map(
-                    (m) => Padding(
-                      padding: const EdgeInsets.only(bottom: 8),
-                      child: Row(
-                        children: [
-                          Icon(Icons.link_rounded,
-                              size: 18, color: theme.colorScheme.primary),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Text(
-                              '${m.senderPattern}  →  ${m.accountName}',
-                              style: theme.textTheme.bodyMedium,
-                            ),
-                          ),
-                          Text(
-                            _institutionLabel(m.institution),
-                            style: theme.textTheme.labelSmall?.copyWith(
-                              color: theme.colorScheme.onSurfaceVariant,
-                            ),
-                          ),
-                          IconButton(
-                            tooltip: 'Delete mapping',
-                            icon: const Icon(Icons.delete_outline_rounded),
-                            onPressed: () => _deleteMapping(m.senderPattern),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
-              );
-            },
-          ),
-        ],
-      ),
+      ],
     );
-  }
-}
-
-String _institutionLabel(EthiopianInstitution i) {
-  switch (i) {
-    case EthiopianInstitution.cbe:
-      return 'CBE';
-    case EthiopianInstitution.awash:
-      return 'Awash';
-    case EthiopianInstitution.telebirr:
-      return 'Telebirr';
-    case EthiopianInstitution.boa:
-      return 'Abyssinia';
-    case EthiopianInstitution.hibret:
-      return 'Hibret';
-    case EthiopianInstitution.dashen:
-      return 'Dashen';
-    case EthiopianInstitution.unknown:
-      return 'Unknown';
   }
 }
 
@@ -1222,110 +944,6 @@ class _LoadingCard extends StatelessWidget {
       child: Center(child: CircularProgressIndicator()),
     );
   }
-}
-
-class _SyncSelection {
-  const _SyncSelection({
-    required this.syncAllMappings,
-    required this.selectedMappingSenderPatterns,
-  });
-
-  final bool syncAllMappings;
-  final Set<String> selectedMappingSenderPatterns;
-}
-
-Future<_SyncSelection?> _openSyncSelectionDialog(
-  BuildContext context,
-  WidgetRef ref,
-) async {
-  final mappings = await ref.read(accountMappingServiceProvider).getMappings();
-  if (!context.mounted) return null;
-  var syncAllMappings = true;
-  final selected = mappings.map((m) => m.senderPattern).toSet();
-
-  return showDialog<_SyncSelection>(
-    context: context,
-    builder: (dialogContext) {
-      return StatefulBuilder(
-        builder: (context, setState) {
-          return AlertDialog(
-            title: const Text('Select mappings to sync'),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                SwitchListTile.adaptive(
-                  contentPadding: EdgeInsets.zero,
-                  value: syncAllMappings,
-                  onChanged: (value) => setState(() => syncAllMappings = value),
-                  title: const Text('Sync all mappings'),
-                  subtitle: Text(
-                    syncAllMappings
-                        ? 'All mappings are selected'
-                        : 'Choose specific mappings below',
-                  ),
-                ),
-                if (mappings.isEmpty)
-                  const Padding(
-                    padding: EdgeInsets.only(top: 8),
-                    child: Text(
-                      'No mappings found. Sync will include all device messages.',
-                    ),
-                  )
-                else if (!syncAllMappings)
-                  ConstrainedBox(
-                    constraints: const BoxConstraints(maxHeight: 260),
-                    child: SingleChildScrollView(
-                      child: Column(
-                        children: mappings
-                            .map(
-                              (mapping) => CheckboxListTile(
-                                dense: true,
-                                value: selected.contains(mapping.senderPattern),
-                                contentPadding: EdgeInsets.zero,
-                                title: Text(mapping.accountName),
-                                subtitle: Text(
-                                  '${mapping.senderPattern} • ${_institutionLabel(mapping.institution)}',
-                                ),
-                                onChanged: (checked) {
-                                  setState(() {
-                                    if (checked == true) {
-                                      selected.add(mapping.senderPattern);
-                                    } else {
-                                      selected.remove(mapping.senderPattern);
-                                    }
-                                  });
-                                },
-                              ),
-                            )
-                            .toList(growable: false),
-                      ),
-                    ),
-                  ),
-              ],
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(dialogContext).pop(),
-                child: const Text('Cancel'),
-              ),
-              FilledButton(
-                onPressed: () {
-                  Navigator.of(dialogContext).pop(
-                    _SyncSelection(
-                      syncAllMappings: syncAllMappings,
-                      selectedMappingSenderPatterns: selected,
-                    ),
-                  );
-                },
-                child: const Text('Sync now'),
-              ),
-            ],
-          );
-        },
-      );
-    },
-  );
 }
 
 Future<String?> _openManualImportDialog(BuildContext context) async {

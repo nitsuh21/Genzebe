@@ -21,6 +21,8 @@ enum SmsIngestionStatus {
   duplicate,
 }
 
+/// Persisted by `name` as the account's institution code, so values may be
+/// added but never renamed. Display data lives in `institutions.dart`.
 enum EthiopianInstitution {
   cbe,
   awash,
@@ -28,6 +30,38 @@ enum EthiopianInstitution {
   boa,
   hibret,
   dashen,
+  wegagen,
+  nib,
+  coop,
+  oromia,
+  zemen,
+  lion,
+  bunna,
+  berhan,
+  abay,
+  addis,
+  enat,
+  global,
+  zamzam,
+  hijra,
+  siinqee,
+  ahadu,
+  goh,
+  tsehay,
+  amhara,
+  tsedey,
+  sidama,
+  gadaa,
+  rammis,
+  shabelle,
+  omo,
+  dbe,
+  cbebirr,
+  mpesa,
+  amole,
+  hellocash,
+  ebirr,
+  kacha,
   unknown,
 }
 

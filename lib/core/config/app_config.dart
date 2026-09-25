@@ -36,7 +36,9 @@ class AppConfig {
   /// Google sign-in to return an ID token that Supabase can verify.
   static String get googleServerClientId => _googleServerClientId;
 
-  /// App-provided Gemini key (users can still store their own in Profile).
+  /// Development-only Gemini key, from `--dart-define=GEMINI_API_KEY=...`.
+  /// Never read from the bundled env.json: assets ship inside the APK, and
+  /// the AI assistant is a Plus perk that free builds must not expose.
   static String get geminiApiKey => _geminiApiKey;
 
   static bool get isBackendConfigured =>
@@ -55,8 +57,7 @@ class AppConfig {
   static Future<void> load() async {
     if (_supabaseUrl.isNotEmpty &&
         _supabaseAnonKey.isNotEmpty &&
-        _googleServerClientId.isNotEmpty &&
-        _geminiApiKey.isNotEmpty) {
+        _googleServerClientId.isNotEmpty) {
       return; // fully provided at build time
     }
     try {
@@ -80,7 +81,6 @@ class AppConfig {
       if (_googleServerClientId.isEmpty) {
         _googleServerClientId = fromAsset('GOOGLE_SERVER_CLIENT_ID');
       }
-      if (_geminiApiKey.isEmpty) _geminiApiKey = fromAsset('GEMINI_API_KEY');
     } catch (_) {
       // No bundled env.json — stay with whatever the defines provided.
     }

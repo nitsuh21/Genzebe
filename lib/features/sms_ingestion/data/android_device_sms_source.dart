@@ -29,10 +29,38 @@ class AndroidDeviceSmsSource implements DeviceSmsSource {
   }
 
   @override
+  Future<SmsPermissionState> currentPermission() async {
+    if (!Platform.isAndroid) return SmsPermissionState.unsupported;
+    final status = await Permission.sms.status;
+    if (status.isGranted) return SmsPermissionState.granted;
+    if (status.isPermanentlyDenied || status.isRestricted) {
+      return SmsPermissionState.permanentlyDenied;
+    }
+    return SmsPermissionState.denied;
+  }
+
+  @override
+  Stream<SmsMessage> incomingMessages() {
+    if (!Platform.isAndroid) return const Stream.empty();
+    // The broadcast carries the network timestamp, not the inbox row's
+    // received time, so these messages are only a signal to re-read the
+    // inbox — ingesting them directly would duplicate on the next sync.
+    return AndroidSMSReader.observeIncomingMessages().map((message) {
+      return SmsMessage(
+        id: 'live-${message.date}',
+        sender: message.address.trim(),
+        body: message.body.trim(),
+        receivedAt: DateTime.fromMillisecondsSinceEpoch(message.date),
+      );
+    });
+  }
+
+  @override
   Future<List<SmsMessage>> fetchRecentMessages({DateTime? since}) async {
     if (!Platform.isAndroid) return const [];
 
-    final permission = await ensurePermission();
+    // Never prompt from here: callers decide when a prompt is appropriate.
+    final permission = await currentPermission();
     if (permission != SmsPermissionState.granted) {
       AppLogger.info(
         'sms.device',
@@ -40,8 +68,6 @@ class AndroidDeviceSmsSource implements DeviceSmsSource {
       );
       return const [];
     }
-    await AndroidSMSReader.requestPermissions();
-
     final results = <SmsMessage>[];
     var start = 0;
     var shouldContinue = true;
