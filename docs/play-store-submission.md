@@ -16,6 +16,7 @@ Fixed in code on 2026-09-25:
 - [x] **Sign-in and subscriptions switched off** (`AppConfig.accountsEnabled`, build flag `GENZEB_ACCOUNTS`). No accounts means Play's account-deletion requirement doesn't apply, and the release manifest drops INTERNET. (The in-app deletion flow + `delete_my_account` migration are kept for when accounts return.)
 
 Still open:
+- [ ] **Bank logos are third-party trademarks** (28 bundled, sources in `assets/logos/SOURCES.md`; owner's decision 2026-09-25). If Play flags impersonation/IP, reply that logos only identify the user's own accounts and the app is not affiliated with the banks — or ship the monogram fallback by emptying `kInstitutionsWithLogo`. Say "not affiliated with any bank" in the store listing.
 - [ ] Only when accounts return: apply `supabase/migrations/0002_delete_my_account.sql` and add the account-deletion web link ([requirement](https://support.google.com/googleplay/android-developer/answer/13327111)).
 - [ ] Replace `CONTACT_EMAIL` in `docs/privacy-policy.html` and publish it (see §9).
 - [ ] Create the upload keystore and `android/key.properties` (§1). Without it the bundle is debug-signed and Play rejects it.

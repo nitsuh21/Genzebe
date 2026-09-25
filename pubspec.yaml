@@ -37,6 +37,8 @@ flutter:
     # Local backend config (gitignored; copy env.example.json -> env.json).
     # Bundled so plain `flutter run` works without --dart-define flags.
     - env.json
+    # Bank and wallet logos (see assets/logos/SOURCES.md).
+    - assets/logos/
 
 flutter_launcher_icons:
   android: true

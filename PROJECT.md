@@ -5,9 +5,10 @@
 **Stack:** Flutter 3 / Dart, sqflite (on-device ledger), Riverpod, Supabase (optional Google sign-in, plans, account deletion), Gemini (chat assistant, Plus-only)
 
 ## Next Step
-> Decide on real bank logos (owner wants them; Play trademark risk) — then Play blockers in `docs/play-store-submission.md` §0 (upload keystore, host privacy policy, rotate old Gemini key).
+> Play blockers in `docs/play-store-submission.md` §0 (upload keystore, host privacy policy, rotate old Gemini key).
 
 ## Built So Far
+- Real logos for 28 banks/wallets (`assets/logos/`, sources in SOURCES.md); monogram fallback for the other 10. Alerts lead with the counterparty name and show direction · type · account.
 - Parser v2 (2026-09-25), driven by 22 real messages from the owner's phone (`test/fixtures/sms/real_2026_09.json`): Hibret 'is made to/from your account' + signed amounts, CBE 'debit transaction of', telebirr withdrawals/cancellations/bonus, M-PESA Amharic purchases/receipts, promotion + evidence gates (Amharic marketing words, links without a balance). On the real inbox: review 245 → 0, fake Awash income gone. Parser version bump triggers a one-time history rebuild (never without SMS permission).
 - System push notifications (2026-09-25): bank/wallet SMS with the app closed → manifest SmsReceiver → headless engine runs `smsBackgroundMain` → booked + alert + notification (tap opens the transaction). Live-vs-inbox duplicates prevented by a 15-min same-sender/same-text twin check. Verified end-to-end on the emulator with a real modem SMS.
 - Play-readiness pass (2026-09-25): no login required (sign-in optional, in Profile, for Plus); registry of 38 Ethiopian banks + wallets with auto-detected accounts and brand monograms (manual sender mapping removed); sync reads only recognised financial senders and purges personal SMS stored by old versions; auto-sync on launch/resume/incoming bank SMS; in-app money in/out alerts (banner + bell inbox); AI assistant gated to Genzeb Plus; light theme default; in-app account deletion; release signing via key.properties, R8, target SDK 36; privacy policy + Play checklist in `docs/`; offline startup no longer blocks on Supabase.
@@ -41,3 +42,4 @@ Required config keys: see `env.example.json` (`SUPABASE_URL`, `SUPABASE_ANON_KEY
 - 2026-09-19: Removed AI (Gemini) from SMS extraction entirely — categorization/direction/institution are now deterministic + user rules + review queue. Reason: Gemini quota/billing blockers, key exposure in APK, and SMS text was leaving the device. Chat assistant kept for now.
 - 2026-09-25: Play-readiness. Login optional (no sign-in wall); AI chat kept but gated to the Plus plan and its key removed from the bundle; manual sender mapping replaced by a built-in institution registry; bank logos replaced by brand-coloured monograms (trademark / Play impersonation risk).
 - 2026-09-25: Sign-in and subscription UI switched off for v1 (code kept behind `accountsEnabled`); release drops INTERNET. Supabase unused until Plus launches.
+- 2026-09-25: Owner chose real bank logos over monograms, accepting the Play trademark risk.

@@ -1,4 +1,7 @@
+import 'dart:io';
+
 import 'package:flutter_test/flutter_test.dart';
+import 'package:genzeb/design_system/institution_avatar.dart';
 import 'package:genzeb/features/sms_ingestion/domain/models/institutions.dart';
 import 'package:genzeb/features/sms_ingestion/domain/models/sms_models.dart';
 
@@ -100,5 +103,32 @@ void main() {
     }
     expect(institutionInfoForCode(null), kUnknownInstitution);
     expect(institutionInfoForCode('retired-bank'), kUnknownInstitution);
+  });
+
+  test('every bundled logo belongs to an institution and exists', () {
+    final codes = kInstitutions.map((i) => i.code).toSet();
+    for (final code in kInstitutionsWithLogo) {
+      expect(codes, contains(code), reason: 'unknown institution $code');
+      expect(File('assets/logos/$code.png').existsSync(), isTrue,
+          reason: 'missing assets/logos/$code.png');
+    }
+    // The banks and wallets seen on the owner's phone all have logos.
+    for (final code in [
+      'cbe',
+      'telebirr',
+      'hibret',
+      'boa',
+      'awash',
+      'dashen',
+      'gadaa',
+      'mpesa',
+      'wegagen',
+      'amhara',
+      'bunna',
+      'abay',
+      'ahadu',
+    ]) {
+      expect(kInstitutionsWithLogo, contains(code));
+    }
   });
 }
