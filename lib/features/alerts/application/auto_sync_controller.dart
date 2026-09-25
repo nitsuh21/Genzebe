@@ -36,12 +36,17 @@ class AutoSyncController {
   bool _running = false;
   bool _rerun = false;
 
+  /// Only react to live SMS while the app is on screen. In the background
+  /// the native receiver books the message and posts a system notification;
+  /// reacting here too would race it on the same database.
+  bool foreground = true;
+
   Stream<List<MoneyAlert>> get newAlerts => _alerts.stream;
 
   void start() {
     _incoming ??= _deviceSmsSource.incomingMessages().listen(
       (message) {
-        if (!isFinancialSender(message.sender)) return;
+        if (!foreground || !isFinancialSender(message.sender)) return;
         _debounce?.cancel();
         _debounce = Timer(incomingSettleDelay, refresh);
       },

@@ -14,6 +14,7 @@ import 'package:genzeb/features/ai/ai_config.dart';
 import 'package:genzeb/features/alerts/application/auto_sync_controller.dart';
 import 'package:genzeb/features/alerts/application/money_alert_service.dart';
 import 'package:genzeb/features/alerts/data/money_alert_repositories.dart';
+import 'package:genzeb/features/alerts/data/notification_bridge.dart';
 import 'package:genzeb/features/alerts/domain/money_alert.dart';
 import 'package:genzeb/features/ai/application/ai_assistant_service.dart';
 import 'package:genzeb/features/ai/data/gemini_client.dart';
@@ -199,6 +200,10 @@ final autoSyncControllerProvider = Provider<AutoSyncController>((ref) {
   );
   ref.onDispose(controller.dispose);
   return controller;
+});
+
+final notificationBridgeProvider = Provider<NotificationBridge>((ref) {
+  return NotificationBridge();
 });
 
 final moneyAlertsProvider = FutureProvider<List<MoneyAlert>>((ref) {

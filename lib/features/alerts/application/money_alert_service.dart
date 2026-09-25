@@ -24,13 +24,21 @@ class MoneyAlertService {
     final clock = now ?? DateTime.now();
     final alerts = <MoneyAlert>[
       for (final tx in result.newTransactions)
-        if (clock.difference(tx.occurredAt) <= freshness) _alertFor(tx, clock),
+        if (clock.difference(tx.occurredAt) <= freshness) alertFor(tx, clock),
     ]..sort((a, b) => b.occurredAt.compareTo(a.occurredAt));
     await _repository.saveAll(alerts);
     return alerts;
   }
 
-  MoneyAlert _alertFor(TransactionRecord tx, DateTime now) {
+  /// Records the alert for one transaction booked in the background (a
+  /// bank SMS that arrived while the app was closed).
+  Future<MoneyAlert> recordTransaction(TransactionRecord tx) async {
+    final alert = alertFor(tx, DateTime.now());
+    await _repository.saveAll([alert]);
+    return alert;
+  }
+
+  MoneyAlert alertFor(TransactionRecord tx, DateTime now) {
     final isIncome = tx.type == TransactionType.income;
     final body = tx.smsSnippet;
     final sender = tx.smsSender;

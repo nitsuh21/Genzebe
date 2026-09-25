@@ -63,6 +63,29 @@ class SqfliteSmsMessageRepository implements SmsMessageRepository {
   }
 
   @override
+  Future<StoredSmsMessage?> findTwin({
+    required String sender,
+    required String body,
+    required DateTime around,
+    required Duration window,
+    required String excludingId,
+  }) async {
+    final db = await _db;
+    final rows = await db.query(
+      'sms_messages',
+      where: 'sender = ? AND body = ? AND id != ?',
+      whereArgs: [sender, body, excludingId],
+    );
+    for (final row in rows) {
+      final stored = _mapRow(row);
+      if (stored.sms.receivedAt.difference(around).abs() <= window) {
+        return stored;
+      }
+    }
+    return null;
+  }
+
+  @override
   Future<void> save(StoredSmsMessage message) async {
     final db = await _db;
     await db.insert(

@@ -18,6 +18,24 @@ class InMemorySmsMessageRepository implements SmsMessageRepository {
   }
 
   @override
+  Future<StoredSmsMessage?> findTwin({
+    required String sender,
+    required String body,
+    required DateTime around,
+    required Duration window,
+    required String excludingId,
+  }) async {
+    for (final entry in _messagesById.values) {
+      if (entry.sms.id == excludingId) continue;
+      if (entry.sms.sender != sender || entry.sms.body != body) continue;
+      if (entry.sms.receivedAt.difference(around).abs() <= window) {
+        return entry;
+      }
+    }
+    return null;
+  }
+
+  @override
   Future<List<StoredSmsMessage>> getAll() async {
     final values = _messagesById.values.toList(growable: false);
     values.sort((a, b) => b.sms.receivedAt.compareTo(a.sms.receivedAt));

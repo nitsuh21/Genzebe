@@ -47,7 +47,14 @@ class SmsIngestionService {
       return null;
     }
 
-    final existingByHash = await _smsMessageRepository.getByHash(hash);
+    final existingByHash = await _smsMessageRepository.getByHash(hash) ??
+        await _smsMessageRepository.findTwin(
+          sender: sms.sender,
+          body: sms.body,
+          around: sms.receivedAt,
+          window: twinWindow,
+          excludingId: sms.id,
+        );
     if (existingByHash != null && existingByHash.sms.id != sms.id) {
       await _smsMessageRepository.save(
         StoredSmsMessage(
@@ -362,6 +369,11 @@ class SmsIngestionService {
         .getByStatus(SmsIngestionStatus.pendingReview);
     return queue.length;
   }
+
+  /// The same text from the same sender within this window is one message
+  /// seen twice (background receiver vs. inbox read), never two payments:
+  /// real receipts differ by reference or balance.
+  static const twinWindow = Duration(minutes: 15);
 
   Future<void> _appendLedgerIfMissing(TransactionRecord record) async {
     final hasEntry =

@@ -1,4 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:genzeb/core/l10n/app_strings.dart';
+import 'package:genzeb/features/alerts/application/background_sms_handler.dart';
 import 'package:genzeb/features/alerts/application/money_alert_service.dart';
 import 'package:genzeb/features/alerts/data/money_alert_repositories.dart';
 import 'package:genzeb/features/sms_ingestion/application/account_resolver.dart';
@@ -47,13 +49,14 @@ void main() {
   late _Inbox inbox;
   late SyncService sync;
   late MoneyAlertService alerts;
+  late SmsIngestionService ingestion;
 
   setUp(() {
     SharedPreferences.setMockInitialValues({});
     ledger = InMemoryLedgerRepository();
     store = InMemorySmsMessageRepository();
     inbox = _Inbox();
-    final ingestion = SmsIngestionService(
+    ingestion = SmsIngestionService(
       parser: buildDefaultSmsParserEngine(),
       ledgerRepository: ledger,
       smsMessageRepository: store,
@@ -183,5 +186,72 @@ void main() {
       ),
       isEmpty,
     );
+  });
+
+  group('background SMS (app closed)', () {
+    BackgroundSmsHandler handler({bool hidden = false}) => BackgroundSmsHandler(
+          ingestion: ingestion,
+          alerts: alerts,
+          strings: enStrings,
+          amountsHidden: hidden,
+        );
+    const body =
+        'You have received ETB 750.00 from Hana T. Your telebirr balance is ETB 1,020.00. Thank you for using telebirr';
+
+    test('books the SMS, records the alert and builds the notification',
+        () async {
+      final notification = await handler().handle(
+        sender: '127',
+        body: body,
+        receivedAt: DateTime.now(),
+      );
+      expect(notification, isNotNull);
+      expect(notification!.title, 'Money in · +ETB 750.00');
+      expect(notification.text, 'telebirr · from Hana T');
+      expect(notification.publicText, 'Money in · telebirr',
+          reason: 'lock screen never shows the amount');
+      expect(await ledger.getTransactionById(notification.transactionId),
+          isNotNull);
+      expect(await alerts.getAll(), hasLength(1));
+    });
+
+    test('hidden amounts stay hidden in the notification', () async {
+      final notification = await handler(hidden: true).handle(
+        sender: '127',
+        body: body,
+        receivedAt: DateTime.now(),
+      );
+      expect(notification!.title, 'Money in · + ETB ••••');
+    });
+
+    test('ignores personal and non-financial senders', () async {
+      expect(
+        await handler().handle(
+          sender: '+251911223344',
+          body: 'I sent you 500 birr',
+          receivedAt: DateTime.now(),
+        ),
+        isNull,
+      );
+      expect(await store.getAll(), isEmpty);
+    });
+
+    test('the later inbox read of the same SMS never double-books', () async {
+      await sync.forceSyncFromSms(); // establishes the last-sync mark
+      final live = DateTime.now();
+      await handler().handle(sender: '127', body: body, receivedAt: live);
+      // The inbox row carries the device time, a few seconds apart.
+      inbox.messages.add(
+          _sms('inbox-row', '127', body, live.add(const Duration(seconds: 4))));
+
+      final result = await sync.forceSyncFromSms(incremental: true);
+
+      expect(result.newTransactions, isEmpty);
+      final smsTransactions = (await ledger.getTransactions())
+          .where((tx) => tx.source == TransactionSource.sms);
+      expect(smsTransactions, hasLength(1));
+      expect((await store.getById('inbox-row'))?.status,
+          SmsIngestionStatus.duplicate);
+    });
   });
 }

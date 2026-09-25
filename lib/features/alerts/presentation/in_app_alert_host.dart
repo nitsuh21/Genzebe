@@ -6,7 +6,10 @@ import 'package:genzeb/app/providers.dart';
 import 'package:genzeb/design_system/institution_avatar.dart';
 import 'package:genzeb/features/alerts/application/auto_sync_controller.dart';
 import 'package:genzeb/features/alerts/domain/money_alert.dart';
+import 'package:genzeb/features/alerts/presentation/alert_text.dart';
 import 'package:genzeb/features/alerts/presentation/alert_widgets.dart';
+import 'package:genzeb/features/alerts/presentation/notification_permission.dart';
+import 'package:genzeb/features/transactions/presentation/transaction_detail_sheet.dart';
 
 /// Drives auto-sync for the signed-in-or-not home experience and shows a
 /// slide-down banner for every money-in / money-out SMS that arrives:
@@ -26,6 +29,7 @@ class _InAppAlertHostState extends ConsumerState<InAppAlertHost>
 
   late final AutoSyncController _autoSync;
   StreamSubscription<List<MoneyAlert>>? _subscription;
+  StreamSubscription<String>? _taps;
   Timer? _hideTimer;
   MoneyAlert? _current;
   int _more = 0;
@@ -38,12 +42,39 @@ class _InAppAlertHostState extends ConsumerState<InAppAlertHost>
     _autoSync = ref.read(autoSyncControllerProvider);
     _subscription = _autoSync.newAlerts.listen(_show);
     _autoSync.start();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _autoSync.refresh());
+    final bridge = ref.read(notificationBridgeProvider);
+    _taps = bridge.taps.listen(_openTransaction);
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      // A big inbox makes the first refresh slow; neither the tapped
+      // notification (already booked in the background) nor the permission
+      // prompt should wait for it.
+      unawaited(_autoSync.refresh());
+      final launched = await bridge.takeLaunchTransaction();
+      if (launched != null) await _openTransaction(launched);
+      await askForNotificationPermissionOnce();
+    });
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) _autoSync.refresh();
+    _autoSync.foreground = state == AppLifecycleState.resumed;
+    if (state == AppLifecycleState.resumed) {
+      // Messages booked by the background receiver while we were away.
+      refreshAppData(ref);
+      _autoSync.refresh();
+    }
+  }
+
+  /// A system notification was tapped: show that transaction.
+  Future<void> _openTransaction(String transactionId) async {
+    final record = await ref
+        .read(ledgerRepositoryProvider)
+        .getTransactionById(transactionId);
+    if (record == null || !mounted) return;
+    await ref.read(moneyAlertServiceProvider).markRead('alert-$transactionId');
+    refreshAppData(ref);
+    if (!mounted) return;
+    await showTransactionDetail(context, ref, record);
   }
 
   void _show(List<MoneyAlert> alerts) {
@@ -80,6 +111,7 @@ class _InAppAlertHostState extends ConsumerState<InAppAlertHost>
     WidgetsBinding.instance.removeObserver(this);
     _hideTimer?.cancel();
     _subscription?.cancel();
+    _taps?.cancel();
     super.dispose();
   }
 

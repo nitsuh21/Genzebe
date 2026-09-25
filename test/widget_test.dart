@@ -88,7 +88,7 @@ void main() {
     expect(find.text('Your plan'), findsNothing);
     expect(find.text('AI assistant'), findsNothing);
     expect(find.text('Delete account'), findsNothing);
-    expect(find.textContaining('everything stays on this phone'),
-        findsOneWidget);
+    expect(
+        find.textContaining('everything stays on this phone'), findsOneWidget);
   });
 }

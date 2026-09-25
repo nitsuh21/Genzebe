@@ -12,6 +12,7 @@ Fixed in code on 2026-09-25:
 - [x] **AI assistant is gated to Genzeb Plus** (`aiEntitledProvider`); Plus is not purchasable, so no release user can reach Gemini. The privacy policy and Data safety answers below assume no AI traffic. Revisit both before Plus launches.
 - [x] **`learning_base.json` export** runs only in debug builds (`kReleaseMode` guard).
 - [x] **Personal SMS are never stored**: sync ingests only recognised bank/wallet senders, and a one-time cleanup removes personal messages older versions stored.
+- [x] **Money in / money out system notifications** (app closed): manifest `SmsReceiver` (guarded by `BROADCAST_SMS`) → headless Dart parser → notification. Uses RECEIVE_SMS (already in the SMS declaration — mention it in the declaration video) and POST_NOTIFICATIONS, asked once after SMS access is granted. Lock-screen version hides the amount.
 - [x] **Sign-in and subscriptions switched off** (`AppConfig.accountsEnabled`, build flag `GENZEB_ACCOUNTS`). No accounts means Play's account-deletion requirement doesn't apply, and the release manifest drops INTERNET. (The in-app deletion flow + `delete_my_account` migration are kept for when accounts return.)
 
 Still open:

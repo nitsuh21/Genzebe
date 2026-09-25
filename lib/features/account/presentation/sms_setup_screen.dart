@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:genzeb/app/providers.dart';
+import 'package:genzeb/features/alerts/presentation/notification_permission.dart';
 import 'package:genzeb/features/sms_ingestion/domain/repositories/device_sms_source.dart';
 
 /// One-time onboarding step: explain the SMS permission in plain language,
@@ -45,6 +46,9 @@ class _SmsSetupScreenState extends ConsumerState<SmsSetupScreen> {
             ),
           ),
         );
+      }
+      if (result.smsPermissionState == SmsPermissionState.granted) {
+        await askForNotificationPermissionOnce();
       }
       await ref.read(smsSetupDoneProvider.notifier).markDone();
     } finally {

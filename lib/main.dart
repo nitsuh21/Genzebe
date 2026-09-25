@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:genzeb/app/app.dart';
 import 'package:genzeb/core/config/app_config.dart';
+import 'package:genzeb/features/alerts/application/background_entry.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 Future<void> main() async {
@@ -20,3 +21,9 @@ Future<void> main() async {
   }
   runApp(const ProviderScope(child: GenzebApp()));
 }
+
+/// Entry point for the headless engine the native SMS receiver starts when a
+/// bank SMS arrives while the app is closed. Must stay in this library:
+/// native resolves it by name in the app's main library.
+@pragma('vm:entry-point')
+Future<void> smsBackgroundMain() => runBackgroundSmsEntry();
