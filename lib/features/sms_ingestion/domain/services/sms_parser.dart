@@ -18,7 +18,7 @@ abstract class SmsParserTemplate {
 /// Bump whenever parser behaviour changes in a way that should rewrite
 /// history. The next sync then re-parses the whole inbox once (manual
 /// entries and user rejections survive), so old misreads are corrected.
-const int kParserVersion = 2;
+const int kParserVersion = 3;
 
 /// Parses at or above this confidence are booked directly; below it they
 /// wait in the review queue for the user.
@@ -389,6 +389,8 @@ const _explicitOutflowPhrases = [
   'paid birr',
   'paid to',
   'you have transferred',
+  // CBE's own spelling: "You have transfered ETB 1,000.00 to Mr Dagim"
+  'you have transfered',
   'successfully transferred',
   'you have sent',
   'you sent',
@@ -689,6 +691,7 @@ String inferCategory({required String body, required bool isExpense}) {
   // fee wording: CBE transfer receipts always list "service charge" and
   // "VAT", but the transaction is the transfer, not the fees.
   if (_containsKeyword(body, 'transferred') ||
+      _containsKeyword(body, 'transfered') ||
       _containsKeyword(body, 'transfer')) {
     return isExpense ? 'transfer_out' : 'transfer_in';
   }
@@ -702,8 +705,11 @@ String inferCategory({required String body, required bool isExpense}) {
     if (_containsKeyword(body, 'salary') || _containsKeyword(body, 'payroll')) {
       return 'salary';
     }
+    // "Credited with ETB 1,000.00 from Elias Y." — money from a named
+    // person or account is a transfer in.
     if (_containsKeyword(body, 'transfer') ||
-        _containsKeyword(body, 'received')) {
+        _containsKeyword(body, 'received') ||
+        _containsKeyword(body, 'from')) {
       return 'transfer_in';
     }
     return 'income';
@@ -722,16 +728,20 @@ String inferCategory({required String body, required bool isExpense}) {
 const _amountPhrase = r'(?:etb|birr|ብር)?\s*[\d,.]*\s*(?:etb|birr|ብር)?\s*';
 
 final List<RegExp> _expenseMerchantPatterns = [
+  // CBE: "... to account 1********6766 (Hanna S. M.)" — the name is the
+  // bracketed part after the masked account number.
+  RegExp(r'to\s+account\s+[\d*]+\s*\(([^)]{2,48})\)', caseSensitive: false),
   // "paid ETB 120.00 to Shoa Supermarket via telebirr" /
   // "paid 320.00 birr to GebeyaGo Delivery via app"
   RegExp(
       'paid\\s+${_amountPhrase}to\\s+([^.,\\n]{2,48}?)\\s+(?:via|through|on|using|ref)',
       caseSensitive: false),
   // "transferred to W/ro Almaz — house rent"
-  RegExp(r'transferred\s+to\s+([^.,\n—-]{2,48})', caseSensitive: false),
+  RegExp(r'transferr?ed\s+to\s+([^.,\n—-]{2,48})', caseSensitive: false),
   // "transferred ETB 500.00 to Abebe Kebede (2519****) on 09/07/2026"
+  // (CBE also writes "transfered")
   RegExp(
-      'transferred\\s+${_amountPhrase}to\\s+([^.,\\n(]{2,48}?)\\s*(?:\\(|via|through|on|ref)',
+      'transferr?ed\\s+${_amountPhrase}to\\s+([^.,\\n(]{2,48}?)\\s*(?:\\(|via|through|on|ref)',
       caseSensitive: false),
   // "You have sent ETB 1,500.00 to Emebet K. via telebirr"
   RegExp(
@@ -774,8 +784,10 @@ String? _cleanMerchant(String raw) {
       .replaceAll(RegExp(r'''["'“”]'''), '')
       .replaceAll(RegExp(r'\s+'), ' ')
       .trim();
-  // Drop trailing possessive/connector fragments left by loose matches.
+  // Drop trailing possessive/connector fragments left by loose matches,
+  // and a closing full stop ("Hanna S. M.").
   value = value.replaceAll(RegExp(r'[—–-]\s*$'), '').trim();
+  value = value.replaceAll(RegExp(r'\.+$'), '').trim();
   if (value.length < 2) return null;
   // Masked accounts / OTP-ish fragments are not merchants.
   if (value.contains('*')) return null;

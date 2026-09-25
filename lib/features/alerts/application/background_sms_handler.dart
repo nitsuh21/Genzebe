@@ -98,13 +98,17 @@ class BackgroundSmsHandler {
     final direction =
         alert.isIncome ? _strings.alertMoneyIn : _strings.alertMoneyOut;
     final institution = institutionInfoForCode(alert.institutionCode).shortName;
-    final subtitle = alertSubtitle(alert);
+    // "Elias Y. · +ETB 1,000.00" / "Money in · Transfer in · CBE"
+    final detail = alertDetail(
+      alert,
+      moneyIn: _strings.alertMoneyIn,
+      moneyOut: _strings.alertMoneyOut,
+    );
     return MoneyNotification(
       id: alert.transactionId.hashCode & 0x7fffffff,
-      title: '$direction · ${alertAmountLabel(alert, hidden: _amountsHidden)}',
-      text: alert.needsReview
-          ? '$subtitle · ${_strings.alertNeedsReview}'
-          : subtitle,
+      title: alertHeadline(alert, hidden: _amountsHidden),
+      text:
+          alert.needsReview ? '$detail · ${_strings.alertNeedsReview}' : detail,
       publicText: '$direction · $institution',
       transactionId: alert.transactionId,
     );

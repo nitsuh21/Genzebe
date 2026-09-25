@@ -146,12 +146,14 @@ class MoneyAlertTile extends ConsumerWidget {
                           color: color,
                         ),
                         const SizedBox(width: 4),
-                        Text(
-                          alert.isIncome
-                              ? strings.alertMoneyIn
-                              : strings.alertMoneyOut,
-                          style: theme.textTheme.titleSmall?.copyWith(
-                            fontWeight: FontWeight.w700,
+                        Flexible(
+                          child: Text(
+                            alertParty(alert),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: theme.textTheme.titleSmall?.copyWith(
+                              fontWeight: FontWeight.w700,
+                            ),
                           ),
                         ),
                         if (!alert.isRead) ...[
@@ -169,7 +171,11 @@ class MoneyAlertTile extends ConsumerWidget {
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      alertSubtitle(alert),
+                      alertDetail(
+                        alert,
+                        moneyIn: strings.alertMoneyIn,
+                        moneyOut: strings.alertMoneyOut,
+                      ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: theme.textTheme.bodySmall?.copyWith(

@@ -51,6 +51,7 @@ class MoneyAlertService {
           sender == null ? null : institutionForSender(sender).name,
       counterparty:
           body == null ? null : extractMerchant(body, isExpense: !isIncome),
+      categoryId: tx.categoryId,
       needsReview: tx.reviewStatus == TransactionReviewStatus.pendingReview,
       occurredAt: tx.occurredAt,
       createdAt: now,

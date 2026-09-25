@@ -9,7 +9,7 @@ class AppDatabase {
   static final AppDatabase instance = AppDatabase._();
 
   static const _databaseName = 'genzebet.db';
-  static const _databaseVersion = 7;
+  static const _databaseVersion = 8;
 
   Database? _db;
   Future<Database>? _opening;
@@ -102,6 +102,7 @@ class AppDatabase {
         institutionCode TEXT,
         counterparty TEXT,
         needsReview INTEGER NOT NULL,
+        categoryId TEXT,
         occurredAt TEXT NOT NULL,
         createdAt TEXT NOT NULL,
         isRead INTEGER NOT NULL DEFAULT 0
@@ -169,6 +170,8 @@ class AppDatabase {
     }
     if (oldVersion < 7) {
       await _createMoneyAlertsTable(db);
+    } else if (oldVersion < 8) {
+      await db.execute('ALTER TABLE money_alerts ADD COLUMN categoryId TEXT');
     }
   }
 }

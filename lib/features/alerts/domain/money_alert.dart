@@ -10,6 +10,7 @@ class MoneyAlert {
     required this.createdAt,
     this.institutionCode,
     this.counterparty,
+    this.categoryId,
     this.needsReview = false,
     this.isRead = false,
   });
@@ -22,6 +23,9 @@ class MoneyAlert {
 
   /// Merchant or person on the other side, when the SMS names one.
   final String? counterparty;
+
+  /// Transaction type ("transfer_in", "salary", "groceries", ...).
+  final String? categoryId;
 
   /// The parse was uncertain; the transaction waits in the review queue.
   final bool needsReview;
@@ -39,6 +43,7 @@ class MoneyAlert {
       createdAt: createdAt,
       institutionCode: institutionCode,
       counterparty: counterparty,
+      categoryId: categoryId,
       needsReview: needsReview,
       isRead: isRead ?? this.isRead,
     );

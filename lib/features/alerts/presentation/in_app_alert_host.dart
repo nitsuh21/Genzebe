@@ -25,7 +25,9 @@ class InAppAlertHost extends ConsumerStatefulWidget {
 
 class _InAppAlertHostState extends ConsumerState<InAppAlertHost>
     with WidgetsBindingObserver {
-  static const _visibleFor = Duration(seconds: 5);
+  /// Long enough to outlast the SMS app's own heads-up for the same
+  /// message, which briefly covers the top of the screen.
+  static const _visibleFor = Duration(seconds: 12);
 
   late final AutoSyncController _autoSync;
   StreamSubscription<List<MoneyAlert>>? _subscription;
@@ -118,23 +120,21 @@ class _InAppAlertHostState extends ConsumerState<InAppAlertHost>
   @override
   Widget build(BuildContext context) {
     final alert = _current;
+    final topInset = MediaQuery.of(context).viewPadding.top;
     return Stack(
       children: [
         widget.child,
-        // Bottom, just above the tab bar: the top of the screen is where
-        // the SMS app's own heads-up for the very same message appears,
-        // which would hide this banner exactly when it matters.
         if (alert != null)
           AnimatedPositioned(
             duration: const Duration(milliseconds: 320),
             curve: Curves.easeOutCubic,
             left: 12,
             right: 12,
-            bottom: _visible ? 12 : -160,
+            top: _visible ? topInset + 8 : -200,
             child: GestureDetector(
               onTap: _onTap,
               onVerticalDragEnd: (details) {
-                if ((details.primaryVelocity ?? 0) > 0) _hide();
+                if ((details.primaryVelocity ?? 0) < 0) _hide();
               },
               child: _AlertBanner(alert: alert, more: _more),
             ),
@@ -174,8 +174,7 @@ class _AlertBanner extends ConsumerWidget {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Text(
-                    '${alert.isIncome ? strings.alertMoneyIn : strings.alertMoneyOut}'
-                    ' · ${alertAmountLabel(alert, hidden: hidden)}',
+                    alertHeadline(alert, hidden: hidden),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: theme.textTheme.titleSmall?.copyWith(
@@ -185,11 +184,15 @@ class _AlertBanner extends ConsumerWidget {
                   ),
                   const SizedBox(height: 2),
                   Text(
-                    more > 0
-                        ? '${alertSubtitle(alert)} · +$more more'
-                        : alert.needsReview
-                            ? '${alertSubtitle(alert)} · ${strings.alertNeedsReview}'
-                            : alertSubtitle(alert),
+                    [
+                      alertDetail(
+                        alert,
+                        moneyIn: strings.alertMoneyIn,
+                        moneyOut: strings.alertMoneyOut,
+                      ),
+                      if (alert.needsReview) strings.alertNeedsReview,
+                      if (more > 0) '+$more more',
+                    ].join(' · '),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: theme.textTheme.bodySmall?.copyWith(

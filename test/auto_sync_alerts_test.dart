@@ -205,8 +205,9 @@ void main() {
         receivedAt: DateTime.now(),
       );
       expect(notification, isNotNull);
-      expect(notification!.title, 'Money in · +ETB 750.00');
-      expect(notification.text, 'telebirr · from Hana T');
+      // Who and how much up front; direction, type and account below.
+      expect(notification!.title, 'Hana T · +ETB 750.00');
+      expect(notification.text, 'Money in · Transfer In · telebirr');
       expect(notification.publicText, 'Money in · telebirr',
           reason: 'lock screen never shows the amount');
       expect(await ledger.getTransactionById(notification.transactionId),
@@ -220,7 +221,7 @@ void main() {
         body: body,
         receivedAt: DateTime.now(),
       );
-      expect(notification!.title, 'Money in · + ETB ••••');
+      expect(notification!.title, 'Hana T · + ETB ••••');
     });
 
     test('ignores personal and non-financial senders', () async {
