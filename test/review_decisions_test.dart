@@ -104,7 +104,8 @@ void main() {
       sms: SmsMessage(
         id: 'unknown-2',
         sender: '8294',
-        body: 'Payment of 150.00 birr received for order #4432.',
+        // Has a reference, so it is a receipt worth reviewing, not noise.
+        body: 'Payment of 150.00 birr received for order. Ref TX44321.',
         receivedAt: DateTime(2026, 6, 3, 11, 0),
       ),
     );

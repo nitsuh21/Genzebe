@@ -6,10 +6,10 @@ import 'package:genzeb/core/logging/app_logger.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:genzeb/features/sms_ingestion/application/sms_ingestion_service.dart';
-import 'package:genzeb/features/sms_ingestion/domain/models/institutions.dart';
 import 'package:genzeb/features/sms_ingestion/domain/models/sms_models.dart';
 import 'package:genzeb/features/sms_ingestion/domain/repositories/device_sms_source.dart';
 import 'package:genzeb/features/sms_ingestion/domain/repositories/sms_message_repository.dart';
+import 'package:genzeb/features/sms_ingestion/domain/services/sms_parser.dart';
 import 'package:genzeb/features/transactions/domain/models/transaction_models.dart';
 import 'package:genzeb/features/transactions/domain/repositories/ledger_repository.dart';
 
@@ -75,6 +75,7 @@ class SyncService {
 
   static const _lastSyncPref = 'sms_last_sync_at';
   static const _cleanupPref = 'sms_non_financial_cleanup_v1';
+  static const _parserVersionPref = 'sms_parser_version';
 
   /// How far back the first sync reads.
   static const historyWindow = Duration(days: 365 * 2);
@@ -89,11 +90,26 @@ class SyncService {
     bool incremental = false,
     bool requestPermission = true,
   }) async {
+    final prefs = await SharedPreferences.getInstance();
+    final lastSyncMillis = prefs.getInt(_lastSyncPref);
+    // History parsed by an older parser is rewritten once, in full.
+    final parserUpgraded = lastSyncMillis != null &&
+        (prefs.getInt(_parserVersionPref) ?? 1) < kParserVersion;
+    if (parserUpgraded) {
+      rebuild = true;
+      AppLogger.info('sync.force', 'Parser upgraded: rebuilding history');
+    }
+    final permissionState = requestPermission
+        ? await _deviceSmsSource.ensurePermission()
+        : await _deviceSmsSource.currentPermission();
+    // Never clear history we can't re-read: without SMS access a rebuild
+    // would only delete the ledger.
+    if (rebuild && permissionState != SmsPermissionState.granted) {
+      rebuild = false;
+    }
     if (rebuild) await _clearSmsDerivedData();
     await _purgeNonFinancialMessagesOnce();
 
-    final prefs = await SharedPreferences.getInstance();
-    final lastSyncMillis = prefs.getInt(_lastSyncPref);
     final isIncremental = incremental && !rebuild && lastSyncMillis != null;
     final now = DateTime.now();
     final since = isIncremental
@@ -101,9 +117,6 @@ class SyncService {
             .subtract(_incrementalOverlap)
         : now.subtract(historyWindow);
 
-    final permissionState = requestPermission
-        ? await _deviceSmsSource.ensurePermission()
-        : await _deviceSmsSource.currentPermission();
     final fetchedDeviceMessages = permissionState == SmsPermissionState.granted
         ? await _deviceSmsSource.fetchRecentMessages(since: since)
         : const <SmsMessage>[];
@@ -145,6 +158,7 @@ class SyncService {
 
     if (permissionState == SmsPermissionState.granted) {
       await prefs.setInt(_lastSyncPref, now.millisecondsSinceEpoch);
+      await prefs.setInt(_parserVersionPref, kParserVersion);
     }
     await _maybeExportLearningBase();
 

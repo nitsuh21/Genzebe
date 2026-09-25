@@ -202,6 +202,49 @@ final autoSyncControllerProvider = Provider<AutoSyncController>((ref) {
   return controller;
 });
 
+final autoSyncStatusProvider = StreamProvider<AutoSyncStatus>((ref) async* {
+  final controller = ref.watch(autoSyncControllerProvider);
+  yield controller.status;
+  yield* controller.statusChanges;
+});
+
+/// Every bank/wallet seen in the inbox — including ones that have only sent
+/// promotions so far — so the user can see the app found them.
+final institutionsSeenProvider =
+    FutureProvider<List<InstitutionSighting>>((ref) async {
+  final stored = await ref.watch(storedSmsProvider.future);
+  final accounts = await ref.watch(accountsProvider.future);
+  final withTransactions = {
+    for (final account in accounts)
+      institutionInfoForCode(account.institutionCode).id,
+  };
+  final seen = <EthiopianInstitution>{
+    for (final message in stored) institutionForSender(message.sms.sender),
+    ...withTransactions,
+  }..remove(EthiopianInstitution.unknown);
+  final sightings = [
+    for (final id in seen)
+      InstitutionSighting(
+        info: institutionInfo(id),
+        hasTransactions: withTransactions.contains(id),
+      ),
+  ]..sort((a, b) {
+      if (a.hasTransactions != b.hasTransactions) {
+        return a.hasTransactions ? -1 : 1;
+      }
+      return a.info.name.compareTo(b.info.name);
+    });
+  return sightings;
+});
+
+class InstitutionSighting {
+  const InstitutionSighting(
+      {required this.info, required this.hasTransactions});
+
+  final InstitutionInfo info;
+  final bool hasTransactions;
+}
+
 final notificationBridgeProvider = Provider<NotificationBridge>((ref) {
   return NotificationBridge();
 });

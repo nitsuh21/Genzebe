@@ -18,14 +18,13 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 class _Inbox implements DeviceSmsSource {
   final messages = <SmsMessage>[];
+  SmsPermissionState permission = SmsPermissionState.granted;
 
   @override
-  Future<SmsPermissionState> ensurePermission() async =>
-      SmsPermissionState.granted;
+  Future<SmsPermissionState> ensurePermission() async => permission;
 
   @override
-  Future<SmsPermissionState> currentPermission() async =>
-      SmsPermissionState.granted;
+  Future<SmsPermissionState> currentPermission() async => permission;
 
   @override
   Stream<SmsMessage> incomingMessages() => const Stream.empty();
@@ -252,6 +251,58 @@ void main() {
       expect(smsTransactions, hasLength(1));
       expect((await store.getById('inbox-row'))?.status,
           SmsIngestionStatus.duplicate);
+    });
+  });
+
+  group('parser upgrade', () {
+    final at = DateTime.now().subtract(const Duration(days: 5));
+    const hibret =
+        'Dear customer, Please be informed that ETB -1011.5 Outgoing Transfer To M-Pesa Via Mobile is made from your account 474041*******013  . Available Balance : 65065.87 Current Balance : 65065.87  .For further queries please call 995. United, We Prosper!';
+
+    Future<void> simulateOldInstall() async {
+      SharedPreferences.setMockInitialValues({
+        'sms_last_sync_at': at.millisecondsSinceEpoch,
+        'sms_parser_version': 1,
+        'sms_non_financial_cleanup_v1': true,
+      });
+      // The old parser dropped this payment (signed amount).
+      await store.save(StoredSmsMessage(
+        sms: _sms('h1', 'HibretBank', hibret, at),
+        messageHash: 'old',
+        status: SmsIngestionStatus.failed,
+      ));
+      inbox.messages.add(_sms('h1', 'HibretBank', hibret, at));
+    }
+
+    test('re-parses history once so old misreads are corrected', () async {
+      await simulateOldInstall();
+
+      await sync.forceSyncFromSms(incremental: true, requestPermission: false);
+
+      final tx = await ledger.getTransactionById('sms-h1');
+      expect(tx?.amount.minorUnits, 101150);
+      expect(tx?.type, TransactionType.expense);
+      final prefs = await SharedPreferences.getInstance();
+      expect(prefs.getInt('sms_parser_version'), kParserVersion);
+    });
+
+    test('never clears history without SMS access', () async {
+      await simulateOldInstall();
+      await ledger.saveTransaction(TransactionRecord(
+        id: 'sms-kept',
+        accountId: 'cbe-main',
+        type: TransactionType.expense,
+        amount: const Money(minorUnits: 100),
+        occurredAt: at,
+        categoryId: 'food',
+        source: TransactionSource.sms,
+      ));
+      inbox.permission = SmsPermissionState.denied;
+
+      await sync.forceSyncFromSms(incremental: true, requestPermission: false);
+
+      expect(await ledger.getTransactionById('sms-kept'), isNotNull);
+      expect(await store.getById('h1'), isNotNull);
     });
   });
 }

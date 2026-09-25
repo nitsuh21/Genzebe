@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:genzeb/app/providers.dart';
+import 'package:genzeb/core/l10n/app_strings.dart';
 import 'package:genzeb/core/utils/formatters.dart';
 import 'package:genzeb/design_system/institution_avatar.dart';
 import 'package:genzeb/design_system/widgets.dart';
@@ -413,6 +414,45 @@ class _QuickActions extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final strings = ref.watch(stringsProvider);
+    final auto = ref.watch(autoSyncStatusProvider).valueOrNull;
+    final busy = syncing || (auto?.running ?? false);
+    final last = auto?.lastSyncedAt;
+    return Column(
+      children: [
+        Row(
+          children: [
+            Expanded(child: _buildAdd(strings)),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _ActionButton(
+                icon: busy ? null : Icons.sync_rounded,
+                label: busy ? strings.syncing : strings.syncSms,
+                onPressed: busy ? null : onSync,
+                busy: busy,
+              ),
+            ),
+          ],
+        ),
+        // Auto-sync runs on launch, on return and when a bank SMS arrives;
+        // this line makes that visible.
+        Padding(
+          padding: const EdgeInsets.only(top: 6),
+          child: Text(
+            busy
+                ? 'Checking your bank messages…'
+                : last == null
+                    ? 'Syncs automatically when bank messages arrive'
+                    : 'Synced automatically · ${relativeDayLabel(last)} ${formatTime(last)}',
+            style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildAdd(AppStrings strings) {
     return Row(
       children: [
         Expanded(
@@ -421,15 +461,6 @@ class _QuickActions extends ConsumerWidget {
             label: strings.add,
             onPressed: onAdd,
             filled: true,
-          ),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: _ActionButton(
-            icon: syncing ? null : Icons.sync_rounded,
-            label: syncing ? strings.syncing : strings.syncSms,
-            onPressed: onSync,
-            busy: syncing,
           ),
         ),
       ],

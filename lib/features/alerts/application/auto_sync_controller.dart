@@ -43,6 +43,19 @@ class AutoSyncController {
 
   Stream<List<MoneyAlert>> get newAlerts => _alerts.stream;
 
+  final _status = StreamController<AutoSyncStatus>.broadcast();
+  AutoSyncStatus _current = const AutoSyncStatus();
+
+  /// Whether a refresh is running and when the inbox was last read, for
+  /// the "Synced 2:51 PM" line on Home.
+  AutoSyncStatus get status => _current;
+  Stream<AutoSyncStatus> get statusChanges => _status.stream;
+
+  void _setStatus(AutoSyncStatus next) {
+    _current = next;
+    if (!_status.isClosed) _status.add(next);
+  }
+
   void start() {
     _incoming ??= _deviceSmsSource.incomingMessages().listen(
       (message) {
@@ -63,6 +76,7 @@ class AutoSyncController {
       return;
     }
     _running = true;
+    _setStatus(_current.copyWith(running: true));
     try {
       do {
         _rerun = false;
@@ -71,6 +85,7 @@ class AutoSyncController {
           requestPermission: false,
         );
         if (result.smsPermissionState != SmsPermissionState.granted) break;
+        _setStatus(_current.copyWith(lastSyncedAt: DateTime.now()));
         final alerts = await _alertService.recordFromSync(result);
         if (result.newTransactions.isNotEmpty) _onDataChanged();
         if (alerts.isNotEmpty && !_alerts.isClosed) _alerts.add(alerts);
@@ -79,6 +94,7 @@ class AutoSyncController {
       AppLogger.info('sync.auto', 'Auto refresh failed: $error');
     } finally {
       _running = false;
+      _setStatus(_current.copyWith(running: false));
     }
   }
 
@@ -86,5 +102,19 @@ class AutoSyncController {
     _debounce?.cancel();
     _incoming?.cancel();
     _alerts.close();
+    _status.close();
   }
+}
+
+class AutoSyncStatus {
+  const AutoSyncStatus({this.running = false, this.lastSyncedAt});
+
+  final bool running;
+  final DateTime? lastSyncedAt;
+
+  AutoSyncStatus copyWith({bool? running, DateTime? lastSyncedAt}) =>
+      AutoSyncStatus(
+        running: running ?? this.running,
+        lastSyncedAt: lastSyncedAt ?? this.lastSyncedAt,
+      );
 }

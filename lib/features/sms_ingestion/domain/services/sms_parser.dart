@@ -15,6 +15,11 @@ abstract class SmsParserTemplate {
 // Confidence
 // ---------------------------------------------------------------------------
 
+/// Bump whenever parser behaviour changes in a way that should rewrite
+/// history. The next sync then re-parses the whole inbox once (manual
+/// entries and user rejections survive), so old misreads are corrected.
+const int kParserVersion = 2;
+
 /// Parses at or above this confidence are booked directly; below it they
 /// wait in the review queue for the user.
 const double kAutoAcceptConfidence = 0.85;
@@ -73,6 +78,7 @@ class GenericAmountParserTemplate implements SmsParserTemplate {
       allowBalanceAsAmount: direction.explicit,
     );
     if (amountMajor == null) return null;
+    if (!_looksLikeRealTransaction(sms.body, direction)) return null;
 
     final isExpense = direction.isExpense;
     final category = inferCategory(body: lowered, isExpense: isExpense);
@@ -138,6 +144,7 @@ abstract class _InstitutionTemplate implements SmsParserTemplate {
           allowBalanceAsAmount: direction.explicit,
         );
     if (amountMajor == null) return null;
+    if (!_looksLikeRealTransaction(sms.body, direction)) return null;
 
     final isExpense = direction.isExpense;
     final category = inferCategory(body: lowered, isExpense: isExpense);
@@ -258,8 +265,10 @@ class SmsParserEngine {
 
 const _amountCapturePattern = r'([0-9]+(?:[,\s][0-9]{3})*(?:\.[0-9]{1,2})?)';
 
+// Hibret writes outgoing amounts signed ("ETB -10027.6"); the sign is noise
+// — direction comes from the wording.
 final _amountWithCurrency = RegExp(
-  '(?:etb|birr|ብር)\\s*$_amountCapturePattern',
+  '(?:etb|birr|ብር)\\s*-?\\s*$_amountCapturePattern',
   caseSensitive: false,
 );
 final _amountBeforeCurrency = RegExp(
@@ -267,7 +276,7 @@ final _amountBeforeCurrency = RegExp(
   caseSensitive: false,
 );
 final _balanceRegex = RegExp(
-  '(?:bal(?:ance)?|available(?:\\s+balance)?|current\\s+balance|ቀሪ\\s*ሂሳብ)(?:\\s+is|[:\\s])*(?:etb|birr|ብር)?\\s*$_amountCapturePattern',
+  '(?:bal(?:ance)?|available(?:\\s+balance)?|current\\s+balance|ቀሪ\\s*ሂሳብ|ቀሪ\\s*ሒሳብ)(?:\\s+is|[:\\s])*(?:etb|birr|ብር)?\\s*$_amountCapturePattern',
   caseSensitive: false,
 );
 
@@ -319,6 +328,11 @@ int? extractBalanceMinor(String body) {
 /// DF24JC2U3S". A real reference always carries a digit, so prose after the
 /// keyword ("transaction with CBE") is never mistaken for one.
 String? extractReference(String body) {
+  final amharic = RegExp(
+    r'መለያ\s*ቁጥር\s*((?=[a-z]*[0-9])[a-z0-9]{4,})',
+    caseSensitive: false,
+  ).firstMatch(body);
+  if (amharic != null) return amharic.group(1);
   final match = RegExp(
     r'(?:ref(?:erence)?|trx|txn|txnid|transaction)(?:\s+(?:number|no|id))?[:\s#.-]*(?:is\s+)?((?=[a-z]*[0-9])[a-z0-9]{4,})',
     caseSensitive: false,
@@ -351,6 +365,14 @@ class DirectionEvidence {
 /// Phrases that can only describe money LEAVING the user's account.
 /// Lower-case; matched by position, so the earliest phrase in a message wins.
 const _explicitOutflowPhrases = [
+  // Hibret: "ETB 10012 Outgoing Transfer ... is made from your account"
+  'is made from your account',
+  // CBE: "A debit transaction of ETB 100.0. has occurred on your account"
+  'debit transaction of',
+  // telebirr: "The request to withdraw ETB 2,000.00 ... is successfully completed"
+  'request to withdraw',
+  // Hibret: "your Mobile Topup transaction of 50 Birr ... has been successful"
+  'topup transaction of',
   'has been debited',
   'have been debited',
   'is debited',
@@ -385,10 +407,15 @@ const _explicitOutflowPhrases = [
   'ተከፍሏል',
   'ልከዋል',
   'ከፍለዋል',
+  // M-PESA: "የ2,200.00 ብር ... ጥቅል ... ገዝተዋል" (you bought)
+  'ገዝተዋል',
 ];
 
 /// Phrases that can only describe money ARRIVING in the user's account.
 const _explicitInflowPhrases = [
+  // Hibret: "ETB 300 Mobile Funds Transfer is made to your account"
+  'is made to your account',
+  'credit transaction of',
   'has been credited',
   'have been credited',
   'is credited',
@@ -419,7 +446,6 @@ const _explicitInflowPhrases = [
   'reversed',
   'ገቢ',
   'ተቀብለዋል',
-  'ተመላሽ',
 ];
 
 /// Bare keywords used only when no explicit phrase is present.
@@ -436,6 +462,8 @@ const _weakExpenseCues = [
 ];
 
 const _weakIncomeCues = [
+  // "ተመላሽ" (refund/cashback) appears in far more promotions than refunds.
+  'ተመላሽ',
   'credited',
   'credit',
   'received',
@@ -664,6 +692,8 @@ String inferCategory({required String body, required bool isExpense}) {
       _containsKeyword(body, 'transfer')) {
     return isExpense ? 'transfer_out' : 'transfer_in';
   }
+  // Cash withdrawals itemize a "service fee" too; the money moved is cash.
+  if (isExpense && body.contains('withdraw')) return 'transfer_out';
 
   final matched = matchRules(rules);
   if (matched != null) return matched;
@@ -875,7 +905,12 @@ bool _isFailedTransactionMessage(String body) {
     'cannot be processed',
     'has been cancelled',
     'has been canceled',
+    'is incorrect',
+    'is cancelled',
+    'is canceled',
     'አልተሳካም',
+    'በቂ ሒሳብ የለዎትም',
+    'በቂ ሂሳብ የለዎትም',
   ];
   for (final blocker in blockers) {
     if (_containsKeyword(body, blocker)) return true;
@@ -886,7 +921,69 @@ bool _isFailedTransactionMessage(String body) {
 bool _shouldIgnoreNonLedgerMessage(String body) {
   return _isLikelyOtpOrVerification(body) ||
       _isAirtimeReceivedMirrorMessage(body) ||
-      _isFailedTransactionMessage(body);
+      _isFailedTransactionMessage(body) ||
+      _isBonusMessage(body) ||
+      _isRechargeMirrorMessage(body);
+}
+
+/// Airtime/package bonuses ("You have got ETB 67.65 bonus") are not cash.
+bool _isBonusMessage(String body) => _containsKeyword(body, 'bonus');
+
+/// Hibret sends a second "X have recharged your prepaid mobile" notice for
+/// the same top-up its "Mobile Topup transaction" receipt already booked.
+bool _isRechargeMirrorMessage(String body) =>
+    body.contains('recharged your prepaid');
+
+/// Marketing words, English and Amharic. Banks and telcos send far more
+/// promotions than receipts, and promotions quote birr amounts ("up to ብር
+/// 5000", "win 250,000 ብር") next to words like ተመላሽ (cashback).
+const _promotionCues = [
+  'lottery',
+  'prize',
+  'cashback',
+  'cash back',
+  'discount',
+  'spin the wheel',
+  'offer',
+  'ሽልማት', // prize
+  'ሸለሙ', // be awarded
+  'ያሸንፉ', // win
+  'ዕጣ', // draw
+  'ዕድል', // luck / lucky draw
+  'ሎተሪ', // lottery
+  'ይበደሩ', // borrow
+  'ብድር', // loan
+  'ቅናሽ', // discount
+  'ስጦታ', // gift
+  'ያገኛሉ', // "you will get"
+  'ይመዝገቡ', // register
+  'ይላኩ', // "send (A to 9632)"
+  '%',
+];
+
+bool _hasLink(String lowered) =>
+    lowered.contains('http') ||
+    lowered.contains('www.') ||
+    lowered.contains('bit.ly') ||
+    lowered.contains('t.me/');
+
+/// A receipt states facts about an account: a balance, a reference, an
+/// account number — or at least an unambiguous "you paid / you received".
+/// Promotions and notices have none of these, so they are dropped instead
+/// of filling the review queue (or worse, being booked as income).
+bool _looksLikeRealTransaction(String body, DirectionEvidence direction) {
+  final lowered = body.toLowerCase();
+  final hasBalance = _balanceRegex.hasMatch(body);
+  final promotional = _hasLink(lowered) ||
+      _containsKeyword(lowered, 'win') ||
+      _containsKeyword(lowered, 'loan') ||
+      _promotionCues.any(lowered.contains);
+  // Real receipts with links or "VAT(15%)" always state the new balance.
+  if (promotional && !hasBalance) return false;
+  if (direction.explicit) return true;
+  return hasBalance ||
+      extractReference(body) != null ||
+      extractAccountHint(body) != null;
 }
 
 // ---------------------------------------------------------------------------

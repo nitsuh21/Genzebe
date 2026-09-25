@@ -89,7 +89,9 @@ const List<InstitutionInfo> kInstitutions = [
     shortName: 'M-PESA',
     kind: InstitutionKind.wallet,
     brandColor: 0xFF43B02A,
-    senderKeywords: ['mpesa', 'safaricom'],
+    // Not "Safaricom": the telco's own package confirmations mirror the
+    // M-PESA debit and would double-count it.
+    senderKeywords: ['mpesa'],
     signatures: ['m-pesa'],
   ),
   InstitutionInfo(
@@ -367,7 +369,8 @@ const List<InstitutionInfo> kInstitutions = [
     shortName: 'Sidama',
     kind: InstitutionKind.bank,
     brandColor: 0xFF2E7D32,
-    senderKeywords: ['sidama'],
+    // Not a bare "sidama": "Sidama Reg" is the regional government.
+    senderKeywords: ['sidamabank'],
     signatures: ['sidama bank'],
   ),
   InstitutionInfo(

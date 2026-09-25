@@ -531,15 +531,7 @@ class _InstitutionsFound extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
-    final accounts = ref.watch(accountsProvider).valueOrNull ?? const [];
-    final found = <InstitutionInfo>[];
-    for (final account in accounts) {
-      final info = institutionInfoForCode(account.institutionCode);
-      if (info.id == EthiopianInstitution.unknown) continue;
-      if (found.any((f) => f.id == info.id)) continue;
-      found.add(info);
-    }
-    found.sort((a, b) => a.name.compareTo(b.name));
+    final found = ref.watch(institutionsSeenProvider).valueOrNull ?? const [];
     if (found.isEmpty) {
       return _InfoCard(
         text: 'No bank or wallet messages yet. Genzeb recognises '
@@ -547,31 +539,50 @@ class _InstitutionsFound extends ConsumerWidget {
             'telebirr, Awash, Dashen, Abyssinia, M-PESA and more.',
       );
     }
-    return Wrap(
-      spacing: 10,
-      runSpacing: 10,
+    final quiet = found.where((f) => !f.hasTransactions).length;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        for (final info in found)
-          Container(
-            padding: const EdgeInsets.fromLTRB(6, 6, 12, 6),
-            decoration: BoxDecoration(
-              color: theme.colorScheme.surfaceContainerHighest
-                  .withValues(alpha: 0.5),
-              borderRadius: BorderRadius.circular(999),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                InstitutionAvatar(info: info, size: 26),
-                const SizedBox(width: 8),
-                Text(
-                  info.shortName,
-                  style: theme.textTheme.labelLarge
-                      ?.copyWith(fontWeight: FontWeight.w700),
+        Wrap(
+          spacing: 10,
+          runSpacing: 10,
+          children: [
+            for (final sighting in found)
+              Opacity(
+                opacity: sighting.hasTransactions ? 1 : 0.55,
+                child: Container(
+                  padding: const EdgeInsets.fromLTRB(6, 6, 12, 6),
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.surfaceContainerHighest
+                        .withValues(alpha: 0.5),
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      InstitutionAvatar(info: sighting.info, size: 26),
+                      const SizedBox(width: 8),
+                      Text(
+                        sighting.info.shortName,
+                        style: theme.textTheme.labelLarge
+                            ?.copyWith(fontWeight: FontWeight.w700),
+                      ),
+                    ],
+                  ),
                 ),
-              ],
+              ),
+          ],
+        ),
+        if (quiet > 0) ...[
+          const SizedBox(height: 10),
+          Text(
+            'Faded: messages found, but only notices or promotions so far — '
+            'their transactions will appear as soon as one arrives.',
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
             ),
           ),
+        ],
       ],
     );
   }

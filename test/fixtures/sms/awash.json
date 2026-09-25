@@ -47,17 +47,12 @@
       }
     },
     {
-      "id": "awash-bare-transfer-keyword-goes-to-review",
+      "id": "awash-bare-transfer-without-balance-reference-or-direction-is-dropped",
       "source": "synthetic",
       "sender": "AWASH",
       "body": "Awash Bank transfer of ETB 700.00 processed on 12/07/2026.",
       "expect": {
-        "parsed": true,
-        "direction": "out",
-        "amountMinor": 70000,
-        "category": "transfer_out",
-        "explicitDirection": false,
-        "autoAccept": false
+        "parsed": false
       }
     }
   ]

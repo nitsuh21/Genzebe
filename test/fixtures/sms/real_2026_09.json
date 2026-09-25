@@ -1,0 +1,259 @@
+{
+  "institution": "various",
+  "note": "Real messages from the owner's phone (2026-09-25). Names, accounts, phone numbers, secret codes and receipt links masked; wording, amounts and structure unchanged.",
+  "cases": [
+    {
+      "id": "hibret-mobile-transfer-in-is-made-to-your-account",
+      "source": "real",
+      "sender": "HibretBank",
+      "body": "Dear customer, Please be informed that ETB 300 Mobile Funds Transfer is made to your account 474041*******013 from Tsega A. ,Remarks - nsndnd . Available Balance : 6746.14 Current Balance : 6746.14  .For further queries please call 995. United, We Prosper!",
+      "expect": {
+        "parsed": true,
+        "institution": "hibret",
+        "direction": "in",
+        "amountMinor": 30000,
+        "balanceMinor": 674614,
+        "explicitDirection": true,
+        "autoAccept": true
+      }
+    },
+    {
+      "id": "hibret-outgoing-transfer-is-made-from-your-account",
+      "source": "real",
+      "sender": "HibretBank",
+      "body": "Dear customer, Please be informed that ETB 10012 Outgoing Transfer To Tele-Birr Via Mobile is made from your account 474041*******013  . Available Balance : 6452.14 Current Balance : 6452.14  .For further queries please call 995. United, We Prosper!",
+      "expect": {
+        "parsed": true,
+        "institution": "hibret",
+        "direction": "out",
+        "amountMinor": 1001200,
+        "balanceMinor": 645214,
+        "explicitDirection": true,
+        "autoAccept": true
+      }
+    },
+    {
+      "id": "hibret-negative-amount-ips-payment-is-not-dropped",
+      "source": "real",
+      "sender": "HibretBank",
+      "body": "Dear customer, Please be informed that ETB -10027.6 Outgoing Instant Payment To Other Bank - (Ips) is made from your account 474041*******013  . Available Balance : 15458.92 Current Balance : 15458.92  .For further queries please call 995. United, We Prosper!",
+      "expect": {
+        "parsed": true,
+        "institution": "hibret",
+        "direction": "out",
+        "amountMinor": 1002760,
+        "balanceMinor": 1545892,
+        "autoAccept": true
+      }
+    },
+    {
+      "id": "hibret-salary-credit",
+      "source": "real",
+      "sender": "HibretBank",
+      "body": "Dear customer, Please be informed that ETB 18883.5 Salary Credit Transaction is made to your account 474041*******013 . Available Balance : 35721.74 Current Balance : 35721.74  .For further queries please call 995. United, We Prosper!",
+      "expect": {
+        "parsed": true,
+        "institution": "hibret",
+        "direction": "in",
+        "amountMinor": 1888350,
+        "category": "salary",
+        "autoAccept": true
+      }
+    },
+    {
+      "id": "hibret-balance-inquiry-is-ignored",
+      "source": "real",
+      "sender": "HibretBank",
+      "body": "Dear Customer,  Account No : 4740************13 Account Name : ABEBE K.  is  Available Balance ETB 419.37 Current Balance   ETB 419.37  Hibir Mobile",
+      "expect": {
+        "parsed": false
+      }
+    },
+    {
+      "id": "cbe-a-debit-transaction-of-has-occurred",
+      "source": "real",
+      "sender": "CBE",
+      "body": "Dear Abebe A debit transaction of ETB 100.0. has occurred on your account 1********9722. Service charge of ETB 10.00 and VAT(15%) of ETB1.50 and Disaster Recovery(5%) of 0.50 with total of ETB112.00 .Your current balance is ETB835.25. Thanks for Banking with CBE. https://mbreciept.cbe.com.et/v2-XXXXXXXX  for feedback: https://forms.gle/XXXXXXXX",
+      "expect": {
+        "parsed": true,
+        "institution": "cbe",
+        "direction": "out",
+        "amountMinor": 11200,
+        "balanceMinor": 83525,
+        "explicitDirection": true,
+        "autoAccept": true
+      }
+    },
+    {
+      "id": "telebirr-atm-withdrawal-request-successful",
+      "source": "real",
+      "sender": "127",
+      "body": "Dear Abebe The request to withdraw ETB 2,000.00 from your telebirr account 2519******69  via secret code ****** on  2026-08-15 19:50:48 using Awash International Bank S C ATM with transaction number  DHF9TE0367 is successfully completed. The service fee (including 15% VAT) is ETB 11.50. Your current Account balance is ETB 777.46.To download your payment information please click this link: https://transactioninfo.ethiotelecom.et/receipt/XXXXXXXX Thank you for using telebirr Ethio telecom",
+      "expect": {
+        "parsed": true,
+        "institution": "telebirr",
+        "direction": "out",
+        "amountMinor": 200000,
+        "balanceMinor": 77746,
+        "explicitDirection": true,
+        "autoAccept": true
+      }
+    },
+    {
+      "id": "telebirr-airtime-bonus-is-not-money",
+      "source": "real",
+      "sender": "127",
+      "body": "Dear  Abebe Congratulations! You have got ETB 67.65 bonus that is used for airtime and package purchase. Your current bonus account balance is ETB 147.55. Thank you for using telebirr  Ethio telecom",
+      "expect": {
+        "parsed": false
+      }
+    },
+    {
+      "id": "mpesa-amharic-package-purchase-is-money-out",
+      "source": "real",
+      "sender": "MPESA",
+      "body": "ውድ Abebe፣ የ2,200.00 ብር የሳፋሪኮም ጥቅል ለ2517******29 በ13/3/26 በ4:43 PM ላይ ገዝተዋል። የገንዘብ ዝውውር መለያ ቁጥር UCD9LRXHF1 ነው። የአገልግሎት ክፍያ 0.00 ብር ነው። አሁን ያለዎት የM-PESA ቀሪ ሒሳብ 169.00 ብር ነው።",
+      "expect": {
+        "parsed": true,
+        "institution": "mpesa",
+        "direction": "out",
+        "amountMinor": 220000,
+        "balanceMinor": 16900,
+        "referenceContains": "UCD9LRXHF1",
+        "explicitDirection": true,
+        "autoAccept": true
+      }
+    },
+    {
+      "id": "mpesa-amharic-received-from-bank",
+      "source": "real",
+      "sender": "MPESA",
+      "body": "ውድ Abebe፣ 2,000.00 ብር ከ 9000811 - Hibret Bank S.C-B2C በ 13/3/26 በ 4:43 PM ላይ ተቀብለዋል። የገንዘብ ዝውውር መለያ ቁጥር UCD1LRXBYF ነው። የእርስዎ አሁን ያለው የM-PESA ቀሪ ሒሳብ 2,369.00 ብር ነው።",
+      "expect": {
+        "parsed": true,
+        "institution": "mpesa",
+        "direction": "in",
+        "amountMinor": 200000,
+        "balanceMinor": 236900,
+        "autoAccept": true
+      }
+    },
+    {
+      "id": "mpesa-amharic-insufficient-balance-is-ignored",
+      "source": "real",
+      "sender": "MPESA",
+      "body": "ይቅርታ፣ በM-PESA ሂሳብዎ ውስጥ የ100.00 ብር ጥቅል ለመግዛት የሚያስችል በቂ ሒሳብ የለዎትም። እባክዎ ከመረጡት ባንክ  ገንዘብ ያስተላልፉ እና እንደገና ይሞክሩ። ለማስተላለፍ ሞባይል ባንክዎ ከገቡ በኋላ ለማስተላለፍ የሚለዉን ይምረጡ > ወደ ዋሌት >ከዛም ወደ M-PESA የሚለዉን ይምረጡ እና ይቀጥሉ። አሁን ያልዎት የM-PESA ቀሪ ሂሳብ 0.00 ብር።",
+      "expect": {
+        "parsed": false
+      }
+    },
+    {
+      "id": "mpesa-amharic-cashback-received",
+      "source": "real",
+      "sender": "MPESA",
+      "body": "እንኳን ደስ አለዎት፣ በM-PESA በኩል ስለከፈሉ 110.00 ብር ተመላሽ ገንዘብ ተቀብለዋል።",
+      "expect": {
+        "parsed": true,
+        "institution": "mpesa",
+        "direction": "in",
+        "amountMinor": 11000
+      }
+    },
+    {
+      "id": "awash-amharic-cashback-promo-is-not-income",
+      "source": "real",
+      "sender": "Awash Bank",
+      "body": "ያዙ ምርቃት ለዓውደ ዓመት!  ግብይትዎን ያድርጉ፣ ስጦታዎን ይውሰዱ! በተመረጡ የንግድ ተቋማት የአዋሽ ካርድዎን በመጠቀም በአዋሽ POS ማሽኖች ወይም በአዋሽ ብር ፕሮ አዋሸ QR ላይ  እስከ ብር 5000.00 ድረስ ክፍያ ሲፈጽሙ፣ 7% ተመላሽ ገንዘብ ያገኛሉ! የተመረጡ የንግድ ተቋማትን ዝርዝር ለማግኘት ማስፈንጠሪያውን ይጫኑ፦ https://awashbank.com/qr-and-pos-merchant-list/",
+      "expect": {
+        "parsed": false
+      }
+    },
+    {
+      "id": "telebirr-amharic-expo-cashback-promo-is-not-income",
+      "source": "real",
+      "sender": "telebirr",
+      "body": "ኢድ ኤክስፖ 2018!  በግዮን ሆቴል በድምቀት እየተካሄደ በሚገኘው ኢድ ኤክስፖ 2018 የመግቢያ ትኬት በቴሌብር ሲቆርጡ 5%፣ ያሻዎን ሲገበዩ እስከ ብር 2500 ላለው 10% ተመላሽ ያገኛሉ!  ቴሌብር ሱፐርአፕን https://bit.ly/telebirr_S",
+      "expect": {
+        "parsed": false
+      }
+    },
+    {
+      "id": "ethiotel-amharic-worldcup-lottery-promo-is-ignored",
+      "source": "real",
+      "sender": "ethio tel",
+      "body": "ጉዞ ወደ 2026 የዓለም ዋንጫ በ100 ሰከንድ ጨዋታ!  የ2026 የዓለም ዋንጫን ሙሉ ወጪዎ ተሸፍኖ ይታደሙ፣ አይፎን 17 ፕሮ፣ 250,000 ብር እና ሌሎች አጓጊ ሽልማቶችን ያሸንፉ።  አሁኑኑ ወደ *636# በመደወል ይመዝገቡ፤ በሚደርስዎት ማስፈንጠሪያ",
+      "expect": {
+        "parsed": false
+      }
+    },
+    {
+      "id": "ethiotel-amharic-subscription-promo-is-ignored",
+      "source": "real",
+      "sender": "ethio tel",
+      "body": "አፍሮሪድን ይጠቀሙ፤ የዲጂታል አኗኗር ዘይቤን ይከተሉ!  አፍሮሪድ የኢ-ቡክ፣ የኦዲዮ ቡክ እና የልጆች ይዘቶችን በአንድ ላይ የያዘ ዲጂታል ቤተ-መጻሕፍት አቅርቦልዎታል!   ለዕለታዊ A በ5 ብር፣ ለሳምንታዊ B በ25 ብር ወይም ለወርኅዊ C ብለው በ80 ብር ወደ 9632 ይላኩ፤ ለ3 ቀናት በነጻ!  ኢትዮ ቴሌኮም",
+      "expect": {
+        "parsed": false
+      }
+    },
+    {
+      "id": "dashen-amharic-dormant-account-notice-is-ignored",
+      "source": "real",
+      "sender": "Dashen Bank",
+      "body": "ውድ ደንበኛችን፣   እ.ኢ.አ ከነሐሴ 01 ቀን 2026 ዓ.ም ጀምሮ ብር 1,000.00 (አንድ ሺህ) እና ከዚያ በታች ኖሯቸው አንድ ዓመት እና ከዚያ በላይ ያልተንቀሳቀሱ የቁጠባ ሂሳቦች እንዲሁም ከብር 100.00 (አንድ መቶ) እና ከዚያ በታች ያላቸው እየተንቀሳቀሱ ያሉ የቁጠባ ሂሳቦች ላይ ወለድ የማይታሰብባቸው መሆኑን በአክብሮት እናስታውቃለን፡፡ እንዲሁም ከብር 5.00 (አምስት) በታች ኖሮአቸው ከአንድ አመት በላይ ያልተንቀሳቀሱ ሂሳቦች እንደሚዘጉ እና በደንበኛው ጥያቄ ተመስርቶ ገንዘቡ ተመላሽ እንደሚደረግ እንገልጻለን።   ለዝርዝር መረጃ በአቅራቢያዎ የሚገኝ የዳሸን ባንክ ቅርንጫፍን ይጎብኙ ወይም 6333 ነጻ የጥሪ ማዕከል ይደውሉ።  ዳሸን ባንክ",
+      "expect": {
+        "parsed": false
+      }
+    },
+    {
+      "id": "boa-amharic-loan-offer-is-ignored",
+      "source": "real",
+      "sender": "BOA",
+      "body": "ለግል ፍላጎትዎ እስከ 100,000 ብር ይበደሩ!  ውድ ABEBE K. ፣ የአቢሲንያ  ሞባይል ባንኪንግ ተጠቃሚ ስለሆኑ እያመሰገንን፤ እቅድዎን ወይም የግል ፍላጎትዎን ለማሳካት እስከ 100,000 ብር ድረስ ይበደሩ፡፡ ያስታውሱ የአካውንት እንቅስቃሴዎ እያደገ በሄደ ቁጥር የብድር መጠንዎ ይጨምራል፡፡  መተግበሪያውን ለማውረድ ፦ ለአንድሮይድ: https://bit.ly/BOAmobilebanki",
+      "expect": {
+        "parsed": false
+      }
+    },
+    {
+      "id": "boa-amharic-visa-prize-promo-is-ignored",
+      "source": "real",
+      "sender": "BOA",
+      "body": "ከ100 ብር ጀምሮ  ፍሪጅ፣ ላፕቶፕ፣ ዘመናዊ ስልክ እና እስከ 10,000 ብር የሚደርስ የፕሪፔይድ ካርድ እንዲሸለሙ፣ በአቢሲንያ ቪዛ ካርድዎ ይገበያዩ!  እየተገበያዩ፣ ለዕድል ጨዋታ (spin the wheel) የሚያበቃዎትን ነጥብ ያግኙ! ይገበያዩ - ይጫወቱ - ይሸለሙ!  አቢሲንያ ባንክ የሁሉም ምርጫ!",
+      "expect": {
+        "parsed": false
+      }
+    },
+    {
+      "id": "hibret-mobile-topup-transaction-is-money-out",
+      "source": "real",
+      "sender": "HibretBank",
+      "body": "Dear customer, your Mobile Topup transaction of 50 Birr to  2519******69 with Transaction Reference no 474TOPU251840001 Yimulu reference no R250703.1038.2500a1 has been successful.",
+      "expect": {
+        "parsed": true,
+        "institution": "hibret",
+        "direction": "out",
+        "amountMinor": 5000,
+        "category": "airtime",
+        "explicitDirection": true,
+        "autoAccept": true
+      }
+    },
+    {
+      "id": "hibret-recharged-your-prepaid-mirror-is-ignored",
+      "source": "real",
+      "sender": "HibretBank",
+      "body": "Dear customer, Abebe K. have recharged your prepaid mobile for amount of 50 Birr. Yimulu Reference No is R250703.1038.2500a1",
+      "expect": {
+        "parsed": false
+      }
+    },
+    {
+      "id": "telebirr-cancelled-request-is-ignored",
+      "source": "real",
+      "sender": "127",
+      "body": "Dear Customer  Your request for transaction number DCD7PTW4VL with amount ETB 150.00 is cancelled.  Your current E-Money Account  balance is  ETB 2,923.74.  Thank you for using telebirr Ethio telecom",
+      "expect": {
+        "parsed": false
+      }
+    }
+  ]
+}
