@@ -18,7 +18,7 @@ Fixed in code on 2026-09-25:
 Still open:
 - [ ] **Bank logos are third-party trademarks** (28 bundled, sources in `assets/logos/SOURCES.md`; owner's decision 2026-09-25). If Play flags impersonation/IP, reply that logos only identify the user's own accounts and the app is not affiliated with the banks — or ship the monogram fallback by emptying `kInstitutionsWithLogo`. Say "not affiliated with any bank" in the store listing.
 - [ ] Only when accounts return: apply `supabase/migrations/0002_delete_my_account.sql` and add the account-deletion web link ([requirement](https://support.google.com/googleplay/android-developer/answer/13327111)).
-- [ ] Replace `CONTACT_EMAIL` in `docs/privacy-policy.html` and publish it (see §9).
+- [x] Contact email filled in `docs/privacy-policy.html` (2026-10-02); publish it (see §9).
 - [ ] Create the upload keystore and `android/key.properties` (§1). Without it the bundle is debug-signed and Play rejects it.
 - [ ] Fix the local toolchain: `flutter doctor` reports a missing `cmdline-tools` component and unknown license status. Install "Android SDK Command-line Tools" in Android Studio → SDK Manager, then run `flutter doctor --android-licenses`. Without them, `flutter build appbundle` exits 1 with "failed to strip debug symbols" even though the `.aab` builds.
 - [ ] New personal developer accounts: closed test with 12+ testers for 14 days before production access.
@@ -60,7 +60,7 @@ Where to file it: Play Console → App content → Sensitive app permissions →
 
 Draft answers:
 - **Core functionality:** Genzeb is a personal-finance app for Ethiopia. Ethiopian banks and mobile-money wallets (CBE, telebirr, etc.) report every transaction only by SMS and offer no public API. Genzeb reads these SMS on-device to record transactions, balances and fees automatically and to power budgets and reports. Without SMS access the core feature doesn't work and the app falls back to manual entry.
-- **Permissions:** `READ_SMS` imports historical transaction SMS from recognised financial senders. `RECEIVE_SMS` records new transaction SMS while the app is in the foreground.
+- **Permissions:** `READ_SMS` imports historical transaction SMS from recognised financial senders. `RECEIVE_SMS` records each new transaction SMS as it arrives, including when the app is closed, and triggers an on-device "money in / money out" notification.
 - **Data handling:** Parsing is fully on-device and deterministic. SMS text is never transmitted. Non-financial SMS are ignored and not stored. Android backup is disabled (`allowBackup=false`).
 - **Why no alternative works:** there is no bank/wallet API or SMS Retriever-style alternative for reading third-party transaction receipts.
 - [ ] **Demo video (required):** a YouTube link (preferred) or a cloud link to an mp4, about 30–90 s. Show: first launch → prominent disclosure screen → user taps accept → Android permission dialog → transactions appear from bank SMS → a new SMS arriving while the app is open → personal SMS not shown. Use a test device with sample messages, not real personal SMS.
