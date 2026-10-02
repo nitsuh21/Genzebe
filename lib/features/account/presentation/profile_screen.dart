@@ -5,6 +5,7 @@ import 'package:genzeb/app/providers.dart';
 import 'package:genzeb/core/config/app_config.dart';
 import 'package:genzeb/core/l10n/app_strings.dart';
 import 'package:genzeb/features/account/domain/models/account_models.dart';
+import 'package:genzeb/features/account/presentation/privacy_policy_screen.dart';
 import 'package:genzeb/features/ai/presentation/ai_assistant_sheet.dart';
 import 'package:genzeb/features/sms_ingestion/presentation/review_queue_screen.dart';
 
@@ -135,6 +136,16 @@ class ProfileScreen extends ConsumerWidget {
               title: 'Private by design',
               subtitle: 'Your SMS and ledger never leave this device. No '
                   'account needed.',
+            ),
+            _SettingsTile(
+              icon: Icons.policy_outlined,
+              iconColor: const Color(0xFF6B7280),
+              title: 'Privacy policy',
+              subtitle: 'What Genzeb reads, stores and never shares',
+              onTap: () => Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                    builder: (_) => const PrivacyPolicyScreen()),
+              ),
             ),
             // Sample data is an onboarding aid; in a release build it would
             // only pollute a real ledger.

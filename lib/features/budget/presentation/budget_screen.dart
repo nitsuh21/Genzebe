@@ -67,8 +67,11 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> {
                       ref.read(amountsHiddenProvider.notifier).toggle(),
                 ),
                 const SizedBox(height: 12),
-                _AiBudgetCard(ref: ref),
-                const SizedBox(height: 8),
+                // AI is a Plus perk; free users must not see it.
+                if (ref.watch(aiEntitledProvider)) ...[
+                  _AiBudgetCard(ref: ref),
+                  const SizedBox(height: 8),
+                ],
                 ...overview.items.map(
                   (item) => _BudgetTile(
                     progress: item,

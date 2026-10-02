@@ -447,12 +447,15 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
                 const SizedBox(height: 10),
                 _RunRateCard(strings: strings, report: report),
               ],
-              const SizedBox(height: 16),
-              _AiReportCard(
-                ref: ref,
-                periodContext:
-                    '${formatDay(start)} to ${formatDay(endExclusive.subtract(const Duration(days: 1)))}',
-              ),
+              // AI is a Plus perk; free users must not see it.
+              if (ref.watch(aiEntitledProvider)) ...[
+                const SizedBox(height: 16),
+                _AiReportCard(
+                  ref: ref,
+                  periodContext:
+                      '${formatDay(start)} to ${formatDay(endExclusive.subtract(const Duration(days: 1)))}',
+                ),
+              ],
               if (_hasMeaningfulBalanceHistory(report.balanceSeries)) ...[
                 const SizedBox(height: 20),
                 SectionHeader(title: strings.balanceOverTime),
