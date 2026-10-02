@@ -29,7 +29,7 @@ if (hasReleaseKeystore) {
 }
 
 android {
-    namespace = "com.nitsuh.genzeb"
+    namespace = "com.eytta.genzeb"
     // Flutter 3.44 defaults compileSdk/targetSdk to 36, which satisfies the
     // Play target-API requirement (>= 35). Floors guard against an older SDK.
     compileSdk = maxOf(flutter.compileSdkVersion, 36)
@@ -41,7 +41,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.nitsuh.genzeb"
+        applicationId = "com.eytta.genzeb"
         minSdk = flutter.minSdkVersion
         targetSdk = maxOf(flutter.targetSdkVersion, 36)
         // Driven by `version:` in pubspec.yaml (name+code).

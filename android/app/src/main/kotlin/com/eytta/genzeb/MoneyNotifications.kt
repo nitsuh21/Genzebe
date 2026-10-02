@@ -1,4 +1,4 @@
-package com.nitsuh.genzeb
+package com.eytta.genzeb
 
 import android.Manifest
 import android.app.Notification
