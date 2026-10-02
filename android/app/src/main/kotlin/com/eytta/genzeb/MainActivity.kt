@@ -1,4 +1,4 @@
-package com.nitsuh.genzeb
+package com.eytta.genzeb
 
 import android.content.Intent
 import io.flutter.embedding.android.FlutterActivity

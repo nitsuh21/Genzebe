@@ -21,7 +21,7 @@ and accounts, wire up Supabase once:
    this is your `GOOGLE_SERVER_CLIENT_ID` (yes, the *web* one; the native
    Android flow uses it to mint an ID token Supabase can verify).
 3. Create a second **OAuth client ID → Android** with package name
-   `com.nitsuh.genzeb` and your signing SHA-1
+   `com.eytta.genzeb` and your signing SHA-1
    (`cd android && ./gradlew signingReport`).
 4. In Supabase: **Authentication → Providers → Google**, enable it and paste
    the web client ID (and secret).
@@ -52,7 +52,7 @@ flutter build apk --dart-define-from-file=env.json
 ### Values for this machine
 
 Debug signing SHA-1 for the Android OAuth client (package
-`com.nitsuh.genzeb`):
+`com.eytta.genzeb`):
 
 ```
 34:E3:B1:0F:28:FB:5F:80:CD:12:92:3E:4E:1C:6C:9F:F8:88:B0:09

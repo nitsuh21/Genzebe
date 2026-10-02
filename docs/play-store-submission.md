@@ -1,6 +1,6 @@
 # Genzeb — Google Play submission checklist
 
-App: **Genzeb** · package `com.nitsuh.genzeb` · category Finance · audience 18+
+App: **Genzeb** · package `com.eytta.genzeb` · category Finance · audience 18+
 Policy facts checked on 2026-09-25 (sources linked inline). Re-check before each submission; Play policies change.
 
 ---
