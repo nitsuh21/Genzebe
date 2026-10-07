@@ -102,6 +102,12 @@ void main() {
       type: TransactionType.income,
       categoryId: 'income',
     ));
+    // The user answered "is this an own transfer?" — that must survive.
+    final telebirrTx =
+        txAfterSecond.firstWhere((tx) => tx.id == 'sms-fake-telebirr-1');
+    await ledger.saveTransaction(
+      telebirrTx.copyWith(ownTransfer: OwnTransferOverride.own),
+    );
     await ledger.saveTransaction(TransactionRecord(
       id: 'manual-1',
       accountId: 'main-wallet',
@@ -120,6 +126,13 @@ void main() {
     final rebuilt =
         txAfterRebuild.firstWhere((tx) => tx.id == 'sms-fake-cbe-1');
     expect(rebuilt.type, TransactionType.expense);
+    // ...but the user's own-transfer answer is kept.
+    expect(
+      txAfterRebuild
+          .firstWhere((tx) => tx.id == 'sms-fake-telebirr-1')
+          .ownTransfer,
+      OwnTransferOverride.own,
+    );
     // Manual entries are never touched by a rebuild.
     expect(txAfterRebuild.any((tx) => tx.id == 'manual-1'), isTrue);
     // No duplicates: same number of SMS transactions as the first sync.

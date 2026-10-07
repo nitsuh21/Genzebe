@@ -63,6 +63,7 @@ class AppStrings {
     required this.madeFor,
     required this.net,
     required this.ownTransfers,
+    required this.toCheck,
     required this.bankFees,
     required this.awaitingReview,
     required this.spendingBreakdown,
@@ -149,6 +150,9 @@ class AppStrings {
   final String madeFor;
   final String net;
   final String ownTransfers;
+
+  /// "3 to check" — possible own transfers waiting for a yes/no.
+  final String toCheck;
   final String bankFees;
   final String awaitingReview;
   final String spendingBreakdown;
@@ -242,6 +246,7 @@ const enStrings = AppStrings(
   madeFor: 'Made with ❤️ for Ethiopia',
   net: 'Net',
   ownTransfers: 'Own transfers',
+  toCheck: 'to check',
   bankFees: 'Bank fees',
   awaitingReview: 'awaiting review',
   spendingBreakdown: 'Spending breakdown',
@@ -330,6 +335,7 @@ const amStrings = AppStrings(
   madeFor: 'በ❤️ ለኢትዮጵያ የተሰራ',
   net: 'ተጣራ',
   ownTransfers: 'የራስ ዝውውሮች',
+  toCheck: 'ለማረጋገጥ',
   bankFees: 'የባንክ ክፍያዎች',
   awaitingReview: 'ግምገማ በመጠበቅ ላይ',
   spendingBreakdown: 'የወጪ ትንተና',

@@ -428,6 +428,9 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
               _FlowStrip(
                 strings: strings,
                 totals: totals,
+                toCheckCount: report.scopedTransactions
+                    .where((tx) => report.suggestedIds.contains(tx.id))
+                    .length,
                 onTransfersTap: () => _showInternalSheet(context, report),
                 onFeesTap: () => _showTransactionsSheet(
                   context,
@@ -554,11 +557,26 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
     required String title,
     String? subtitle,
     required List<TransactionRecord> rows,
+    int? totalMinor,
+    String? checkTitle,
+    List<TransactionRecord> checkRows = const [],
   }) {
     final strings = ref.read(stringsProvider);
     final sorted = List<TransactionRecord>.from(rows)
       ..sort((a, b) => b.occurredAt.compareTo(a.occurredAt));
-    final total = sorted.fold<int>(0, (sum, tx) => sum + tx.amount.minorUnits);
+    final total = totalMinor ??
+        sorted.fold<int>(0, (sum, tx) => sum + tx.amount.minorUnits);
+    final toCheck = List<TransactionRecord>.from(checkRows)
+      ..sort((a, b) => b.occurredAt.compareTo(a.occurredAt));
+    Widget tile(BuildContext context, TransactionRecord tx) => Padding(
+          padding: const EdgeInsets.only(bottom: 10),
+          child: TransactionTile(
+            showDate: true,
+            record: tx,
+            dense: true,
+            onTap: () => showTransactionDetail(context, ref, tx),
+          ),
+        );
 
     showModalBottomSheet<void>(
       context: context,
@@ -603,22 +621,25 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
                   ),
                 ],
                 const SizedBox(height: 14),
-                if (sorted.isEmpty)
+                if (toCheck.isNotEmpty) ...[
+                  Text(
+                    checkTitle ?? '',
+                    style: theme.textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.w700,
+                      color: const Color(0xFFE8833A),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  for (final tx in toCheck) tile(context, tx),
+                  const SizedBox(height: 8),
+                ],
+                if (sorted.isEmpty && toCheck.isEmpty)
                   Padding(
                     padding: const EdgeInsets.all(24),
                     child: Center(child: Text(strings.noSpendingPeriod)),
                   )
                 else
-                  for (final tx in sorted)
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 10),
-                      child: TransactionTile(
-                        showDate: true,
-                        record: tx,
-                        dense: true,
-                        onTap: () => showTransactionDetail(context, ref, tx),
-                      ),
-                    ),
+                  for (final tx in sorted) tile(context, tx),
               ],
             );
           },
@@ -632,10 +653,15 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
       context,
       title: ref.read(stringsProvider).ownTransfers,
       subtitle: 'Money moving between your own accounts — excluded from '
-          'income and spending. Tap one to recategorize if the '
-          'classification is wrong.',
+          'income and spending (only what a move cost counts, as a bank '
+          'fee). Tap one to see why, or to correct it.',
       rows: report.scopedTransactions
           .where((tx) => report.internalIds.contains(tx.id))
+          .toList(growable: false),
+      totalMinor: report.totals.internalMovedMinor,
+      checkTitle: 'Possibly yours — tap to answer',
+      checkRows: report.scopedTransactions
+          .where((tx) => report.suggestedIds.contains(tx.id))
           .toList(growable: false),
     );
   }
@@ -886,10 +912,14 @@ class _FlowStrip extends StatelessWidget {
     required this.totals,
     required this.onTransfersTap,
     required this.onFeesTap,
+    this.toCheckCount = 0,
   });
 
   final AppStrings strings;
   final MonthlyReport totals;
+
+  /// Possible own transfers waiting for the user's yes/no.
+  final int toCheckCount;
   final VoidCallback onTransfersTap;
   final VoidCallback onFeesTap;
 
@@ -950,8 +980,14 @@ class _FlowStrip extends StatelessWidget {
       ),
       child: Row(
         children: [
-          item(Icons.swap_horiz_rounded, const Color(0xFF3B8DD6),
-              strings.ownTransfers, totals.internalMovedMinor, onTransfersTap),
+          item(
+              Icons.swap_horiz_rounded,
+              const Color(0xFF3B8DD6),
+              toCheckCount > 0
+                  ? '${strings.ownTransfers} · $toCheckCount ${strings.toCheck}'
+                  : strings.ownTransfers,
+              totals.internalMovedMinor,
+              onTransfersTap),
           Container(width: 1, height: 30, color: theme.dividerColor),
           const SizedBox(width: 10),
           item(Icons.account_balance_rounded, const Color(0xFFD08A3E),

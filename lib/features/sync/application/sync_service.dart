@@ -107,7 +107,9 @@ class SyncService {
     if (rebuild && permissionState != SmsPermissionState.granted) {
       rebuild = false;
     }
-    if (rebuild) await _clearSmsDerivedData();
+    final answers = rebuild
+        ? await _clearSmsDerivedData()
+        : const <String, OwnTransferOverride>{};
     await _purgeNonFinancialMessagesOnce();
 
     final isIncremental = incremental && !rebuild && lastSyncMillis != null;
@@ -155,6 +157,8 @@ class SyncService {
       if (stored.status == SmsIngestionStatus.duplicate) duplicates += 1;
       if (stored.status == SmsIngestionStatus.failed) failed += 1;
     }
+
+    await _restoreOwnTransferAnswers(answers);
 
     if (permissionState == SmsPermissionState.granted) {
       await prefs.setInt(_lastSyncPref, now.millisecondsSinceEpoch);
@@ -274,12 +278,19 @@ class SyncService {
   /// so the following ingest re-parses the whole inbox with the CURRENT
   /// parser and learned rules. Manual transactions are untouched; rejected
   /// messages are kept so user rejections stay honored across rebuilds.
-  Future<void> _clearSmsDerivedData() async {
+  /// Clears SMS-derived rows for a rebuild and returns the user's
+  /// own-transfer answers on them, keyed by transaction id — ids come from
+  /// the device SMS id, so the rebuilt rows get the same ones.
+  Future<Map<String, OwnTransferOverride>> _clearSmsDerivedData() async {
+    final answers = <String, OwnTransferOverride>{};
     final ledger = _ledgerRepository;
     if (ledger != null) {
       final transactions = await ledger.getTransactions();
       for (final tx in transactions) {
         if (tx.source == TransactionSource.sms) {
+          if (tx.ownTransfer != OwnTransferOverride.none) {
+            answers[tx.id] = tx.ownTransfer;
+          }
           await ledger.deleteTransaction(tx.id);
         }
       }
@@ -290,6 +301,22 @@ class SyncService {
       await _smsMessageRepository.delete(message.sms.id);
     }
     AppLogger.info('sync.rebuild', 'Cleared SMS-derived data for rebuild');
+    return answers;
+  }
+
+  /// A rebuild re-reads every SMS; the user's answers to "is this an own
+  /// transfer?" are knowledge the inbox doesn't hold, so they carry over.
+  Future<void> _restoreOwnTransferAnswers(
+    Map<String, OwnTransferOverride> answers,
+  ) async {
+    final ledger = _ledgerRepository;
+    if (ledger == null || answers.isEmpty) return;
+    for (final MapEntry(key: id, value: answer) in answers.entries) {
+      final tx = await ledger.getTransactionById(id);
+      if (tx != null) {
+        await ledger.saveTransaction(tx.copyWith(ownTransfer: answer));
+      }
+    }
   }
 
   List<SmsMessage> _parseImportedPayload(String? payload) {

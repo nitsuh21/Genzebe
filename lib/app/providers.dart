@@ -274,6 +274,16 @@ final transactionServiceProvider = Provider<TransactionService>((ref) {
   );
 });
 
+/// Which transactions are money moving between the user's own accounts.
+/// Always computed on the whole ledger — an institution-filtered list would
+/// hide one leg of a pair.
+final flowAnalysisProvider = FutureProvider<FlowAnalysis>((ref) async {
+  ref.watch(dataVersionProvider);
+  final transactions =
+      await ref.watch(ledgerRepositoryProvider).getTransactions();
+  return ReportService.analyzeFlows(transactions);
+});
+
 final reportServiceProvider = Provider<ReportService>((ref) {
   return ReportService(
     ref.watch(ledgerRepositoryProvider),
@@ -454,6 +464,12 @@ final allTransactionsProvider =
   ref.watch(dataVersionProvider);
   final repo = ref.watch(ledgerRepositoryProvider);
   return repo.getTransactions();
+});
+
+final transactionByIdProvider =
+    FutureProvider.family<TransactionRecord?, String>((ref, id) {
+  ref.watch(dataVersionProvider);
+  return ref.watch(ledgerRepositoryProvider).getTransactionById(id);
 });
 
 final accountsProvider = FutureProvider<List<Account>>((ref) {

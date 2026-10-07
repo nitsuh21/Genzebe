@@ -9,7 +9,7 @@ import 'package:genzeb/features/transactions/presentation/add_transaction_sheet.
 import 'package:genzeb/features/transactions/presentation/transaction_detail_sheet.dart';
 import 'package:genzeb/features/transactions/presentation/transaction_tile.dart';
 
-enum _LedgerFilter { all, income, expense, sms, manual }
+enum _LedgerFilter { all, income, expense, ownTransfers, sms, manual }
 
 enum _LedgerPeriod {
   today,
@@ -46,14 +46,17 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
     });
   }
 
-  bool _matches(TransactionRecord record) {
+  bool _matches(TransactionRecord record, FlowAnalysis flows) {
+    final ownTransfer = flows.internalIds.contains(record.id);
     switch (_filter) {
       case _LedgerFilter.all:
         return true;
       case _LedgerFilter.income:
-        return record.type != TransactionType.expense;
+        return isInflowType(record.type) && !ownTransfer;
       case _LedgerFilter.expense:
-        return record.type == TransactionType.expense;
+        return isOutflowType(record.type) && !ownTransfer;
+      case _LedgerFilter.ownTransfers:
+        return ownTransfer;
       case _LedgerFilter.sms:
         return record.source == TransactionSource.sms;
       case _LedgerFilter.manual:
@@ -128,6 +131,8 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final transactionsAsync = ref.watch(ledgerTransactionsProvider);
+    final flows =
+        ref.watch(flowAnalysisProvider).valueOrNull ?? FlowAnalysis.empty;
     final institutionOptionsAsync = ref.watch(institutionFilterOptionsProvider);
     final selectedInstitutionCodes =
         ref.watch(selectedInstitutionCodesProvider);
@@ -145,18 +150,14 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
         error: (e, _) => Center(child: Text('Error: $e')),
         data: (allRecords) {
           final records = allRecords
-              .where(_matches)
+              .where((record) => _matches(record, flows))
               .where(_matchesPeriod)
               .toList()
             ..sort((a, b) => b.occurredAt.compareTo(a.occurredAt));
-          // Pending parses show in the list (badged) but never in the total,
-          // matching how Reports counts.
-          final net = records.fold<int>(0, (sum, record) {
-            if (record.reviewStatus == TransactionReviewStatus.pendingReview) {
-              return sum;
-            }
-            return sum + signedMinorForRecord(record);
-          });
+          final net = records.fold<int>(
+            0,
+            (sum, record) => sum + _countedMinor(record, flows),
+          );
           return Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -441,6 +442,8 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
         return 'Income';
       case _LedgerFilter.expense:
         return 'Expense';
+      case _LedgerFilter.ownTransfers:
+        return 'Own transfers';
       case _LedgerFilter.sms:
         return 'From SMS';
       case _LedgerFilter.manual:
@@ -538,6 +541,19 @@ class _FilterButton extends StatelessWidget {
   }
 }
 
+/// What a row adds to a ledger total, matching how Reports counts: pending
+/// parses show in the list (badged) but count nothing, and an own transfer
+/// counts only for what it cost.
+int _countedMinor(TransactionRecord record, FlowAnalysis flows) {
+  if (record.reviewStatus == TransactionReviewStatus.pendingReview) return 0;
+  if (flows.internalIds.contains(record.id)) {
+    return isOutflowType(record.type)
+        ? -ReportService.feesFor(record, flows)
+        : 0;
+  }
+  return signedMinorForRecord(record);
+}
+
 class _GroupedList extends ConsumerWidget {
   const _GroupedList({
     required this.records,
@@ -550,6 +566,8 @@ class _GroupedList extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
+    final flows =
+        ref.watch(flowAnalysisProvider).valueOrNull ?? FlowAnalysis.empty;
     final groups = <String, List<TransactionRecord>>{};
     for (final record in records) {
       final key = relativeDayLabel(record.occurredAt);
@@ -560,7 +578,7 @@ class _GroupedList extends ConsumerWidget {
     groups.forEach((label, items) {
       var dayTotal = 0;
       for (final item in items) {
-        dayTotal += signedMinorForRecord(item);
+        dayTotal += _countedMinor(item, flows);
       }
       children.add(
         Padding(

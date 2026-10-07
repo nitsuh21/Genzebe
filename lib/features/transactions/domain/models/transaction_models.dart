@@ -6,6 +6,10 @@ enum TransactionSource { sms, manual, sync }
 
 enum TransactionReviewStatus { autoAccepted, pendingReview, rejected }
 
+/// The user's own answer to "is this money moving between my own
+/// accounts?". It beats anything the flow engine infers.
+enum OwnTransferOverride { none, own, notOwn }
+
 class Account {
   const Account({
     required this.id,
@@ -53,6 +57,7 @@ class TransactionRecord {
     this.parserConfidence,
     this.reviewStatus = TransactionReviewStatus.autoAccepted,
     this.statementBalanceMinor,
+    this.ownTransfer = OwnTransferOverride.none,
   });
 
   final String id;
@@ -72,6 +77,8 @@ class TransactionRecord {
   /// when the message included one. Used to derive real account balances.
   final int? statementBalanceMinor;
 
+  final OwnTransferOverride ownTransfer;
+
   TransactionRecord copyWith({
     String? id,
     String? accountId,
@@ -86,6 +93,7 @@ class TransactionRecord {
     double? parserConfidence,
     TransactionReviewStatus? reviewStatus,
     int? statementBalanceMinor,
+    OwnTransferOverride? ownTransfer,
   }) {
     return TransactionRecord(
       id: id ?? this.id,
@@ -102,6 +110,7 @@ class TransactionRecord {
       reviewStatus: reviewStatus ?? this.reviewStatus,
       statementBalanceMinor:
           statementBalanceMinor ?? this.statementBalanceMinor,
+      ownTransfer: ownTransfer ?? this.ownTransfer,
     );
   }
 }

@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:genzeb/app/providers.dart';
 import 'package:genzeb/features/sms_ingestion/domain/models/institutions.dart';
 import 'package:genzeb/features/sms_ingestion/domain/models/sms_models.dart';
 import 'package:genzeb/core/utils/formatters.dart';
@@ -6,6 +8,14 @@ import 'package:genzeb/features/reports/application/report_service.dart';
 import 'package:genzeb/features/sms_ingestion/domain/services/sms_parser.dart';
 import 'package:genzeb/features/transactions/domain/models/categories.dart';
 import 'package:genzeb/features/transactions/domain/models/transaction_models.dart';
+
+/// How an own-account movement shows in lists, whatever its category.
+const kOwnTransferCategory = CategoryInfo(
+  id: 'own_transfer',
+  label: 'Own transfer',
+  icon: Icons.swap_horiz_rounded,
+  color: kOwnTransferColor,
+);
 
 /// The name a person recognises a transaction by: the merchant or
 /// counterparty from the SMS, else the manual note, else the category.
@@ -23,7 +33,10 @@ String transactionTitle(TransactionRecord record) {
   return categoryInfoFor(record.categoryId).label;
 }
 
-class TransactionTile extends StatelessWidget {
+/// Neutral colour for own-transfer amounts: the money didn't come or go.
+const kOwnTransferColor = Color(0xFF3B8DD6);
+
+class TransactionTile extends ConsumerWidget {
   const TransactionTile({
     super.key,
     required this.record,
@@ -41,18 +54,28 @@ class TransactionTile extends StatelessWidget {
   final bool showDate;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
-    final info = categoryInfoFor(record.categoryId);
+    final flows =
+        ref.watch(flowAnalysisProvider).valueOrNull ?? FlowAnalysis.empty;
+    final isOwnTransfer = flows.internalIds.contains(record.id);
+    final maybeOwnTransfer = flows.suggestedIds.contains(record.id);
+    final info = isOwnTransfer
+        ? kOwnTransferCategory
+        : categoryInfoFor(record.categoryId);
     final isExpense = isOutflowType(record.type);
     final signedMinor = signedMinorForRecord(record);
-    final amountColor =
-        isExpense ? const Color(0xFFE25555) : const Color(0xFF2E9E6B);
+    final amountColor = isOwnTransfer
+        ? kOwnTransferColor
+        : isExpense
+            ? const Color(0xFFE25555)
+            : const Color(0xFF2E9E6B);
 
     final title = transactionTitle(record);
     // Don't repeat the category when it is already the title.
     final subtitleParts = <String>[
       if (title != info.label) info.label,
+      if (maybeOwnTransfer) 'Own transfer?',
       _sourceLabel(record),
       if (showDate) relativeDayLabel(record.occurredAt),
     ];

@@ -186,10 +186,14 @@ class AiAssistantService {
     }
 
     if (scopedTransactions.isNotEmpty) {
-      final inflows =
-          scopedTransactions.where((t) => isInflowType(t.type)).toList();
-      final outflows =
-          scopedTransactions.where((t) => isOutflowType(t.type)).toList();
+      // Own transfers aren't income or spending here either.
+      final internalIds = ReportService.analyzeFlows(transactions).internalIds;
+      final inflows = scopedTransactions
+          .where((t) => isInflowType(t.type) && !internalIds.contains(t.id))
+          .toList();
+      final outflows = scopedTransactions
+          .where((t) => isOutflowType(t.type) && !internalIds.contains(t.id))
+          .toList();
       inflows
           .sort((a, b) => b.amount.minorUnits.compareTo(a.amount.minorUnits));
       outflows.sort(
