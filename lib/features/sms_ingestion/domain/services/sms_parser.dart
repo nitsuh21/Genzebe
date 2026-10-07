@@ -18,7 +18,7 @@ abstract class SmsParserTemplate {
 /// Bump whenever parser behaviour changes in a way that should rewrite
 /// history. The next sync then re-parses the whole inbox once (manual
 /// entries and user rejections survive), so old misreads are corrected.
-const int kParserVersion = 3;
+const int kParserVersion = 4;
 
 /// Parses at or above this confidence are booked directly; below it they
 /// wait in the review queue for the user.
@@ -686,6 +686,16 @@ String inferCategory({required String body, required bool isExpense}) {
 
   final priority = matchRules(priorityRules);
   if (priority != null) return priority;
+
+  // Cash out of an ATM or over the counter is spending, and says so —
+  // never a transfer. telebirr: "request to withdraw ... using ... ATM";
+  // Hibret: "ETB 2000 Cash Withdrawal is made from your account".
+  if (isExpense &&
+      body.toLowerCase().contains('withdraw') &&
+      (_containsKeyword(body, 'atm') ||
+          _containsKeyword(body, 'cash withdrawal'))) {
+    return 'atm';
+  }
 
   // A person-to-person / account-to-account transfer outranks incidental
   // fee wording: CBE transfer receipts always list "service charge" and
