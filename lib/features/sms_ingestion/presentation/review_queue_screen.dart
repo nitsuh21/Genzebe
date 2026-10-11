@@ -4,8 +4,7 @@ import 'package:genzeb/design_system/theme.dart';
 import 'package:genzeb/app/providers.dart';
 import 'package:genzeb/core/logging/app_logger.dart';
 import 'package:genzeb/core/utils/formatters.dart';
-import 'package:genzeb/design_system/institution_avatar.dart';
-import 'package:genzeb/features/sms_ingestion/domain/models/institutions.dart';
+import 'package:genzeb/features/account/presentation/banks_screen.dart';
 import 'package:genzeb/features/sms_ingestion/domain/models/sms_models.dart';
 import 'package:genzeb/features/sms_ingestion/domain/repositories/device_sms_source.dart';
 import 'package:genzeb/features/transactions/domain/models/categories.dart';
@@ -225,9 +224,9 @@ class _ReviewQueueScreenState extends ConsumerState<ReviewQueueScreen> {
           _CollapsibleCard(
             icon: Icons.account_balance_outlined,
             title: 'Banks & wallets found',
-            subtitle: 'Synced automatically from your inbox',
+            subtitle: 'Turn one off to keep it out of your ledger',
             initiallyExpanded: true,
-            child: const _InstitutionsFound(),
+            child: const InstitutionSwitchList(framed: false),
           ),
           const SizedBox(height: 12),
           _CollapsibleCard(
@@ -513,71 +512,6 @@ class _SyncCard extends StatelessWidget {
           ),
         ],
       ),
-    );
-  }
-}
-
-/// Every bank and wallet Genzeb has seen in the inbox. Nothing to set up:
-/// a new institution appears here the first time one of its messages does.
-class _InstitutionsFound extends ConsumerWidget {
-  const _InstitutionsFound();
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final theme = Theme.of(context);
-    final found = ref.watch(institutionsSeenProvider).valueOrNull ?? const [];
-    if (found.isEmpty) {
-      return _InfoCard(
-        text: 'No bank or wallet messages yet. Genzeb recognises '
-            '${kInstitutions.length} Ethiopian banks and wallets, including '
-            'CBE, telebirr, Awash, Dashen, Abyssinia and M-PESA.',
-      );
-    }
-    final quiet = found.where((f) => !f.hasTransactions).length;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Wrap(
-          spacing: 10,
-          runSpacing: 10,
-          children: [
-            for (final sighting in found)
-              Opacity(
-                opacity: sighting.hasTransactions ? 1 : 0.55,
-                child: Container(
-                  padding: const EdgeInsets.fromLTRB(6, 6, 12, 6),
-                  decoration: BoxDecoration(
-                    color: theme.colorScheme.surfaceContainerHighest
-                        .withValues(alpha: 0.5),
-                    borderRadius: BorderRadius.circular(999),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      InstitutionAvatar(info: sighting.info, size: 26),
-                      const SizedBox(width: 8),
-                      Text(
-                        sighting.info.shortName,
-                        style: theme.textTheme.labelLarge
-                            ?.copyWith(fontWeight: FontWeight.w700),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-          ],
-        ),
-        if (quiet > 0) ...[
-          const SizedBox(height: 10),
-          Text(
-            'Faded ones have sent only notices or promotions so far. Their '
-            'transactions will appear as soon as one arrives.',
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
-            ),
-          ),
-        ],
-      ],
     );
   }
 }

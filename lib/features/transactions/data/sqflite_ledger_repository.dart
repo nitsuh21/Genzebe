@@ -30,6 +30,12 @@ class SqfliteLedgerRepository implements LedgerRepository {
   }
 
   @override
+  Future<void> deleteAccount(String accountId) async {
+    final db = await _db;
+    await db.delete('accounts', where: 'id = ?', whereArgs: [accountId]);
+  }
+
+  @override
   Future<void> saveTransaction(TransactionRecord transaction) async {
     final db = await _db;
     await db.insert(

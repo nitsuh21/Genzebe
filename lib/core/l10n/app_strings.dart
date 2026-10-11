@@ -19,6 +19,21 @@ class AppStrings {
     required this.smsAllow,
     required this.smsDemo,
     required this.smsLater,
+    required this.banksTitle,
+    required this.banksFoundTitle,
+    required this.banksFoundBody,
+    required this.banksImport,
+    required this.banksContinue,
+    required this.banksSettingsBody,
+    required this.banksOff,
+    required this.banksNoTransactions,
+    required this.banksNoneFound,
+    required this.banksTurnOff,
+    required this.banksTurnOffTitle,
+    required this.banksTurnOffBody,
+    required this.messageCount,
+    required this.transactionCount,
+    required this.cancel,
     required this.goodMorning,
     required this.goodAfternoon,
     required this.goodEvening,
@@ -93,6 +108,21 @@ class AppStrings {
   final String smsAllow;
   final String smsDemo;
   final String smsLater;
+  final String banksTitle;
+  final String banksFoundTitle;
+  final String banksFoundBody;
+  final String banksImport;
+  final String banksContinue;
+  final String banksSettingsBody;
+  final String banksOff;
+  final String banksNoTransactions;
+  final String banksNoneFound;
+  final String banksTurnOff;
+  final String Function(String name) banksTurnOffTitle;
+  final String banksTurnOffBody;
+  final String Function(int count) messageCount;
+  final String Function(int count) transactionCount;
+  final String cancel;
 
   final String goodMorning;
   final String goodAfternoon;
@@ -153,6 +183,15 @@ class AppStrings {
   final String alertsMarkRead;
 }
 
+String _enTurnOffTitle(String name) => 'Turn off $name?';
+String _enMessageCount(int n) => n == 1 ? '1 message' : '$n messages';
+String _enTransactionCount(int n) =>
+    n == 1 ? '1 transaction' : '$n transactions';
+
+String _amTurnOffTitle(String name) => '$name ይጥፋ?';
+String _amMessageCount(int n) => n == 1 ? '1 መልዕክት' : '$n መልዕክቶች';
+String _amTransactionCount(int n) => n == 1 ? '1 ግብይት' : '$n ግብይቶች';
+
 const enStrings = AppStrings(
   navHome: 'Home',
   navLedger: 'Ledger',
@@ -171,6 +210,23 @@ const enStrings = AppStrings(
   smsAllow: 'Allow SMS access',
   smsDemo: 'Try sample data',
   smsLater: 'Not now',
+  banksTitle: 'Banks & wallets',
+  banksFoundTitle: 'Found your banks',
+  banksFoundBody: 'Tap any you want to leave out. You can change this later '
+      'in Profile.',
+  banksImport: 'Import',
+  banksContinue: 'Continue',
+  banksSettingsBody: 'Turn one off to keep it out of your ledger.',
+  banksOff: 'Off',
+  banksNoTransactions: 'No transactions yet',
+  banksNoneFound: 'No bank or wallet messages yet.',
+  banksTurnOff: 'Turn off',
+  banksTurnOffTitle: _enTurnOffTitle,
+  banksTurnOffBody: 'Its transactions leave your ledger until you turn it '
+      'back on.',
+  messageCount: _enMessageCount,
+  transactionCount: _enTransactionCount,
+  cancel: 'Cancel',
   goodMorning: 'Good morning',
   goodAfternoon: 'Good afternoon',
   goodEvening: 'Good evening',
@@ -245,6 +301,21 @@ const amStrings = AppStrings(
   smsAllow: 'የSMS ፈቃድ ስጥ',
   smsDemo: 'በናሙና ውሂብ ሞክር',
   smsLater: 'ኋላ ላይ',
+  banksTitle: 'ባንኮችና ዋሌቶች',
+  banksFoundTitle: 'ባንኮችዎ ተገኝተዋል',
+  banksFoundBody: 'የማይፈልጉትን ይንኩና ያስቀሩ። በኋላ በመገለጫ መቀየር ይችላሉ።',
+  banksImport: 'አስገባ',
+  banksContinue: 'ቀጥል',
+  banksSettingsBody: 'ከመዝገብዎ ለማስቀረት ያጥፉት።',
+  banksOff: 'ጠፍቷል',
+  banksNoTransactions: 'ገና ግብይት የለም',
+  banksNoneFound: 'ገና የባንክ ወይም የዋሌት መልዕክት የለም።',
+  banksTurnOff: 'አጥፋ',
+  banksTurnOffTitle: _amTurnOffTitle,
+  banksTurnOffBody: 'መልሰው እስኪያበሩት ድረስ ግብይቶቹ ከመዝገብዎ ይወጣሉ።',
+  messageCount: _amMessageCount,
+  transactionCount: _amTransactionCount,
+  cancel: 'ይቅር',
   goodMorning: 'እንደምን አደሩ',
   goodAfternoon: 'እንደምን ዋሉ',
   goodEvening: 'እንደምን አመሹ',

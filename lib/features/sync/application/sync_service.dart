@@ -5,11 +5,13 @@ import 'package:flutter/foundation.dart' show kReleaseMode;
 import 'package:genzeb/core/logging/app_logger.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:genzeb/features/sms_ingestion/application/account_resolver.dart';
 import 'package:genzeb/features/sms_ingestion/application/sms_ingestion_service.dart';
 import 'package:genzeb/features/sms_ingestion/domain/models/sms_models.dart';
 import 'package:genzeb/features/sms_ingestion/domain/repositories/device_sms_source.dart';
 import 'package:genzeb/features/sms_ingestion/domain/repositories/sms_message_repository.dart';
 import 'package:genzeb/features/sms_ingestion/domain/services/sms_parser.dart';
+import 'package:genzeb/features/sync/data/excluded_institutions_store.dart';
 import 'package:genzeb/features/transactions/domain/models/transaction_models.dart';
 import 'package:genzeb/features/transactions/domain/repositories/ledger_repository.dart';
 
@@ -53,25 +55,70 @@ class ForceSyncResult {
   final bool wasIncremental;
 }
 
+/// The inbox read without writing anything, so the user can see which banks
+/// and wallets were found and turn some off before the first import.
+class InboxScan {
+  const InboxScan({
+    required this.permission,
+    required this.messages,
+    required this.fetchedCount,
+  });
+
+  final SmsPermissionState permission;
+
+  /// Messages from recognised banks and wallets in the history window.
+  final List<SmsMessage> messages;
+
+  /// Every inbox message read in the window.
+  final int fetchedCount;
+
+  /// Each bank or wallet found with how many messages it sent, busiest
+  /// first.
+  List<(EthiopianInstitution, int)> get institutions {
+    final counts = <EthiopianInstitution, int>{};
+    for (final message in messages) {
+      final id = institutionForSender(message.sender);
+      counts[id] = (counts[id] ?? 0) + 1;
+    }
+    return [
+      for (final MapEntry(:key, :value) in counts.entries) (key, value),
+    ]..sort((a, b) => b.$2.compareTo(a.$2));
+  }
+}
+
 /// Reads the inbox and books every message from a recognised Ethiopian bank
-/// or wallet. There is no setup step: whichever institutions appear in the
-/// inbox are synced, each into its own account. Messages from anyone else
-/// (people, OTP services, promos) are skipped before they are stored.
+/// or wallet the user hasn't turned off, each into its own account.
+/// Messages from anyone else (people, OTP services, promos) are skipped
+/// before they are stored.
 class SyncService {
   SyncService({
     required SmsMessageRepository smsMessageRepository,
     required SmsIngestionService smsIngestionService,
     required DeviceSmsSource deviceSmsSource,
     LedgerRepository? ledgerRepository,
+    ExcludedInstitutionsStore exclusions = const ExcludedInstitutionsStore(),
   })  : _smsMessageRepository = smsMessageRepository,
         _smsIngestionService = smsIngestionService,
         _deviceSmsSource = deviceSmsSource,
-        _ledgerRepository = ledgerRepository;
+        _ledgerRepository = ledgerRepository,
+        _exclusions = exclusions;
 
   final SmsMessageRepository _smsMessageRepository;
   final SmsIngestionService _smsIngestionService;
   final DeviceSmsSource _deviceSmsSource;
   final LedgerRepository? _ledgerRepository;
+  final ExcludedInstitutionsStore _exclusions;
+
+  /// Syncs and bank on/off changes run one at a time: a sync that started
+  /// before a bank was turned off would otherwise book its messages again
+  /// right after they were removed.
+  Future<void> _queue = Future.value();
+
+  Future<T> _serial<T>(Future<T> Function() task) {
+    final result = _queue.then((_) => task());
+    _queue = result.then<void>((_) {}, onError: (Object _) {});
+    return result;
+  }
 
   static const _lastSyncPref = 'sms_last_sync_at';
   static const _cleanupPref = 'sms_non_financial_cleanup_v1';
@@ -84,11 +131,80 @@ class SyncService {
   /// is still picked up. Already-ingested ids are skipped cheaply.
   static const _incrementalOverlap = Duration(days: 2);
 
+  /// Reads the whole history window without storing anything.
+  Future<InboxScan> scanInbox({bool requestPermission = true}) async {
+    final permission = requestPermission
+        ? await _deviceSmsSource.ensurePermission()
+        : await _deviceSmsSource.currentPermission();
+    if (permission != SmsPermissionState.granted) {
+      return InboxScan(
+          permission: permission, messages: const [], fetchedCount: 0);
+    }
+    final fetched = await _deviceSmsSource.fetchRecentMessages(
+      since: DateTime.now().subtract(historyWindow),
+    );
+    return InboxScan(
+      permission: permission,
+      messages: fetched
+          .where((message) => isFinancialSender(message.sender))
+          .toList(growable: false),
+      fetchedCount: fetched.length,
+    );
+  }
+
+  /// [scan] lets a first sync book what onboarding already read instead of
+  /// reading the inbox twice.
   Future<ForceSyncResult> forceSyncFromSms({
     String? importedRawPayload,
     bool rebuild = false,
     bool incremental = false,
     bool requestPermission = true,
+    InboxScan? scan,
+  }) =>
+      _serial(() => _forceSync(
+            importedRawPayload: importedRawPayload,
+            rebuild: rebuild,
+            incremental: incremental,
+            requestPermission: requestPermission,
+            scan: scan,
+          ));
+
+  /// The banks and wallets turned off.
+  Future<Set<EthiopianInstitution>> excludedInstitutions() =>
+      _exclusions.load();
+
+  /// Replaces the set of banks and wallets turned off, removing whatever
+  /// the newly excluded ones already put in the ledger.
+  Future<void> setExcludedInstitutions(Set<EthiopianInstitution> excluded) =>
+      _serial(() async {
+        final before = await _exclusions.load();
+        await _exclusions.save(excluded);
+        for (final id in excluded.difference(before)) {
+          await _purgeInstitution(id);
+        }
+      });
+
+  /// Turns one bank or wallet off and removes its transactions.
+  Future<void> excludeInstitution(EthiopianInstitution id) async {
+    final current = await _exclusions.load();
+    await setExcludedInstitutions({...current, id});
+  }
+
+  /// Turns one bank or wallet back on and reads its history from the inbox,
+  /// as far back as a first sync does.
+  Future<ForceSyncResult> includeInstitution(EthiopianInstitution id) =>
+      _serial(() async {
+        final current = await _exclusions.load();
+        await _exclusions.save({...current}..remove(id));
+        return _forceSync(requestPermission: false);
+      });
+
+  Future<ForceSyncResult> _forceSync({
+    String? importedRawPayload,
+    bool rebuild = false,
+    bool incremental = false,
+    bool requestPermission = true,
+    InboxScan? scan,
   }) async {
     final prefs = await SharedPreferences.getInstance();
     final lastSyncMillis = prefs.getInt(_lastSyncPref);
@@ -119,12 +235,20 @@ class SyncService {
             .subtract(_incrementalOverlap)
         : now.subtract(historyWindow);
 
-    final fetchedDeviceMessages = permissionState == SmsPermissionState.granted
-        ? await _deviceSmsSource.fetchRecentMessages(since: since)
-        : const <SmsMessage>[];
-    final deviceMessages = fetchedDeviceMessages
-        .where((message) => isFinancialSender(message.sender))
-        .toList(growable: false);
+    final excluded = await _exclusions.load();
+    final reuseScan = scan != null &&
+        !isIncremental &&
+        scan.permission == SmsPermissionState.granted;
+    final fetchedDeviceMessages = reuseScan
+        ? scan.messages
+        : permissionState == SmsPermissionState.granted
+            ? await _deviceSmsSource.fetchRecentMessages(since: since)
+            : const <SmsMessage>[];
+    final deviceMessages = fetchedDeviceMessages.where((message) {
+      final institution = institutionForSender(message.sender);
+      return institution != EthiopianInstitution.unknown &&
+          !excluded.contains(institution);
+    }).toList(growable: false);
     // Pasted messages are the user's explicit choice; ingest them as-is.
     final importedMessages = _parseImportedPayload(importedRawPayload);
     final allMessages = <SmsMessage>[
@@ -179,7 +303,8 @@ class SyncService {
       pendingReview: pendingReview,
       duplicates: duplicates,
       failed: failed,
-      deviceFetched: fetchedDeviceMessages.length,
+      deviceFetched:
+          reuseScan ? scan.fetchedCount : fetchedDeviceMessages.length,
       deviceFinancial: deviceMessages.length,
       importedCount: importedMessages.length,
       smsPermissionState: permissionState,
@@ -187,6 +312,39 @@ class SyncService {
       institutionsFound: Set.unmodifiable(institutions),
       wasIncremental: isIncremental,
     );
+  }
+
+  /// Removes what [id] put in the ledger: its messages, their transactions,
+  /// and its account once nothing of the user's own is filed under it.
+  /// Rejected messages stay, so a rejection still holds if it's turned back
+  /// on.
+  Future<void> _purgeInstitution(EthiopianInstitution id) async {
+    final ledger = _ledgerRepository;
+    final stored = await _smsMessageRepository.getAll();
+    var removed = 0;
+    for (final message in stored) {
+      if (institutionForSender(message.sms.sender) != id) continue;
+      if (message.status == SmsIngestionStatus.rejected) continue;
+      final txId = message.parsedTransactionId;
+      if (txId != null) await ledger?.deleteTransaction(txId);
+      await _smsMessageRepository.delete(message.sms.id);
+      removed += 1;
+    }
+    if (ledger != null) {
+      // Pasted messages matched by their sign-off land in the same account.
+      final accountId = AccountResolver.accountIdFor(id);
+      var kept = 0;
+      for (final tx in await ledger.getTransactions()) {
+        if (tx.accountId != accountId) continue;
+        if (tx.source == TransactionSource.sms) {
+          await ledger.deleteTransaction(tx.id);
+        } else {
+          kept += 1;
+        }
+      }
+      if (kept == 0) await ledger.deleteAccount(accountId);
+    }
+    AppLogger.info('sync.exclude', 'Turned off ${id.name}: $removed messages');
   }
 
   /// Earlier versions ingested the WHOLE inbox when no sender mapping

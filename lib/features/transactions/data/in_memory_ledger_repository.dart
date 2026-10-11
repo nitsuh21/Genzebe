@@ -59,4 +59,9 @@ class InMemoryLedgerRepository implements LedgerRepository {
   Future<void> upsertAccount(Account account) async {
     _accounts[account.id] = account;
   }
+
+  @override
+  Future<void> deleteAccount(String accountId) async {
+    _accounts.remove(accountId);
+  }
 }

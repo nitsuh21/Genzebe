@@ -12,12 +12,16 @@ class OnboardingPage extends StatelessWidget {
     required this.body,
     required this.actions,
     this.topBar,
+    this.fitPicture = true,
   });
 
   /// Drawn at its natural size and scaled down to the room left above the
   /// words; it must not depend on incoming constraints.
   final Widget picture;
 
+  /// False hands [picture] the room above the words as-is, for a list that
+  /// scrolls instead of shrinking.
+  final bool fitPicture;
   final String title;
   final String body;
   final Widget actions;
@@ -55,7 +59,9 @@ class OnboardingPage extends StatelessWidget {
                 const SizedBox(height: 28),
                 actions,
               ];
-              final art = FittedBox(fit: BoxFit.scaleDown, child: picture);
+              final art = fitPicture
+                  ? FittedBox(fit: BoxFit.scaleDown, child: picture)
+                  : picture;
               const padding = EdgeInsets.fromLTRB(24, 0, 24, 16);
               // Tall screens: the picture takes whatever the words leave.
               // Short ones (or very large text): a fixed picture and scroll.

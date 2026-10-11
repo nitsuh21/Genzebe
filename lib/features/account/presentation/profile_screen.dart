@@ -5,6 +5,7 @@ import 'package:genzeb/app/providers.dart';
 import 'package:genzeb/core/config/app_config.dart';
 import 'package:genzeb/core/l10n/app_strings.dart';
 import 'package:genzeb/features/account/domain/models/account_models.dart';
+import 'package:genzeb/features/account/presentation/banks_screen.dart';
 import 'package:genzeb/features/account/presentation/privacy_policy_screen.dart';
 import 'package:genzeb/features/ai/presentation/ai_assistant_sheet.dart';
 import 'package:genzeb/features/sms_ingestion/presentation/review_queue_screen.dart';
@@ -110,9 +111,17 @@ class ProfileScreen extends ConsumerWidget {
         _SettingsCard(
           children: [
             _SettingsTile(
+              icon: Icons.account_balance_outlined,
+              title: strings.banksTitle,
+              trailingWidget: const InstitutionLogoStack(),
+              onTap: () => Navigator.of(context).push(
+                MaterialPageRoute<void>(builder: (_) => const BanksScreen()),
+              ),
+            ),
+            _SettingsTile(
               icon: Icons.sms_outlined,
               title: 'SMS sync & review',
-              subtitle: 'Banks found, refresh and the review queue',
+              subtitle: 'Refresh and the review queue',
               trailingWidget: (pendingReview ?? 0) > 0
                   ? _CountBadge(count: pendingReview!)
                   : null,

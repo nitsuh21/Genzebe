@@ -15,6 +15,7 @@ import 'package:genzeb/features/sms_ingestion/application/sms_ingestion_service.
 import 'package:genzeb/features/sms_ingestion/data/sqflite_category_rule_repository.dart';
 import 'package:genzeb/features/sms_ingestion/data/sqflite_sms_message_repository.dart';
 import 'package:genzeb/features/sms_ingestion/domain/services/sms_parser.dart';
+import 'package:genzeb/features/sync/data/excluded_institutions_store.dart';
 import 'package:genzeb/features/transactions/data/sqflite_ledger_repository.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -51,6 +52,7 @@ Future<void> runBackgroundSmsEntry() async {
       ),
       strings: _stringsFor(prefs.getString('app_language')),
       amountsHidden: prefs.getBool('amounts_hidden') ?? true,
+      excluded: await const ExcludedInstitutionsStore().load(),
     );
     for (final message in messages) {
       final notification = await handler.handle(

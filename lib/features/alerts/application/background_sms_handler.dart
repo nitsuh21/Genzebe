@@ -40,22 +40,27 @@ class MoneyNotification {
 /// Handles a bank/wallet SMS that arrived while the app was closed: books
 /// it exactly like an inbox sync would, records the in-app alert, and
 /// returns the system notification to post. Returns null for anything that
-/// isn't a new money movement from a recognised institution.
+/// isn't a new money movement from a recognised institution the user keeps.
 class BackgroundSmsHandler {
   BackgroundSmsHandler({
     required SmsIngestionService ingestion,
     required MoneyAlertService alerts,
     required AppStrings strings,
     required bool amountsHidden,
+    Set<EthiopianInstitution> excluded = const {},
   })  : _ingestion = ingestion,
         _alerts = alerts,
         _strings = strings,
-        _amountsHidden = amountsHidden;
+        _amountsHidden = amountsHidden,
+        _excluded = excluded;
 
   final SmsIngestionService _ingestion;
   final MoneyAlertService _alerts;
   final AppStrings _strings;
   final bool _amountsHidden;
+
+  /// Banks and wallets the user turned off.
+  final Set<EthiopianInstitution> _excluded;
 
   /// Same id scheme family as the inbox reader; the ingestion twin check
   /// makes the later inbox read of this message a no-op.
@@ -75,7 +80,12 @@ class BackgroundSmsHandler {
   }) async {
     final trimmedSender = sender.trim();
     final trimmedBody = body.trim();
-    if (trimmedBody.isEmpty || !isFinancialSender(trimmedSender)) return null;
+    final institution = institutionForSender(trimmedSender);
+    if (trimmedBody.isEmpty ||
+        institution == EthiopianInstitution.unknown ||
+        _excluded.contains(institution)) {
+      return null;
+    }
 
     final record = await _ingestion.ingest(
       sms: SmsMessage(
