@@ -76,7 +76,7 @@ void main() {
       amountMinor: 110120,
       at: t,
       categoryId: 'fees',
-      snippet: 'Dear Nitsuh Demissew your Account 1********9722 has been '
+      snippet: 'Dear Abebe Kebede your Account 1********2468 has been '
           'debited with ETB 1101.20 including Service charge ETB1.00ETB0.05 '
           'and VAT(15%) ETB0.15. Your Current Balance is ETB 14977.6. Thank '
           'you for Banking with CBE!.',
@@ -88,10 +88,10 @@ void main() {
       amountMinor: 110000,
       at: t.add(const Duration(minutes: 1)),
       categoryId: 'transfer_in',
-      snippet: 'Dear Nitsuh, You have received  ETB 1,100.00 by transaction '
+      snippet: 'Dear Abebe, You have received  ETB 1,100.00 by transaction '
           'number DJ30DW1SRY on 2026-07-05 10:01:00 from Commercial Bank of '
-          'Ethiopia to your telebirr Account 2519******69 - Nitsuh Demissew '
-          'Mekonnen. Your current balance is ETB 9,832.48.',
+          'Ethiopia to your telebirr Account 2519******69 - Abebe Kebede '
+          'Tesfaye. Your current balance is ETB 9,832.48.',
     ));
     // Plus a real salary and a real purchase for contrast.
     await ledger.saveTransaction(_tx(

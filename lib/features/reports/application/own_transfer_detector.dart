@@ -457,7 +457,7 @@ EthiopianInstitution _institutionOf(TransactionRecord tx) {
 // ---------------------------------------------------------------------------
 
 /// An account number as banks print it in SMS — usually masked
-/// ("1*****9722", "474041*******013"). Only the visible digits are kept.
+/// ("1*****2468", "474041*******013"). Only the visible digits are kept.
 class MaskedAccount {
   const MaskedAccount._(this.lead, this.tail);
 
@@ -515,7 +515,7 @@ class MaskedAccount {
 final _maskChar = RegExp(r'[*xX#•]');
 const _acct = r'([0-9][0-9*xX#•]{3,})';
 
-/// "your Account 1*****9722", "your telebirr account 2519******69",
+/// "your Account 1*****2468", "your telebirr account 2519******69",
 /// "your account 474041*******013".
 final _yourAccount = RegExp(
   '\\byour\\s+(?:[a-z-]+\\s+){0,2}?(?:acc(?:oun)?t|a/c)\\.?\\s*'
@@ -523,7 +523,7 @@ final _yourAccount = RegExp(
   caseSensitive: false,
 );
 
-/// "from account 1**9722" — the source account of an outflow.
+/// "from account 1**2468" — the source account of an outflow.
 final _fromAccount = RegExp(
   '\\bfrom\\s+(?:acc(?:oun)?t|a/c)\\.?\\s*(?:no\\.?)?\\s*:?\\s*$_acct',
   caseSensitive: false,
@@ -535,7 +535,7 @@ final _toAccount = RegExp(
   caseSensitive: false,
 );
 
-/// "to Commercial Bank of Ethiopia account number 1000217459722" — telebirr's
+/// "to Commercial Bank of Ethiopia account number 1000213572468" — telebirr's
 /// wording for a wallet-to-bank transfer.
 final _toNamedAccount = RegExp(
   '\\bto\\s+[^.\\n]{0,60}?\\bacc(?:oun)?t\\s+(?:number|no\\.?)\\s*:?\\s*$_acct',
@@ -572,7 +572,7 @@ MaskedAccount? _counterpartyAccountIn(String body, {required bool isOutflow}) {
 
 /// What the user's own receipts reveal about them: the account holder's
 /// name (from the "Dear ..." greeting) and their own account numbers ("your account
-/// 1*****9722"). Learned fresh from the ledger on every analysis.
+/// 1*****2468"). Learned fresh from the ledger on every analysis.
 class OwnerProfile {
   const OwnerProfile({
     this.nameTokens = const [],

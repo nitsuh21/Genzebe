@@ -19,7 +19,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 /// the app learns who "you" are.
 const _cbeFullNameReceipt =
     'Dear  Abebe Kebede Alemu You have successfully transferred ETB400.00 '
-    'from account 1********9722 to account 1********6766 (Hanna S. M.). '
+    'from account 1********2468 to account 1********6766 (Hanna S. M.). '
     'Service charge of ETB 0.50 and VAT(15%) of ETB0.08 with a total of '
     'ETB400.58. Your Current Balance is ETB 11,420.67. Thank you for '
     'Banking with CBE!';
@@ -109,7 +109,7 @@ void main() {
           type: TransactionType.income,
           amountMinor: 1,
           at: DateTime(2026, 7, 1),
-          snippet: 'Dear Abebe your Account 1*****9722 has been credited '
+          snippet: 'Dear Abebe your Account 1*****2468 has been credited '
               'with ETB 5000.00.',
         ),
         _tx(
@@ -120,7 +120,7 @@ void main() {
           at: DateTime(2026, 7, 1),
           // "A" starts the sentence — it is not an initial.
           snippet: 'Dear Abebe A debit transaction of ETB 100.0. has '
-              'occurred on your account 1********9722.',
+              'occurred on your account 1********2468.',
         ),
         _tx(
           id: 'c',
@@ -157,8 +157,8 @@ void main() {
           type: TransactionType.income,
           amountMinor: 1,
           at: DateTime(2026, 7, 1),
-          snippet: 'Dear Abebe You have received ETB 53.00 from Mekuria '
-              'Solomon(2519****4846) on 02/06/2026 13:14:04.',
+          snippet: 'Dear Abebe You have received ETB 53.00 from Selam '
+              'Girma(2519****4846) on 02/06/2026 13:14:04.',
         ),
       ]);
       expect(profile.isOwnerName('Abebe Kebede'), isFalse);
@@ -203,7 +203,7 @@ void main() {
           amountMinor: 1000000,
           at: t.add(const Duration(minutes: 4)),
           categoryId: 'transfer_in',
-          snippet: 'Dear Abebe your Account 1*********9722 has been Credited '
+          snippet: 'Dear Abebe your Account 1*********2468 has been Credited '
               'with ETB 10,000.00 from Abebe Kebede Alemu, on 08/07/2026 at '
               '10:04:10 with Ref No FT26189AB1CD Your Current Balance is '
               'ETB 25,000.00. Thank you for Banking with CBE!',
@@ -227,7 +227,7 @@ void main() {
           at: t,
           categoryId: 'transfer_out',
           snippet: 'Dear customer You have successfully transferred '
-              'ETB1100.00 from account 1**9722 to account 1**4607. Service '
+              'ETB1100.00 from account 1**2468 to account 1**4607. Service '
               'charge of ETB 1.00 and VAT(15%) of ETB0.15 and Disaster '
               'Recovery(5%) of 0.05 with total of ETB1101.20 .Your current '
               'balance is ETB89,468.32.',
@@ -275,7 +275,7 @@ void main() {
           categoryId: 'transfer_in',
           snippet: 'Dear Abebe You have received ETB 10,000.00 from Hibret '
               'Bank on 10/07/2026 13:00:04. Your transaction number is '
-              'DF24JC2U3S. Thank you for using telebirr',
+              'DF24QK7M1Z. Thank you for using telebirr',
         ),
       ]);
       expect(report.incomeMinor, 0);
@@ -325,7 +325,7 @@ void main() {
           amountMinor: minor,
           at: at,
           categoryId: 'fees',
-          snippet: 'Dear Abebe Kebede your Account 1********9722 has been '
+          snippet: 'Dear Abebe Kebede your Account 1********2468 has been '
               'debited with ETB ${(minor / 100).toStringAsFixed(2)} including '
               'Service charge ETB5.00ETB0.25 and VAT(15%) ETB0.75. Your '
               'Current Balance is ETB 14977.6. Thank you for Banking with '
@@ -411,7 +411,7 @@ void main() {
           at: DateTime(2026, 7, 9, 18),
           categoryId: 'transfer_out',
           snippet: 'Dear  Abebe Kebede Alemu You have successfully '
-              'transferred ETB1100.00 from account 1**9722 to account '
+              'transferred ETB1100.00 from account 1**2468 to account '
               '1**4607 (Abebe K. A.). Service charge of ETB 1.00 and '
               'VAT(15%) of ETB0.15 and Disaster Recovery(5%) of 0.05 with '
               'total of ETB1101.20 .Your current balance is ETB89,468.32.',
@@ -434,9 +434,9 @@ void main() {
           categoryId: 'transfer_out',
           snippet: 'Dear Abebe\nYou have transferred ETB 3,000.00 '
               'successfully from your telebirr account 2519******69 to '
-              'Commercial Bank of Ethiopia account number 1000217459722 on '
+              'Commercial Bank of Ethiopia account number 1000213572468 on '
               '27/07/2026 18:44:13. Your telebirr transaction number is '
-              'DIR974DA1T and your bank transaction number is FT26270W75F0. '
+              'DIR974QZ8X1 and your bank transaction number is FT26270K3M9Q. '
               'The service fee is  ETB 7.83 and  15% VAT on the service fee '
               'is ETB 1.17.',
         ),
@@ -455,7 +455,7 @@ void main() {
           amountMinor: 500000,
           at: DateTime(2026, 7, 14, 9),
           categoryId: 'transfer_in',
-          snippet: 'Dear Abebe your Account 1*********9722 has been Credited '
+          snippet: 'Dear Abebe your Account 1*********2468 has been Credited '
               'with ETB 5,000.00 from ABEBE KEBEDE ALEMU, on 14/07/2026 at '
               '09:00:00 with Ref No FT26195XY Your Current Balance is ETB '
               '30,000.00. Thank you for Banking with CBE!',
@@ -486,7 +486,7 @@ void main() {
           at: DateTime(2026, 7, 15, 9),
           categoryId: 'transfer_out',
           snippet: 'Dear customer You have successfully transferred '
-              'ETB2000.00 from account 1**9722 to account 1**4607.',
+              'ETB2000.00 from account 1**2468 to account 1**4607.',
         ),
       ]);
       expect(report.expenseMinor, 0);
@@ -510,15 +510,15 @@ void main() {
           snippet: _cbeFullNameReceipt,
         ),
         _tx(
-          id: 'from-mekuria',
+          id: 'from-selam',
           accountId: 'telebirr-main',
           type: TransactionType.income,
           amountMinor: 40000,
           at: t.add(const Duration(minutes: 10)),
           categoryId: 'transfer_in',
-          snippet: 'Dear Abebe You have received ETB 400.00 from Mekuria '
-              'Solomon(2519****4846) on 16/07/2026 12:10:04. Your '
-              'transaction number is DF24JC2U3S.',
+          snippet: 'Dear Abebe You have received ETB 400.00 from Selam '
+              'Girma(2519****4846) on 16/07/2026 12:10:04. Your '
+              'transaction number is DF24QK7M1Z.',
         ),
       ]);
       expect(report.incomeMinor, 40000);
@@ -547,7 +547,7 @@ void main() {
           amountMinor: 100000,
           at: t.add(const Duration(minutes: 20)),
           categoryId: 'income',
-          snippet: 'Dear Abebe your Account 1*****9722 has been credited '
+          snippet: 'Dear Abebe your Account 1*****2468 has been credited '
               'with ETB 1,000.00.',
         ),
       ]);
@@ -578,7 +578,7 @@ void main() {
           amountMinor: 200000,
           at: t.add(const Duration(minutes: 30)),
           categoryId: 'income',
-          snippet: 'Dear Abebe your Account 1*****9722 has been credited '
+          snippet: 'Dear Abebe your Account 1*****2468 has been credited '
               'with ETB 2,000.00.',
         ),
       ]);
@@ -599,7 +599,7 @@ void main() {
           categoryId: 'transfer_out',
           snippet: 'Dear Abebe, You have transfered ETB 500.00 to Abebe '
               'Tesfaye on 19/07/2026 at 09:00:00 from your account '
-              '1*********9722.',
+              '1*********2468.',
         ),
       ]);
       expect(report.expenseMinor, 50058);
@@ -624,7 +624,7 @@ void main() {
           type: TransactionType.expense,
           amountMinor: 300000,
           at: DateTime(2026, 7, 20, 9),
-          snippet: 'Dear Abebe your Account 1*****9722 has been debited '
+          snippet: 'Dear Abebe your Account 1*****2468 has been debited '
               'with ETB3,000.00.',
           ownTransfer: OwnTransferOverride.own,
         ),
@@ -666,7 +666,7 @@ void main() {
       // match can't catch it — the user's answer does.
       String body(String amount) =>
           'Dear Abebe, You have transfered ETB $amount to ABEBE KEBEDDE on '
-          '22/07/2026 at 09:00:00 from your account 1*********9722.';
+          '22/07/2026 at 09:00:00 from your account 1*********2468.';
       final report = await _julyReport([
         _nameSource(),
         _tx(
@@ -707,7 +707,7 @@ void main() {
             categoryId: 'transfer_out',
             snippet: 'Dear Abebe, You have transfered ETB ${minor ~/ 100}.00 '
                 'to Abebe Kebede on $day/07/2026 at 09:00:00 from your '
-                'account 1*********9722.',
+                'account 1*********2468.',
             ownTransfer: answer,
           );
 
@@ -800,7 +800,7 @@ void main() {
         amountMinor: 13000,
         at: DateTime(2026, 7, 1),
         categoryId: 'income',
-        snippet: 'Dear Abebe Kebede your Account 1********9722 has been '
+        snippet: 'Dear Abebe Kebede your Account 1********2468 has been '
             'credited with ETB 130.',
       ),
       _tx(
@@ -887,8 +887,8 @@ void main() {
         amountMinor: 5300,
         at: DateTime(2026, 7, 1),
         categoryId: 'transfer_in',
-        snippet: 'Dear Abebe You have received ETB 53.00 from Mekuria '
-            'Solomon(2519****4846) on 01/07/2026 13:14:04.',
+        snippet: 'Dear Abebe You have received ETB 53.00 from Selam '
+            'Girma(2519****4846) on 01/07/2026 13:14:04.',
       ),
       // ...so a Hibret -> telebirr transfer with no telebirr credit went to
       // someone else's wallet.
