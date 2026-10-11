@@ -7,6 +7,9 @@ import 'package:genzeb/design_system/institution_avatar.dart';
 import 'package:genzeb/design_system/widgets.dart';
 import 'package:genzeb/features/account/presentation/profile_screen.dart';
 import 'package:genzeb/features/alerts/presentation/alert_widgets.dart';
+import 'package:genzeb/features/budget/domain/models/budget.dart';
+import 'package:genzeb/features/budget/presentation/budget_screen.dart';
+import 'package:genzeb/features/budget/presentation/budget_widgets.dart';
 import 'package:genzeb/features/sms_ingestion/domain/repositories/device_sms_source.dart';
 import 'package:genzeb/features/reports/application/report_service.dart';
 import 'package:genzeb/features/transactions/domain/models/categories.dart';
@@ -157,6 +160,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                   ),
                 ),
               ],
+              _BudgetGlance(showAmounts: showAmounts),
               const SizedBox(height: 20),
               SectionHeader(title: strings.cashFlow),
               _CashflowCard(series: series),
@@ -785,6 +789,201 @@ class _EmptyState extends StatelessWidget {
 
 /// "2 transactions need your review" — the one action the parser cannot
 /// take for the user, surfaced where they will actually see it.
+/// This month's budgets at a glance, most at risk first. With no budgets
+/// yet, a nudge toward the Budget tab once there is history to plan from.
+class _BudgetGlance extends ConsumerWidget {
+  const _BudgetGlance({required this.showAmounts});
+
+  final bool showAmounts;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
+    final strings = ref.watch(stringsProvider);
+    final overview = ref.watch(budgetOverviewProvider).valueOrNull;
+    if (overview == null) return const SizedBox.shrink();
+    void openBudgetTab() => ref.read(homeTabProvider.notifier).state = 2;
+
+    if (!overview.hasAnyBudgets) {
+      final suggestions =
+          ref.watch(budgetSuggestionsProvider).valueOrNull ?? const [];
+      if (suggestions.isEmpty) return const SizedBox.shrink();
+      return Padding(
+        padding: const EdgeInsets.only(top: 20),
+        child: Material(
+          color: theme.colorScheme.primary.withValues(alpha: 0.08),
+          borderRadius: BorderRadius.circular(16),
+          child: InkWell(
+            onTap: openBudgetTab,
+            borderRadius: BorderRadius.circular(16),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              child: Row(
+                children: [
+                  Icon(Icons.savings_outlined,
+                      color: theme.colorScheme.primary),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      'Plan your month — Genzeb can suggest budgets from '
+                      'your spending',
+                      style: theme.textTheme.bodyMedium
+                          ?.copyWith(fontWeight: FontWeight.w600),
+                    ),
+                  ),
+                  Icon(Icons.chevron_right_rounded,
+                      color: theme.colorScheme.primary),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
+    final items = overview.items
+        .where((item) => item.pace != BudgetPace.upcoming)
+        .take(3)
+        .toList(growable: false);
+    if (items.isEmpty) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.only(top: 20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SectionHeader(
+            title: strings.budgets,
+            action: TextButton(
+              onPressed: openBudgetTab,
+              child: Text(
+                overview.items.length > items.length
+                    ? 'See all (${overview.items.length})'
+                    : 'See all',
+              ),
+            ),
+          ),
+          Container(
+            padding: const EdgeInsets.symmetric(vertical: 4),
+            decoration: BoxDecoration(
+              color: theme.cardTheme.color,
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Column(
+              children: [
+                for (final item in items)
+                  _BudgetGlanceRow(
+                    progress: item,
+                    showAmounts: showAmounts,
+                    onTap: () => Navigator.of(context).push(
+                      MaterialPageRoute<void>(
+                        builder: (_) =>
+                            BudgetDetailPage(budgetId: item.budget.id),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _BudgetGlanceRow extends StatelessWidget {
+  const _BudgetGlanceRow({
+    required this.progress,
+    required this.showAmounts,
+    required this.onTap,
+  });
+
+  final BudgetProgress progress;
+  final bool showAmounts;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final budget = progress.budget;
+    final accent = budgetAccent(budget, theme);
+    final pace = progress.pace;
+    final color = budgetPaceColor(pace, theme, accent);
+    final percent = (progress.ratio * 100).round();
+    final String status;
+    if (pace == BudgetPace.over) {
+      status = 'Over budget';
+    } else if (progress.isCurrent) {
+      status = pace == BudgetPace.ahead
+          ? 'Spending fast · ${daysLabel(progress.daysLeft)} left'
+          : '${daysLabel(progress.daysLeft)} left';
+    } else {
+      status = 'Ended';
+    }
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(16),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
+        child: Row(
+          children: [
+            Icon(budgetIcon(budget), size: 20, color: accent),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          budget.name,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                      Text(
+                        '$percent%',
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          fontWeight: FontWeight.w800,
+                          color: pace == BudgetPace.over ||
+                                  pace == BudgetPace.ahead
+                              ? color
+                              : null,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  BudgetProgressBar(
+                    ratio: progress.ratio,
+                    color: color,
+                    height: 6,
+                    todayFraction:
+                        progress.isCurrent ? progress.elapsedFraction : null,
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    showAmounts && progress.remainingMinor > 0
+                        ? '$status · ${formatMinorEtb(progress.remainingMinor)} '
+                            'to spend'
+                        : status,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _ReviewNudge extends StatelessWidget {
   const _ReviewNudge({required this.count, required this.onTap});
 

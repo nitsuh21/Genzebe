@@ -138,9 +138,36 @@ final aiAvailableProvider = FutureProvider<bool>((ref) async {
   return ref.watch(aiAssistantServiceProvider).isAvailable();
 });
 
+/// Budgets for this month — Home, Profile and the Budget tab share it.
 final budgetOverviewProvider = FutureProvider<BudgetOverview>((ref) {
+  return ref.watch(budgetMonthOverviewProvider(0).future);
+});
+
+/// Which month the Budget tab shows: 0 = this month, -1 = last month.
+final budgetMonthOffsetProvider = StateProvider<int>((ref) => 0);
+
+final budgetMonthOverviewProvider =
+    FutureProvider.family<BudgetOverview, int>((ref, monthOffset) {
   ref.watch(dataVersionProvider);
-  return ref.watch(budgetServiceProvider).buildOverview();
+  return ref
+      .watch(budgetServiceProvider)
+      .buildOverview(monthOffset: monthOffset);
+});
+
+/// One budget's page for one month.
+final budgetDetailProvider = FutureProvider.autoDispose
+    .family<BudgetDetail?, ({String budgetId, int monthOffset})>((ref, key) {
+  ref.watch(dataVersionProvider);
+  return ref
+      .watch(budgetServiceProvider)
+      .buildDetail(key.budgetId, monthOffset: key.monthOffset);
+});
+
+/// Budgets proposed from the user's own spending history.
+final budgetSuggestionsProvider =
+    FutureProvider<List<BudgetSuggestion>>((ref) {
+  ref.watch(dataVersionProvider);
+  return ref.watch(budgetServiceProvider).suggestBudgets();
 });
 
 final smsMessageRepositoryProvider = Provider<SmsMessageRepository>((ref) {
@@ -187,7 +214,10 @@ final moneyAlertRepositoryProvider = Provider<MoneyAlertRepository>((ref) {
 });
 
 final moneyAlertServiceProvider = Provider<MoneyAlertService>((ref) {
-  return MoneyAlertService(ref.watch(moneyAlertRepositoryProvider));
+  return MoneyAlertService(
+    ref.watch(moneyAlertRepositoryProvider),
+    budgets: ref.watch(budgetServiceProvider),
+  );
 });
 
 /// App-lifetime auto-sync (launch, resume, incoming bank SMS).

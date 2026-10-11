@@ -31,6 +31,12 @@ class SqfliteBudgetRepository implements BudgetRepository {
             ),
             limitMinor: row['limitMinor'] as int,
             createdAt: DateTime.parse(row['createdAt'] as String),
+            periodKind: row['periodKind'] == BudgetPeriodKind.custom.name
+                ? BudgetPeriodKind.custom
+                : BudgetPeriodKind.monthly,
+            startDay: (row['startDay'] as int?) ?? 1,
+            customStart: _parseDate(row['customStart'] as String?),
+            customEnd: _parseDate(row['customEnd'] as String?),
           ),
         )
         .toList(growable: false);
@@ -55,6 +61,10 @@ class SqfliteBudgetRepository implements BudgetRepository {
             : budget.categoryIds.first,
         'limitMinor': budget.limitMinor,
         'createdAt': budget.createdAt.toIso8601String(),
+        'periodKind': budget.periodKind.name,
+        'startDay': budget.startDay,
+        'customStart': budget.customStart?.toIso8601String(),
+        'customEnd': budget.customEnd?.toIso8601String(),
       },
       conflictAlgorithm: ConflictAlgorithm.replace,
     );
@@ -83,6 +93,9 @@ class SqfliteBudgetRepository implements BudgetRepository {
     if (legacy == _legacyGeneralCategorySentinel) return const <String>[];
     return <String>[legacy];
   }
+
+  DateTime? _parseDate(String? value) =>
+      value == null ? null : DateTime.tryParse(value);
 
   List<String> _decodeStringList(String? encoded) {
     if (encoded == null || encoded.trim().isEmpty) return const <String>[];

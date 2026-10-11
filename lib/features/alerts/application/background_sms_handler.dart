@@ -104,11 +104,15 @@ class BackgroundSmsHandler {
       moneyIn: _strings.alertMoneyIn,
       moneyOut: _strings.alertMoneyOut,
     );
+    final text =
+        alert.needsReview ? '$detail · ${_strings.alertNeedsReview}' : detail;
+    final budgetNote = alert.budgetNote;
     return MoneyNotification(
       id: alert.transactionId.hashCode & 0x7fffffff,
       title: alertHeadline(alert, hidden: _amountsHidden),
-      text:
-          alert.needsReview ? '$detail · ${_strings.alertNeedsReview}' : detail,
+      // The expanded notification shows every line; the lock screen keeps
+      // its amount-free public text.
+      text: budgetNote == null ? text : '$text\n$budgetNote',
       publicText: '$direction · $institution',
       transactionId: alert.transactionId,
     );

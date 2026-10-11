@@ -199,6 +199,10 @@ class _AlertBanner extends ConsumerWidget {
                       color: theme.colorScheme.onSurfaceVariant,
                     ),
                   ),
+                  if (alert.budgetNote != null) ...[
+                    const SizedBox(height: 2),
+                    BudgetNoteText(note: alert.budgetNote!, maxLines: 2),
+                  ],
                 ],
               ),
             ),

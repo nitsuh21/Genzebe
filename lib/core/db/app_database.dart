@@ -9,7 +9,7 @@ class AppDatabase {
   static final AppDatabase instance = AppDatabase._();
 
   static const _databaseName = 'genzebet.db';
-  static const _databaseVersion = 9;
+  static const _databaseVersion = 10;
 
   Database? _db;
   Future<Database>? _opening;
@@ -84,7 +84,11 @@ class AppDatabase {
         excludedTransactionIds TEXT,
         categoryId TEXT,
         limitMinor INTEGER NOT NULL,
-        createdAt TEXT NOT NULL
+        createdAt TEXT NOT NULL,
+        periodKind TEXT NOT NULL DEFAULT 'monthly',
+        startDay INTEGER NOT NULL DEFAULT 1,
+        customStart TEXT,
+        customEnd TEXT
       )
     ''');
 
@@ -106,7 +110,8 @@ class AppDatabase {
         categoryId TEXT,
         occurredAt TEXT NOT NULL,
         createdAt TEXT NOT NULL,
-        isRead INTEGER NOT NULL DEFAULT 0
+        isRead INTEGER NOT NULL DEFAULT 0,
+        budgetNote TEXT
       )
     ''');
   }
@@ -176,6 +181,20 @@ class AppDatabase {
     }
     if (oldVersion < 9) {
       await db.execute('ALTER TABLE transactions ADD COLUMN ownTransfer TEXT');
+    }
+    if (oldVersion < 10) {
+      await db.execute(
+        "ALTER TABLE budgets ADD COLUMN periodKind TEXT NOT NULL DEFAULT 'monthly'",
+      );
+      await db.execute(
+        'ALTER TABLE budgets ADD COLUMN startDay INTEGER NOT NULL DEFAULT 1',
+      );
+      await db.execute('ALTER TABLE budgets ADD COLUMN customStart TEXT');
+      await db.execute('ALTER TABLE budgets ADD COLUMN customEnd TEXT');
+      // Databases older than 7 just created money_alerts with the column.
+      if (oldVersion >= 7) {
+        await db.execute('ALTER TABLE money_alerts ADD COLUMN budgetNote TEXT');
+      }
     }
   }
 }
