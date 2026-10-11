@@ -1,7 +1,7 @@
 name: genzeb
 description: Genzeb — personal finance for Ethiopian market.
 publish_to: "none"
-version: 1.0.0+4
+version: 1.0.0+7
 
 environment:
   sdk: ">=3.3.0 <4.0.0"
@@ -39,6 +39,8 @@ flutter:
     - env.json
     # Bank and wallet logos (see assets/logos/SOURCES.md).
     - assets/logos/
+    # Small coin mark from the app icon, for in-app branding.
+    - assets/brand/
 
 flutter_launcher_icons:
   android: true

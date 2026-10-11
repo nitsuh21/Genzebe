@@ -1,150 +1,145 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:genzeb/app/providers.dart';
+import 'package:genzeb/core/l10n/app_strings.dart';
+import 'package:genzeb/design_system/institution_avatar.dart';
+import 'package:genzeb/features/account/presentation/onboarding_widgets.dart';
 
-class _Slide {
-  const _Slide({
-    required this.icon,
-    required this.accent,
-    required this.title,
-    required this.body,
-  });
-
-  final IconData icon;
-  final Color accent;
-  final String title;
-  final String body;
-}
-
-/// First-launch onboarding: swipeable story slides, then SMS setup. No
-/// account is needed to use the app.
-class OnboardingScreen extends ConsumerStatefulWidget {
+/// First-launch welcome: the banks and wallets people already use, gathered
+/// around the Genzeb coin. SMS setup follows; no account is needed.
+class OnboardingScreen extends ConsumerWidget {
   const OnboardingScreen({super.key});
 
   @override
-  ConsumerState<OnboardingScreen> createState() => _OnboardingScreenState();
-}
+  Widget build(BuildContext context, WidgetRef ref) {
+    final strings = ref.watch(stringsProvider);
+    final isAmharic = identical(strings, amStrings);
 
-class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
-  final _controller = PageController();
-  int _page = 0;
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  void _finish() {
-    ref.read(introSeenProvider.notifier).markDone();
-  }
-
-  void _next(int slideCount) {
-    if (_page == slideCount - 1) {
-      _finish();
-      return;
-    }
-    _controller.nextPage(
-      duration: const Duration(milliseconds: 320),
-      curve: Curves.easeOutCubic,
+    return OnboardingPage(
+      // Each language is offered in its own script, so someone who can't
+      // read the current one still finds theirs.
+      topBar: Row(
+        children: [
+          Text(
+            'Genzeb',
+            style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: -0.4,
+                ),
+          ),
+          const Spacer(),
+          OnboardingTextButton(
+            label: isAmharic ? 'English' : 'አማርኛ',
+            onPressed: () => ref
+                .read(appLanguageProvider.notifier)
+                .setLanguage(isAmharic ? 'en' : 'am'),
+          ),
+        ],
+      ),
+      picture: const _BankRing(),
+      title: strings.onbTitle,
+      body: strings.onbBody,
+      actions: OnboardingButton(
+        label: strings.onbGetStarted,
+        onPressed: () => ref.read(introSeenProvider.notifier).markDone(),
+      ),
     );
   }
+}
+
+/// Well-known banks and wallets, in the order they sit around the coin.
+const _ringCodes = [
+  'cbe',
+  'telebirr',
+  'awash',
+  'dashen',
+  'boa',
+  'coop',
+  'hibret',
+  'wegagen',
+  'zemen',
+  'mpesa',
+];
+
+class _BankRing extends StatefulWidget {
+  const _BankRing();
+
+  @override
+  State<_BankRing> createState() => _BankRingState();
+}
+
+class _BankRingState extends State<_BankRing>
+    with SingleTickerProviderStateMixin, OnboardingEntrance {
+  @override
+  Duration get entranceDuration => const Duration(milliseconds: 1500);
+
+  late final _coin = phase(0, 0.45, curve: Curves.easeOutBack);
+  late final _coinFade = phase(0, 0.25);
+  late final _orbit = phase(0.55, 1);
+  // The logos close in from outside, one after another, and settle in a
+  // ring: many accounts, one place.
+  late final _logos = [
+    for (var i = 0; i < _ringCodes.length; i++)
+      phase(0.2 + i * 0.04, 0.62 + i * 0.04),
+  ];
+
+  static const _side = 356.0;
+  static const _tile = _side * 0.15;
+  static const _ring = _side / 2 - _tile / 2;
+  static const _coinSize = _side * 0.44;
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final strings = ref.watch(stringsProvider);
-    final slides = [
-      _Slide(
-        icon: Icons.mark_chat_read_rounded,
-        accent: const Color(0xFF4E5AE8),
-        title: strings.onbSlide1Title,
-        body: strings.onbSlide1Body,
-      ),
-      _Slide(
-        icon: Icons.donut_large_rounded,
-        accent: const Color(0xFF2E9E6B),
-        title: strings.onbSlide2Title,
-        body: strings.onbSlide2Body,
-      ),
-      _Slide(
-        icon: Icons.auto_awesome_rounded,
-        accent: const Color(0xFF8E63D8),
-        title: strings.onbSlide3Title,
-        body: strings.onbSlide3Body,
-      ),
-    ];
-    final isLast = _page == slides.length - 1;
-
-    return Scaffold(
-      body: SafeArea(
-        child: Column(
+    return AnimatedBuilder(
+      animation: entrance,
+      builder: (context, _) => SizedBox.square(
+        dimension: _side,
+        child: Stack(
+          clipBehavior: Clip.none,
           children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(24, 8, 12, 0),
-              child: Row(
-                children: [
-                  Text(
-                    'ገ  Genzeb',
-                    style: theme.textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w800,
-                      color: theme.colorScheme.primary,
-                    ),
-                  ),
-                  const Spacer(),
-                  TextButton(
-                    onPressed: _finish,
-                    child: Text(strings.onbSkip),
-                  ),
-                ],
-              ),
-            ),
-            Expanded(
-              child: PageView.builder(
-                controller: _controller,
-                itemCount: slides.length,
-                onPageChanged: (index) => setState(() => _page = index),
-                itemBuilder: (context, index) =>
-                    _SlideView(slide: slides[index]),
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
-              child: Row(
-                children: [
-                  _Dots(count: slides.length, index: _page),
-                  const Spacer(),
-                  SizedBox(
-                    height: 52,
-                    child: FilledButton(
-                      style: FilledButton.styleFrom(
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                        padding: const EdgeInsets.symmetric(horizontal: 28),
-                      ),
-                      onPressed: () => _next(slides.length),
-                      child: Row(
-                        children: [
-                          Text(
-                            isLast ? strings.onbGetStarted : strings.onbNext,
-                            style: const TextStyle(
-                              fontSize: 15.5,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                          const SizedBox(width: 6),
-                          Icon(
-                            isLast
-                                ? Icons.rocket_launch_rounded
-                                : Icons.arrow_forward_rounded,
-                            size: 18,
-                          ),
-                        ],
+            // The orbit the logos settle on.
+            Positioned.fill(
+              child: Padding(
+                padding: const EdgeInsets.all(_tile / 2),
+                child: Opacity(
+                  opacity: _orbit.value,
+                  child: const DecoratedBox(
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.fromBorderSide(
+                        BorderSide(color: Color(0x24FFFFFF)),
                       ),
                     ),
                   ),
-                ],
+                ),
+              ),
+            ),
+            for (var i = 0; i < _ringCodes.length; i++)
+              _placed(
+                angle: -math.pi / 2 + i * 2 * math.pi / _ringCodes.length,
+                radius: _ring * (1.45 - 0.45 * _logos[i].value),
+                child: Opacity(
+                  opacity: _logos[i].value.clamp(0.0, 1.0),
+                  child: InstitutionAvatar.forCode(_ringCodes[i], size: _tile),
+                ),
+              ),
+            Center(
+              child: Opacity(
+                opacity: _coinFade.value,
+                child: Transform.scale(
+                  scale: 0.7 + 0.3 * _coin.value,
+                  child: ClipOval(
+                    child: Image.asset(
+                      'assets/brand/coin.png',
+                      width: _coinSize,
+                      height: _coinSize,
+                      filterQuality: FilterQuality.medium,
+                    ),
+                  ),
+                ),
               ),
             ),
           ],
@@ -152,103 +147,19 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
       ),
     );
   }
-}
 
-class _SlideView extends StatelessWidget {
-  const _SlideView({required this.slide});
-
-  final _Slide slide;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 28),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Center(
-            child: Container(
-              width: 190,
-              height: 190,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                gradient: RadialGradient(
-                  colors: [
-                    slide.accent.withValues(alpha: 0.22),
-                    slide.accent.withValues(alpha: 0.05),
-                  ],
-                ),
-              ),
-              child: Center(
-                child: Container(
-                  width: 104,
-                  height: 104,
-                  decoration: BoxDecoration(
-                    color: slide.accent,
-                    borderRadius: BorderRadius.circular(32),
-                    boxShadow: [
-                      BoxShadow(
-                        color: slide.accent.withValues(alpha: 0.4),
-                        blurRadius: 30,
-                        offset: const Offset(0, 12),
-                      ),
-                    ],
-                  ),
-                  child: Icon(slide.icon, color: Colors.white, size: 48),
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(height: 44),
-          Text(
-            slide.title,
-            style: theme.textTheme.headlineMedium?.copyWith(
-              fontWeight: FontWeight.w800,
-              height: 1.15,
-              letterSpacing: -0.5,
-            ),
-          ),
-          const SizedBox(height: 14),
-          Text(
-            slide.body,
-            style: theme.textTheme.bodyLarge?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
-              height: 1.55,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _Dots extends StatelessWidget {
-  const _Dots({required this.count, required this.index});
-
-  final int count;
-  final int index;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Row(
-      children: [
-        for (var i = 0; i < count; i++)
-          AnimatedContainer(
-            duration: const Duration(milliseconds: 250),
-            margin: const EdgeInsets.only(right: 6),
-            width: i == index ? 22 : 8,
-            height: 8,
-            decoration: BoxDecoration(
-              color: i == index
-                  ? theme.colorScheme.primary
-                  : theme.colorScheme.surfaceContainerHighest,
-              borderRadius: BorderRadius.circular(999),
-            ),
-          ),
-      ],
+  Widget _placed({
+    required double angle,
+    required double radius,
+    required Widget child,
+  }) {
+    const center = _side / 2;
+    return Positioned(
+      left: center + radius * math.cos(angle) - _tile / 2,
+      top: center + radius * math.sin(angle) - _tile / 2,
+      width: _tile,
+      height: _tile,
+      child: child,
     );
   }
 }

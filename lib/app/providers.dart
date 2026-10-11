@@ -138,9 +138,35 @@ final aiAvailableProvider = FutureProvider<bool>((ref) async {
   return ref.watch(aiAssistantServiceProvider).isAvailable();
 });
 
+/// Budgets for this month — Home, Profile and the Budget tab share it.
 final budgetOverviewProvider = FutureProvider<BudgetOverview>((ref) {
+  return ref.watch(budgetMonthOverviewProvider(0).future);
+});
+
+/// Which month the Budget tab shows: 0 = this month, -1 = last month.
+final budgetMonthOffsetProvider = StateProvider<int>((ref) => 0);
+
+final budgetMonthOverviewProvider =
+    FutureProvider.family<BudgetOverview, int>((ref, monthOffset) {
   ref.watch(dataVersionProvider);
-  return ref.watch(budgetServiceProvider).buildOverview();
+  return ref
+      .watch(budgetServiceProvider)
+      .buildOverview(monthOffset: monthOffset);
+});
+
+/// One budget's page for one month.
+final budgetDetailProvider = FutureProvider.autoDispose
+    .family<BudgetDetail?, ({String budgetId, int monthOffset})>((ref, key) {
+  ref.watch(dataVersionProvider);
+  return ref
+      .watch(budgetServiceProvider)
+      .buildDetail(key.budgetId, monthOffset: key.monthOffset);
+});
+
+/// Budgets proposed from the user's own spending history.
+final budgetSuggestionsProvider = FutureProvider<List<BudgetSuggestion>>((ref) {
+  ref.watch(dataVersionProvider);
+  return ref.watch(budgetServiceProvider).suggestBudgets();
 });
 
 final smsMessageRepositoryProvider = Provider<SmsMessageRepository>((ref) {
@@ -187,7 +213,10 @@ final moneyAlertRepositoryProvider = Provider<MoneyAlertRepository>((ref) {
 });
 
 final moneyAlertServiceProvider = Provider<MoneyAlertService>((ref) {
-  return MoneyAlertService(ref.watch(moneyAlertRepositoryProvider));
+  return MoneyAlertService(
+    ref.watch(moneyAlertRepositoryProvider),
+    budgets: ref.watch(budgetServiceProvider),
+  );
 });
 
 /// App-lifetime auto-sync (launch, resume, incoming bank SMS).
@@ -208,50 +237,127 @@ final autoSyncStatusProvider = StreamProvider<AutoSyncStatus>((ref) async* {
   yield* controller.statusChanges;
 });
 
-/// Every bank/wallet seen in the inbox — including ones that have only sent
-/// promotions so far — so the user can see the app found them.
+/// Banks and wallets the user turned off (empty until loaded). Turning one
+/// off removes its transactions; turning it back on reads them back from
+/// the inbox.
+class ExcludedInstitutionsController
+    extends StateNotifier<Set<EthiopianInstitution>> {
+  ExcludedInstitutionsController(this._sync, this._onDataChanged)
+      : super(const {}) {
+    _loaded = _load();
+  }
+
+  final SyncService _sync;
+  final void Function() _onDataChanged;
+
+  /// Changes wait for the stored set, so a slow first read can't overwrite
+  /// them with the old value.
+  late final Future<void> _loaded;
+
+  Future<void> _load() async {
+    final excluded = await _sync.excludedInstitutions();
+    if (mounted) state = excluded;
+  }
+
+  /// Returns how many transactions came back when turning one on.
+  Future<int> setIncluded(EthiopianInstitution id, bool included) async {
+    await _loaded;
+    state = included ? ({...state}..remove(id)) : {...state, id};
+    var restored = 0;
+    try {
+      if (included) {
+        restored = (await _sync.includeInstitution(id)).newTransactions.length;
+      } else {
+        await _sync.excludeInstitution(id);
+      }
+    } finally {
+      _onDataChanged();
+    }
+    return restored;
+  }
+
+  /// Onboarding's choice, made before anything is imported.
+  Future<void> replaceAll(Set<EthiopianInstitution> excluded) async {
+    await _loaded;
+    state = {...excluded};
+    await _sync.setExcludedInstitutions(excluded);
+  }
+}
+
+final excludedInstitutionsProvider = StateNotifierProvider<
+    ExcludedInstitutionsController, Set<EthiopianInstitution>>((ref) {
+  return ExcludedInstitutionsController(
+    ref.watch(syncServiceProvider),
+    () => ref.read(dataVersionProvider.notifier).state++,
+  );
+});
+
+/// Every bank/wallet seen in the inbox, including ones that have only sent
+/// promotions so far and ones the user turned off, so all of them can be
+/// switched on or off in one list.
 final institutionsSeenProvider =
     FutureProvider<List<InstitutionSighting>>((ref) async {
+  final excluded = ref.watch(excludedInstitutionsProvider);
   final stored = await ref.watch(storedSmsProvider.future);
   final accounts = await ref.watch(accountsProvider.future);
-  final withTransactions = {
+  final transactions = await ref.watch(allTransactionsProvider.future);
+  final institutionByAccount = {
     for (final account in accounts)
-      institutionInfoForCode(account.institutionCode).id,
+      account.id: institutionInfoForCode(account.institutionCode).id,
   };
+  final counts = <EthiopianInstitution, int>{};
+  for (final tx in transactions) {
+    final id = institutionByAccount[tx.accountId];
+    if (id != null) counts[id] = (counts[id] ?? 0) + 1;
+  }
   final seen = <EthiopianInstitution>{
     for (final message in stored) institutionForSender(message.sms.sender),
-    ...withTransactions,
+    ...counts.keys,
+    ...excluded,
   }..remove(EthiopianInstitution.unknown);
-  final sightings = [
+  // Alphabetical, so a row doesn't jump when it's switched off.
+  return [
     for (final id in seen)
       InstitutionSighting(
         info: institutionInfo(id),
-        hasTransactions: withTransactions.contains(id),
+        transactionCount: counts[id] ?? 0,
+        excluded: excluded.contains(id),
       ),
-  ]..sort((a, b) {
-      if (a.hasTransactions != b.hasTransactions) {
-        return a.hasTransactions ? -1 : 1;
-      }
-      return a.info.name.compareTo(b.info.name);
-    });
-  return sightings;
+  ]..sort(
+      (a, b) => a.info.name.toLowerCase().compareTo(b.info.name.toLowerCase()));
 });
 
 class InstitutionSighting {
-  const InstitutionSighting(
-      {required this.info, required this.hasTransactions});
+  const InstitutionSighting({
+    required this.info,
+    required this.transactionCount,
+    required this.excluded,
+  });
 
   final InstitutionInfo info;
-  final bool hasTransactions;
+  final int transactionCount;
+
+  /// Turned off by the user: none of its messages are synced.
+  final bool excluded;
+
+  bool get hasTransactions => transactionCount > 0;
 }
 
 final notificationBridgeProvider = Provider<NotificationBridge>((ref) {
   return NotificationBridge();
 });
 
-final moneyAlertsProvider = FutureProvider<List<MoneyAlert>>((ref) {
+/// Alerts from banks and wallets the user turned off are hidden with them.
+final moneyAlertsProvider = FutureProvider<List<MoneyAlert>>((ref) async {
   ref.watch(dataVersionProvider);
-  return ref.watch(moneyAlertServiceProvider).getAll();
+  final excluded = {
+    for (final id in ref.watch(excludedInstitutionsProvider)) id.name,
+  };
+  final alerts = await ref.watch(moneyAlertServiceProvider).getAll();
+  if (excluded.isEmpty) return alerts;
+  return alerts
+      .where((alert) => !excluded.contains(alert.institutionCode))
+      .toList(growable: false);
 });
 
 final unreadAlertCountProvider = Provider<int>((ref) {
@@ -272,6 +378,16 @@ final transactionServiceProvider = Provider<TransactionService>((ref) {
     ref.watch(ledgerRepositoryProvider),
     ref.watch(categoryRuleRepositoryProvider),
   );
+});
+
+/// Which transactions are money moving between the user's own accounts.
+/// Always computed on the whole ledger — an institution-filtered list would
+/// hide one leg of a pair.
+final flowAnalysisProvider = FutureProvider<FlowAnalysis>((ref) async {
+  ref.watch(dataVersionProvider);
+  final transactions =
+      await ref.watch(ledgerRepositoryProvider).getTransactions();
+  return ReportService.analyzeFlows(transactions);
 });
 
 final reportServiceProvider = Provider<ReportService>((ref) {
@@ -454,6 +570,12 @@ final allTransactionsProvider =
   ref.watch(dataVersionProvider);
   final repo = ref.watch(ledgerRepositoryProvider);
   return repo.getTransactions();
+});
+
+final transactionByIdProvider =
+    FutureProvider.family<TransactionRecord?, String>((ref, id) {
+  ref.watch(dataVersionProvider);
+  return ref.watch(ledgerRepositoryProvider).getTransactionById(id);
 });
 
 final accountsProvider = FutureProvider<List<Account>>((ref) {

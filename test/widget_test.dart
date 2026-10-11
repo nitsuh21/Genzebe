@@ -53,12 +53,12 @@ void main() {
     await tester.pumpWidget(_app());
     await tester.pumpAndSettle();
 
-    expect(find.text('Skip'), findsOneWidget);
-    await tester.tap(find.text('Skip'));
+    expect(find.text('Get started'), findsOneWidget);
+    await tester.tap(find.text('Get started'));
     await tester.pumpAndSettle();
 
-    // Straight from the intro to the SMS disclosure — no sign-in step.
-    expect(find.text('Connect your SMS'), findsOneWidget);
+    // Straight from the welcome to the SMS disclosure — no sign-in step.
+    expect(find.text('Genzeb reads only your bank texts'), findsOneWidget);
     expect(find.text('Continue with Google'), findsNothing);
   });
 
@@ -88,7 +88,6 @@ void main() {
     expect(find.text('Your plan'), findsNothing);
     expect(find.text('AI assistant'), findsNothing);
     expect(find.text('Delete account'), findsNothing);
-    expect(
-        find.textContaining('everything stays on this phone'), findsOneWidget);
+    expect(find.text('Everything stays on this phone.'), findsOneWidget);
   });
 }

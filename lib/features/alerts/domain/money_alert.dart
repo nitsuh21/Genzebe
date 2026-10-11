@@ -13,6 +13,7 @@ class MoneyAlert {
     this.categoryId,
     this.needsReview = false,
     this.isRead = false,
+    this.budgetNote,
   });
 
   final String id;
@@ -33,7 +34,11 @@ class MoneyAlert {
   final DateTime createdAt;
   final bool isRead;
 
-  MoneyAlert copyWith({bool? isRead}) {
+  /// Set when this spending pushed a budget past 80% or over its limit:
+  /// "Food budget is 85% used · 9 days left". Never contains amounts.
+  final String? budgetNote;
+
+  MoneyAlert copyWith({bool? isRead, String? budgetNote}) {
     return MoneyAlert(
       id: id,
       transactionId: transactionId,
@@ -46,6 +51,7 @@ class MoneyAlert {
       categoryId: categoryId,
       needsReview: needsReview,
       isRead: isRead ?? this.isRead,
+      budgetNote: budgetNote ?? this.budgetNote,
     );
   }
 }

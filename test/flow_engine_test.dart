@@ -66,23 +66,32 @@ void main() {
       () async {
     final ledger = InMemoryLedgerRepository();
     final t = DateTime(2026, 7, 5, 10, 0);
-    // Outflow leg: total incl. fees. Inflow leg: net amount, minutes later.
+    // The real shapes of a CBE-app telebirr top-up: CBE debits the total
+    // incl. fees without naming telebirr; telebirr credits the net amount
+    // and names the bank.
     await ledger.saveTransaction(_tx(
       id: 'out-1',
       accountId: 'cbe-main',
-      type: TransactionType.transferOut,
+      type: TransactionType.expense,
       amountMinor: 110120,
       at: t,
-      categoryId: 'transfer_out',
-      snippet: _cbeTransferBody,
+      categoryId: 'fees',
+      snippet: 'Dear Abebe Kebede your Account 1********2468 has been '
+          'debited with ETB 1101.20 including Service charge ETB1.00ETB0.05 '
+          'and VAT(15%) ETB0.15. Your Current Balance is ETB 14977.6. Thank '
+          'you for Banking with CBE!.',
     ));
     await ledger.saveTransaction(_tx(
       id: 'in-1',
       accountId: 'telebirr-main',
       type: TransactionType.income,
       amountMinor: 110000,
-      at: t.add(const Duration(minutes: 3)),
-      categoryId: 'income',
+      at: t.add(const Duration(minutes: 1)),
+      categoryId: 'transfer_in',
+      snippet: 'Dear Abebe, You have received  ETB 1,100.00 by transaction '
+          'number DJ30DW1SRY on 2026-07-05 10:01:00 from Commercial Bank of '
+          'Ethiopia to your telebirr Account 2519******69 - Abebe Kebede '
+          'Tesfaye. Your current balance is ETB 9,832.48.',
     ));
     // Plus a real salary and a real purchase for contrast.
     await ledger.saveTransaction(_tx(

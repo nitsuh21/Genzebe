@@ -109,7 +109,7 @@ class PlanCatalog {
     PlanInfo(
       code: freemiumCode,
       name: 'Freemium',
-      tagline: 'Everything you need to track your money — no account needed',
+      tagline: 'Everything you need to track your money, no account needed',
       priceLabel: 'Free',
       available: true,
       perks: [

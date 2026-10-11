@@ -2,6 +2,7 @@ import 'package:genzeb/features/transactions/domain/models/transaction_models.da
 
 abstract class LedgerRepository {
   Future<void> upsertAccount(Account account);
+  Future<void> deleteAccount(String accountId);
   Future<void> saveTransaction(TransactionRecord transaction);
   Future<void> appendLedgerEntry(LedgerEntry ledgerEntry);
 

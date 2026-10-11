@@ -78,6 +78,21 @@ class TransactionService {
     return merchant;
   }
 
+  /// Records the user's answer to "is this a transfer between my own
+  /// accounts?". Balances don't change — only how Reports, budgets and the
+  /// ledger total count it. [OwnTransferOverride.none] hands the decision
+  /// back to the flow engine.
+  Future<void> setOwnTransfer({
+    required String transactionId,
+    required OwnTransferOverride answer,
+  }) async {
+    final existing = await _ledgerRepository.getTransactionById(transactionId);
+    if (existing == null || existing.ownTransfer == answer) return;
+    await _ledgerRepository.saveTransaction(
+      existing.copyWith(ownTransfer: answer),
+    );
+  }
+
   Future<void> addManualTransaction({
     required String transactionId,
     required String accountId,

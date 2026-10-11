@@ -107,6 +107,12 @@ const Map<String, CategoryInfo> kCategoryCatalog = {
     icon: Icons.account_balance_rounded,
     color: Color(0xFF8A8FA3),
   ),
+  'atm': CategoryInfo(
+    id: 'atm',
+    label: 'ATM / cash withdrawal',
+    icon: Icons.local_atm_rounded,
+    color: Color(0xFF5B7083),
+  ),
   'transfer_out': CategoryInfo(
     id: 'transfer_out',
     label: 'Transfer Out',
@@ -152,6 +158,7 @@ const List<String> kExpenseCategoryIds = [
   'entertainment',
   'savings',
   'fees',
+  'atm',
   'transfer_out',
   'expense',
 ];

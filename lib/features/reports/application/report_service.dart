@@ -1,8 +1,12 @@
+import 'package:genzeb/features/reports/application/own_transfer_detector.dart';
 import 'package:genzeb/features/sms_ingestion/application/sms_ingestion_service.dart';
 import 'package:genzeb/features/sms_ingestion/domain/services/sms_parser.dart'
     show extractItemizedFeesMinor, extractMerchant, normalizeMerchant;
 import 'package:genzeb/features/transactions/domain/models/transaction_models.dart';
 import 'package:genzeb/features/transactions/domain/repositories/ledger_repository.dart';
+
+export 'package:genzeb/features/reports/application/own_transfer_detector.dart'
+    show FlowAnalysis, OwnTransferReason;
 
 bool isOutflowType(TransactionType type) {
   return type == TransactionType.expense || type == TransactionType.transferOut;
@@ -50,21 +54,6 @@ class MonthlyReport {
   final Map<String, int> incomeByCategoryMinor;
 }
 
-/// Result of classifying transactions into real flows vs internal movements.
-class FlowAnalysis {
-  const FlowAnalysis({
-    required this.internalIds,
-    required this.pairFeeByOutflowId,
-  });
-
-  /// Transaction ids that are legs of an own-account movement (both legs of
-  /// a matched pair, plus outflows into own savings).
-  final Set<String> internalIds;
-
-  /// For matched pairs: outflow-leg id -> fee delta (outflow - inflow).
-  final Map<String, int> pairFeeByOutflowId;
-}
-
 class MerchantSpend {
   const MerchantSpend({
     required this.name,
@@ -100,6 +89,7 @@ class PeriodReport {
     required this.scopedTransactions,
     required this.internalIds,
     required this.feeByTransactionId,
+    this.suggestedIds = const <String>{},
   });
 
   /// Confirmed transactions inside the period (for drill-down and export).
@@ -107,6 +97,10 @@ class PeriodReport {
 
   /// Ids classified as own-account movements.
   final Set<String> internalIds;
+
+  /// Unmatched transfers that may be the user's own — still counted, but
+  /// worth a yes/no from the user.
+  final Set<String> suggestedIds;
 
   /// Transactions that carried a bank fee, with the fee amount per id.
   final Map<String, int> feeByTransactionId;
@@ -156,12 +150,11 @@ class ReportService {
     required DateTime endExclusive,
     Set<String> institutionCodes = const <String>{},
   }) async {
-    final transactions = await _filteredTransactions(
-      institutionCodes: institutionCodes,
-    );
-    // Flow analysis runs on the full history so a transfer pair straddling
-    // the range boundary is still recognized.
-    final flows = analyzeFlows(transactions);
+    final (:all, :transactions) = await _loadTransactions(institutionCodes);
+    // Flow analysis runs on the full, unfiltered history so a transfer pair
+    // straddling the range boundary — or a bank filter — is still
+    // recognized.
+    final flows = analyzeFlows(all);
     final scoped = _filterByRange(
       transactions,
       startInclusive: startInclusive,
@@ -176,10 +169,8 @@ class ReportService {
     required DateTime endExclusive,
     Set<String> institutionCodes = const <String>{},
   }) async {
-    final transactions = await _filteredTransactions(
-      institutionCodes: institutionCodes,
-    );
-    final flows = analyzeFlows(transactions);
+    final (:all, :transactions) = await _loadTransactions(institutionCodes);
+    final flows = analyzeFlows(all);
     final scoped = _filterByRange(
       transactions,
       startInclusive: startInclusive,
@@ -248,9 +239,10 @@ class ReportService {
               (tx) => tx.reviewStatus != TransactionReviewStatus.pendingReview)
           .toList(growable: false),
       internalIds: flows.internalIds,
+      suggestedIds: flows.suggestedIds,
       feeByTransactionId: {
         for (final tx in scoped)
-          if (_feesFor(tx, flows) > 0) tx.id: _feesFor(tx, flows),
+          if (feesFor(tx, flows) > 0) tx.id: feesFor(tx, flows),
       },
     );
   }
@@ -291,9 +283,7 @@ class ReportService {
   Future<DashboardInsights> generateDashboardInsights({
     Set<String> institutionCodes = const <String>{},
   }) async {
-    final transactions = await _filteredTransactions(
-      institutionCodes: institutionCodes,
-    );
+    final (:all, :transactions) = await _loadTransactions(institutionCodes);
     final filteredAccountIds = await _filteredAccountIds(
       institutionCodes: institutionCodes,
     );
@@ -302,7 +292,7 @@ class ReportService {
     final currentEnd = DateTime(now.year, now.month + 1, 1);
     final previousStart = DateTime(now.year, now.month - 1, 1);
     final previousEnd = DateTime(now.year, now.month, 1);
-    final flows = analyzeFlows(transactions);
+    final flows = analyzeFlows(all);
     final currentMonth = _filterByRange(
       transactions,
       startInclusive: currentStart,
@@ -369,44 +359,34 @@ class ReportService {
     );
   }
 
-  /// Income/expense totals for the trailing [months] months (oldest first).
+  /// Income/expense totals for the trailing [months] months (oldest first),
+  /// counted exactly like the period totals.
   Future<List<MonthBucket>> monthlySeries({
     int months = 6,
     Set<String> institutionCodes = const <String>{},
   }) async {
-    final transactions = await _filteredTransactions(
-      institutionCodes: institutionCodes,
-    );
-    final flows = analyzeFlows(transactions);
+    final (:all, :transactions) = await _loadTransactions(institutionCodes);
+    final flows = analyzeFlows(all);
     final now = DateTime.now();
-    final buckets = <MonthBucket>[];
-    for (var i = months - 1; i >= 0; i--) {
-      final monthStart = DateTime(now.year, now.month - i, 1);
-      var income = 0;
-      var expense = 0;
-      for (final record in transactions) {
-        if (record.reviewStatus == TransactionReviewStatus.pendingReview) {
-          continue;
-        }
-        if (flows.internalIds.contains(record.id)) continue;
-        if (record.occurredAt.year == monthStart.year &&
-            record.occurredAt.month == monthStart.month) {
-          if (isOutflowType(record.type)) {
-            expense += record.amount.minorUnits;
-          } else if (isInflowType(record.type)) {
-            income += record.amount.minorUnits;
-          }
-        }
-      }
-      buckets.add(
-        MonthBucket(
-          month: monthStart,
-          incomeMinor: income,
-          expenseMinor: expense,
-        ),
-      );
-    }
-    return buckets;
+    return [
+      for (var i = months - 1; i >= 0; i--)
+        () {
+          final monthStart = DateTime(now.year, now.month - i, 1);
+          final totals = _toMonthlyReport(
+            _filterByRange(
+              transactions,
+              startInclusive: monthStart,
+              endExclusive: DateTime(monthStart.year, monthStart.month + 1, 1),
+            ),
+            flows: flows,
+          );
+          return MonthBucket(
+            month: monthStart,
+            incomeMinor: totals.incomeMinor,
+            expenseMinor: totals.expenseMinor,
+          );
+        }(),
+    ];
   }
 
   Future<List<AccountInsightCard>> _buildAccountCards({
@@ -496,90 +476,18 @@ class ReportService {
     }).toList(growable: false);
   }
 
-  /// Detects own-account movements so they never masquerade as income or
-  /// spending. Deliberately conservative — a false pair silently deletes
-  /// real income AND real spending, which is worse than missing a transfer:
-  ///  - The OUTFLOW leg must actually look like a transfer (transfer_out /
-  ///    savings category, or the receipt says "transfer"). A grocery
-  ///    payment can never be swallowed by a coincidental same-amount credit.
-  ///  - The inflow leg must not be salary.
-  ///  - Legs must be on DIFFERENT accounts, within 3 hours (bank->wallet
-  ///    hops land in minutes), amounts equal up to a plausible fee
-  ///    (<= 2% or ETB 25).
-  ///  - Outflows categorized as savings are money the user keeps.
-  static FlowAnalysis analyzeFlows(List<TransactionRecord> records) {
-    final confirmed = records
-        .where((tx) => tx.reviewStatus != TransactionReviewStatus.pendingReview)
-        .toList(growable: false);
-
-    bool transferishOutflow(TransactionRecord tx) {
-      if (tx.type == TransactionType.transferOut) return true;
-      if (tx.categoryId == 'transfer_out' || tx.categoryId == 'savings') {
-        return true;
-      }
-      final snippet = tx.smsSnippet?.toLowerCase();
-      return snippet != null && snippet.contains('transfer');
-    }
-
-    final outflows = confirmed
-        .where((tx) => isOutflowType(tx.type) && transferishOutflow(tx))
-        .toList()
-      ..sort((a, b) => a.occurredAt.compareTo(b.occurredAt));
-    final inflows = confirmed
-        .where((tx) => isInflowType(tx.type) && tx.categoryId != 'salary')
-        .toList()
-      ..sort((a, b) => a.occurredAt.compareTo(b.occurredAt));
-
-    final internalIds = <String>{};
-    final pairFees = <String, int>{};
-    final usedInflows = <String>{};
-
-    bool feeTolerated(int outMinor, int inMinor) {
-      final delta = outMinor - inMinor;
-      if (delta < 0) return false;
-      final tolerance =
-          (outMinor * 0.02).round() > 2500 ? (outMinor * 0.02).round() : 2500;
-      return delta <= tolerance;
-    }
-
-    for (final out in outflows) {
-      TransactionRecord? best;
-      Duration? bestGap;
-      for (final inn in inflows) {
-        if (usedInflows.contains(inn.id)) continue;
-        if (inn.accountId == out.accountId) continue;
-        final gap = inn.occurredAt.difference(out.occurredAt).abs();
-        if (gap > const Duration(hours: 3)) continue;
-        if (!feeTolerated(out.amount.minorUnits, inn.amount.minorUnits)) {
-          continue;
-        }
-        if (best == null || gap < bestGap!) {
-          best = inn;
-          bestGap = gap;
-        }
-      }
-      if (best != null) {
-        usedInflows.add(best.id);
-        internalIds
-          ..add(out.id)
-          ..add(best.id);
-        pairFees[out.id] = out.amount.minorUnits - best.amount.minorUnits;
-      } else if (out.categoryId == 'savings') {
-        internalIds.add(out.id);
-      }
-    }
-    return FlowAnalysis(
-      internalIds: internalIds,
-      pairFeeByOutflowId: pairFees,
-    );
-  }
+  /// Own-account movements, so they never masquerade as income or
+  /// spending. See [analyzeOwnTransfers] for the rules. Always pass the
+  /// full, unfiltered ledger — a filtered list hides one leg of a pair.
+  static FlowAnalysis analyzeFlows(List<TransactionRecord> records) =>
+      analyzeOwnTransfers(records);
 
   /// Bank charges for one transaction. Itemized receipt fees are the ground
   /// truth: a big debit that merely MENTIONS "service charge" (or was once
   /// miscategorized as fees) contributes only its itemized charge — never
   /// its whole amount. Only a pure charge SMS with no itemization counts
   /// fully.
-  static int _feesFor(TransactionRecord tx, FlowAnalysis flows) {
+  static int feesFor(TransactionRecord tx, FlowAnalysis flows) {
     if (tx.reviewStatus == TransactionReviewStatus.pendingReview) return 0;
     final itemized =
         tx.smsSnippet == null ? 0 : extractItemizedFeesMinor(tx.smsSnippet!);
@@ -596,6 +504,7 @@ class ReportService {
     FlowAnalysis? flows,
   }) {
     final analysis = flows ?? analyzeFlows(records);
+    final inScope = {for (final record in records) record.id};
     int income = 0;
     int expense = 0;
     int internal = 0;
@@ -611,20 +520,28 @@ class ReportService {
         pending += 1;
         continue;
       }
-      fees += _feesFor(entry, analysis);
+      fees += feesFor(entry, analysis);
 
       if (analysis.internalIds.contains(entry.id)) {
         if (isOutflowType(entry.type)) {
           internal += entry.amount.minorUnits;
-          // The fee delta of an internal pair is real money lost.
-          final pairFee = analysis.pairFeeByOutflowId[entry.id] ?? 0;
-          if (pairFee > 0) {
-            expense += pairFee;
+          // What the move cost — the pair's fee delta, or the receipt's
+          // itemized charges for a one-sided transfer — is real money lost.
+          final lost = feesFor(entry, analysis);
+          if (lost > 0) {
+            expense += lost;
             categoryTotals.update(
               'fees',
-              (value) => value + pairFee,
-              ifAbsent: () => pairFee,
+              (value) => value + lost,
+              ifAbsent: () => lost,
             );
+          }
+        } else {
+          // Count each move once: an inflow only when its outflow leg is
+          // outside this view (other period, filtered bank, or no SMS).
+          final partner = analysis.partnerById[entry.id];
+          if (partner == null || !inScope.contains(partner)) {
+            internal += entry.amount.minorUnits;
           }
         }
         continue;
@@ -659,16 +576,20 @@ class ReportService {
     );
   }
 
-  Future<List<TransactionRecord>> _filteredTransactions({
-    required Set<String> institutionCodes,
-  }) async {
-    final transactions = await _ledgerRepository.getTransactions();
-    if (institutionCodes.isEmpty) return transactions;
+  /// The whole ledger (for flow analysis) and the part the institution
+  /// filter keeps (for totals).
+  Future<({List<TransactionRecord> all, List<TransactionRecord> transactions})>
+      _loadTransactions(Set<String> institutionCodes) async {
+    final all = await _ledgerRepository.getTransactions();
+    if (institutionCodes.isEmpty) return (all: all, transactions: all);
     final accountIds =
         await _filteredAccountIds(institutionCodes: institutionCodes);
-    return transactions
-        .where((tx) => accountIds.contains(tx.accountId))
-        .toList(growable: false);
+    return (
+      all: all,
+      transactions: all
+          .where((tx) => accountIds.contains(tx.accountId))
+          .toList(growable: false),
+    );
   }
 
   Future<Set<String>> _filteredAccountIds({

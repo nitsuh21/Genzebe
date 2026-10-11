@@ -214,7 +214,7 @@ Future<void> promptRecategorize(
       content: Text(
         learnedMerchant == null
             ? 'Moved to $label$flipped.'
-            : 'Moved to $label$flipped — "$learnedMerchant" will always go '
+            : 'Moved to $label$flipped. "$learnedMerchant" will always go '
                 'there now.',
       ),
     ),

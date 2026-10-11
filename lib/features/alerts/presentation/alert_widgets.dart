@@ -193,6 +193,11 @@ class MoneyAlertTile extends ConsumerWidget {
                           ),
                         ),
                       ),
+                    if (alert.budgetNote != null)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 2),
+                        child: BudgetNoteText(note: alert.budgetNote!),
+                      ),
                   ],
                 ),
               ),
@@ -221,6 +226,45 @@ class MoneyAlertTile extends ConsumerWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+/// "Food budget is 85% used · 9 days left" under a money-out alert.
+class BudgetNoteText extends StatelessWidget {
+  const BudgetNoteText({super.key, required this.note, this.maxLines});
+
+  final String note;
+  final int? maxLines;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final over = note.contains('over its limit');
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(top: 1),
+          child: Icon(
+            Icons.savings_outlined,
+            size: 13,
+            color: over ? theme.colorScheme.error : const Color(0xFFE8833A),
+          ),
+        ),
+        const SizedBox(width: 4),
+        Expanded(
+          child: Text(
+            note,
+            maxLines: maxLines,
+            overflow: maxLines == null ? null : TextOverflow.ellipsis,
+            style: theme.textTheme.labelSmall?.copyWith(
+              color: over ? theme.colorScheme.error : const Color(0xFFE8833A),
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

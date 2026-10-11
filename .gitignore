@@ -52,3 +52,9 @@ env.json
 key.properties
 *.jks
 *.keystore
+
+# Categorization model data: real (masked) SMS and labels, never committed.
+/tool/ml/data/
+/tool/ml/.venv/
+__pycache__/
+.ipynb_checkpoints/

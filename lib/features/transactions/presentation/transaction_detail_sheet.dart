@@ -45,6 +45,12 @@ class _DetailSheet extends ConsumerWidget {
     final account = accounts.where((a) => a.id == record.accountId).firstOrNull;
     final pending =
         record.reviewStatus == TransactionReviewStatus.pendingReview;
+    final isOwnTransfer = ref
+            .watch(flowAnalysisProvider)
+            .valueOrNull
+            ?.internalIds
+            .contains(record.id) ??
+        false;
 
     return SingleChildScrollView(
       child: Padding(
@@ -100,7 +106,7 @@ class _DetailSheet extends ConsumerWidget {
               Padding(
                 padding: const EdgeInsets.only(top: 4),
                 child: Text(
-                  'Waiting for your review — not counted in totals yet.',
+                  'Waiting for your review. Not counted in totals yet.',
                   style: theme.textTheme.bodySmall?.copyWith(
                     color: const Color(0xFFE8833A),
                     fontWeight: FontWeight.w600,
@@ -109,7 +115,14 @@ class _DetailSheet extends ConsumerWidget {
               ),
             const SizedBox(height: 16),
             _Row(label: 'Category', value: info.label),
-            _Row(label: 'Type', value: isExpense ? 'Expense' : 'Income'),
+            _Row(
+              label: 'Type',
+              value: isOwnTransfer
+                  ? 'Own transfer (money ${isExpense ? 'out' : 'in'})'
+                  : isExpense
+                      ? 'Expense'
+                      : 'Income',
+            ),
             _Row(label: 'Account', value: account?.name ?? record.accountId),
             _Row(
               label: 'Source',
@@ -142,6 +155,10 @@ class _DetailSheet extends ConsumerWidget {
                   style: theme.textTheme.bodySmall,
                 ),
               ),
+            ],
+            if (!pending) ...[
+              const SizedBox(height: 16),
+              _OwnTransferPanel(record: record, hostContext: hostContext),
             ],
             const SizedBox(height: 20),
             Row(
@@ -206,6 +223,230 @@ class _DetailSheet extends ConsumerWidget {
     if (!hostContext.mounted) return;
     ScaffoldMessenger.of(hostContext).showSnackBar(
       const SnackBar(content: Text('Transaction deleted.')),
+    );
+  }
+}
+
+/// Whether this transaction counts as money moving between the user's own
+/// accounts, why, and the one tap that corrects it.
+class _OwnTransferPanel extends ConsumerWidget {
+  const _OwnTransferPanel({required this.record, required this.hostContext});
+
+  final TransactionRecord record;
+  final BuildContext hostContext;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final flows = ref.watch(flowAnalysisProvider).valueOrNull;
+    if (flows == null) return const SizedBox.shrink();
+    final theme = Theme.of(context);
+    final isOwn = flows.internalIds.contains(record.id);
+    final maybeOwn = flows.suggestedIds.contains(record.id);
+
+    if (isOwn) {
+      return _Panel(
+        color: kOwnTransferColor,
+        icon: Icons.swap_horiz_rounded,
+        title: 'Own transfer, not counted as income or spending',
+        body: _reasonText(ref, flows),
+        actions: [
+          TextButton(
+            onPressed: () => _answer(
+              context,
+              ref,
+              OwnTransferOverride.notOwn,
+              isExpense(record)
+                  ? 'Counted as spending again.'
+                  : 'Counted as '
+                      'income again.',
+            ),
+            child: const Text('Not my own transfer'),
+          ),
+        ],
+      );
+    }
+    if (maybeOwn) {
+      return _Panel(
+        color: const Color(0xFFE8833A),
+        icon: Icons.help_outline_rounded,
+        title: 'Is this a transfer between your own accounts?',
+        body: 'It went ${isExpense(record) ? 'to' : 'from'} a bank or wallet '
+            'you also use, but no matching '
+            '${isExpense(record) ? 'deposit' : 'withdrawal'} was found. It '
+            'counts as ${isExpense(record) ? 'spending' : 'income'} until you '
+            'say otherwise.',
+        actions: [
+          TextButton(
+            onPressed: () => _answer(context, ref, OwnTransferOverride.notOwn,
+                'Got it. It stays counted.'),
+            child: const Text('No'),
+          ),
+          FilledButton.tonal(
+            onPressed: () => _answer(context, ref, OwnTransferOverride.own,
+                'Marked as an own transfer.'),
+            child: const Text('Yes, my own'),
+          ),
+        ],
+      );
+    }
+    if (record.ownTransfer == OwnTransferOverride.notOwn) {
+      return Row(
+        children: [
+          Expanded(
+            child: Text(
+              'You said this isn\'t a transfer between your own accounts.',
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ),
+          TextButton(
+            onPressed: () => _answer(
+                context, ref, OwnTransferOverride.none, 'Answer cleared.'),
+            child: const Text('Undo'),
+          ),
+        ],
+      );
+    }
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: TextButton.icon(
+        onPressed: () => _answer(context, ref, OwnTransferOverride.own,
+            'Marked as an own transfer.'),
+        icon: const Icon(Icons.swap_horiz_rounded, size: 18),
+        label: const Text('Mark as transfer between my accounts'),
+      ),
+    );
+  }
+
+  static bool isExpense(TransactionRecord record) => isOutflowType(record.type);
+
+  String _reasonText(WidgetRef ref, FlowAnalysis flows) {
+    final out = isExpense(record);
+    switch (flows.reasonById[record.id]) {
+      case OwnTransferReason.paired:
+        final partnerId = flows.partnerById[record.id];
+        final partner = partnerId == null
+            ? null
+            : ref.watch(transactionByIdProvider(partnerId)).valueOrNull;
+        if (partner == null) return 'Matched with the other side of the move.';
+        final accounts = ref.watch(accountsProvider).valueOrNull ?? const [];
+        final account = accounts
+                .where((a) => a.id == partner.accountId)
+                .firstOrNull
+                ?.name ??
+            partner.accountId;
+        final gap = partner.occurredAt.difference(record.occurredAt);
+        final fee = flows.pairFeeByOutflowId[out ? record.id : partner.id];
+        return 'Matched with '
+            '${formatSignedMinorEtb(signedMinorForRecord(partner))} '
+            '${out ? 'into' : 'out of'} $account, ${_gapLabel(gap)}.'
+            '${fee != null && fee > 0 ? ' The ${formatMinorEtb(fee)} it cost '
+                'counts as a bank fee.' : ''}';
+      case OwnTransferReason.markedByUser:
+        return 'You marked this as a transfer between your own accounts.';
+      case OwnTransferReason.ownAccount:
+        return out
+            ? 'Sent to an account number your bank calls yours.'
+            : 'Came from an account number your bank calls yours.';
+      case OwnTransferReason.ownName:
+        return out
+            ? 'Sent to an account in your own name.'
+            : 'Came from an account in your own name.';
+      case OwnTransferReason.learned:
+        return out
+            ? 'Same recipient as a transfer you marked as your own.'
+            : 'Same sender as a transfer you marked as your own.';
+      case OwnTransferReason.savings:
+        return 'Categorized as savings: money you keep.';
+      case null:
+        return '';
+    }
+  }
+
+  static String _gapLabel(Duration gap) {
+    final abs = gap.abs();
+    final when = gap.isNegative ? 'earlier' : 'later';
+    if (abs.inMinutes < 1) return 'at the same time';
+    if (abs.inMinutes < 60) return '${abs.inMinutes} min $when';
+    if (abs.inHours < 48) return '${abs.inHours} h $when';
+    return '${abs.inDays} days $when';
+  }
+
+  Future<void> _answer(
+    BuildContext context,
+    WidgetRef ref,
+    OwnTransferOverride answer,
+    String confirmation,
+  ) async {
+    await ref
+        .read(transactionServiceProvider)
+        .setOwnTransfer(transactionId: record.id, answer: answer);
+    refreshAppData(ref);
+    if (!context.mounted) return;
+    Navigator.of(context).pop();
+    if (!hostContext.mounted) return;
+    ScaffoldMessenger.of(hostContext).showSnackBar(
+      SnackBar(content: Text(confirmation)),
+    );
+  }
+}
+
+class _Panel extends StatelessWidget {
+  const _Panel({
+    required this.color,
+    required this.icon,
+    required this.title,
+    required this.body,
+    required this.actions,
+  });
+
+  final Color color;
+  final IconData icon;
+  final String title;
+  final String body;
+  final List<Widget> actions;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(12, 12, 12, 4),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(icon, size: 18, color: color),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  title,
+                  style: theme.textTheme.labelLarge
+                      ?.copyWith(fontWeight: FontWeight.w700),
+                ),
+              ),
+            ],
+          ),
+          if (body.isNotEmpty) ...[
+            const SizedBox(height: 4),
+            Padding(
+              padding: const EdgeInsets.only(left: 26),
+              child: Text(body, style: theme.textTheme.bodySmall),
+            ),
+          ],
+          Align(
+            alignment: Alignment.centerRight,
+            child: Wrap(spacing: 8, children: actions),
+          ),
+        ],
+      ),
     );
   }
 }

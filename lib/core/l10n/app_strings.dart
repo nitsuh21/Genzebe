@@ -9,27 +9,31 @@ class AppStrings {
     required this.navBudget,
     required this.navReports,
     required this.navProfile,
-    required this.onbSkip,
-    required this.onbNext,
+    required this.onbTitle,
+    required this.onbBody,
     required this.onbGetStarted,
-    required this.onbSlide1Title,
-    required this.onbSlide1Body,
-    required this.onbSlide2Title,
-    required this.onbSlide2Body,
-    required this.onbSlide3Title,
-    required this.onbSlide3Body,
     required this.authGoogle,
     required this.smsTitle,
     required this.smsBody,
-    required this.smsPoint1Title,
-    required this.smsPoint1Body,
-    required this.smsPoint2Title,
-    required this.smsPoint2Body,
-    required this.smsPoint3Title,
-    required this.smsPoint3Body,
+    required this.smsSkipped,
     required this.smsAllow,
     required this.smsDemo,
     required this.smsLater,
+    required this.banksTitle,
+    required this.banksFoundTitle,
+    required this.banksFoundBody,
+    required this.banksImport,
+    required this.banksContinue,
+    required this.banksSettingsBody,
+    required this.banksOff,
+    required this.banksNoTransactions,
+    required this.banksNoneFound,
+    required this.banksTurnOff,
+    required this.banksTurnOffTitle,
+    required this.banksTurnOffBody,
+    required this.messageCount,
+    required this.transactionCount,
+    required this.cancel,
     required this.goodMorning,
     required this.goodAfternoon,
     required this.goodEvening,
@@ -63,6 +67,7 @@ class AppStrings {
     required this.madeFor,
     required this.net,
     required this.ownTransfers,
+    required this.toCheck,
     required this.bankFees,
     required this.awaitingReview,
     required this.spendingBreakdown,
@@ -91,29 +96,33 @@ class AppStrings {
   final String navReports;
   final String navProfile;
 
-  final String onbSkip;
-  final String onbNext;
+  final String onbTitle;
+  final String onbBody;
   final String onbGetStarted;
-  final String onbSlide1Title;
-  final String onbSlide1Body;
-  final String onbSlide2Title;
-  final String onbSlide2Body;
-  final String onbSlide3Title;
-  final String onbSlide3Body;
 
   final String authGoogle;
 
   final String smsTitle;
   final String smsBody;
-  final String smsPoint1Title;
-  final String smsPoint1Body;
-  final String smsPoint2Title;
-  final String smsPoint2Body;
-  final String smsPoint3Title;
-  final String smsPoint3Body;
+  final String smsSkipped;
   final String smsAllow;
   final String smsDemo;
   final String smsLater;
+  final String banksTitle;
+  final String banksFoundTitle;
+  final String banksFoundBody;
+  final String banksImport;
+  final String banksContinue;
+  final String banksSettingsBody;
+  final String banksOff;
+  final String banksNoTransactions;
+  final String banksNoneFound;
+  final String banksTurnOff;
+  final String Function(String name) banksTurnOffTitle;
+  final String banksTurnOffBody;
+  final String Function(int count) messageCount;
+  final String Function(int count) transactionCount;
+  final String cancel;
 
   final String goodMorning;
   final String goodAfternoon;
@@ -149,6 +158,9 @@ class AppStrings {
   final String madeFor;
   final String net;
   final String ownTransfers;
+
+  /// "3 to check" — possible own transfers waiting for a yes/no.
+  final String toCheck;
   final String bankFees;
   final String awaitingReview;
   final String spendingBreakdown;
@@ -171,44 +183,50 @@ class AppStrings {
   final String alertsMarkRead;
 }
 
+String _enTurnOffTitle(String name) => 'Turn off $name?';
+String _enMessageCount(int n) => n == 1 ? '1 message' : '$n messages';
+String _enTransactionCount(int n) =>
+    n == 1 ? '1 transaction' : '$n transactions';
+
+String _amTurnOffTitle(String name) => '$name ይጥፋ?';
+String _amMessageCount(int n) => n == 1 ? '1 መልዕክት' : '$n መልዕክቶች';
+String _amTransactionCount(int n) => n == 1 ? '1 ግብይት' : '$n ግብይቶች';
+
 const enStrings = AppStrings(
   navHome: 'Home',
   navLedger: 'Ledger',
   navBudget: 'Budget',
   navReports: 'Reports',
   navProfile: 'Profile',
-  onbSkip: 'Skip',
-  onbNext: 'Next',
+  onbTitle: 'All your banks and wallets in one place',
+  onbBody: 'Genzeb tracks your spending from the texts they already send '
+      'you.',
   onbGetStarted: 'Get started',
-  onbSlide1Title: 'Your SMS is already\na ledger',
-  onbSlide1Body:
-      'CBE, telebirr, Awash, Dashen, Abyssinia and every other Ethiopian bank '
-      'and wallet confirm each birr by text. Genzeb turns those into your '
-      'money history automatically.',
-  onbSlide2Title: 'See where every\nbirr goes',
-  onbSlide2Body:
-      'Spending by category, monthly trends, budgets that warn you before '
-      'you overshoot — not after.',
-  onbSlide3Title: 'Private. Free.\nNo sign-up.',
-  onbSlide3Body:
-      'Everything stays on your phone and no account is needed. No fees, '
-      'no ads, no card required.',
   authGoogle: 'Continue with Google',
-  smsTitle: 'Connect your SMS',
-  smsBody: 'Genzeb reads SMS from Ethiopian banks and wallets to record '
-      'your transactions automatically and alert you when money moves in or '
-      'out of your accounts.',
-  smsPoint1Title: 'Only bank and wallet messages',
-  smsPoint1Body: 'Texts from people, OTP codes and promotions are skipped '
-      'and never stored.',
-  smsPoint2Title: 'Nothing leaves your phone',
-  smsPoint2Body: 'Messages are processed and stored on this device only.',
-  smsPoint3Title: 'You stay in control',
-  smsPoint3Body: 'Uncertain matches wait for your approval in Review. You '
-      'can turn SMS access off anytime in Android settings.',
-  smsAllow: 'Allow SMS access & import',
-  smsDemo: 'Explore with demo data',
-  smsLater: 'Maybe later',
+  smsTitle: 'Genzeb reads only your bank texts',
+  smsBody: 'It records your transactions from them. Personal messages and '
+      'codes are skipped, and nothing leaves this phone.',
+  smsSkipped: 'Skipped',
+  smsAllow: 'Allow SMS access',
+  smsDemo: 'Try sample data',
+  smsLater: 'Not now',
+  banksTitle: 'Banks & wallets',
+  banksFoundTitle: 'Found your banks',
+  banksFoundBody: 'Tap any you want to leave out. You can change this later '
+      'in Profile.',
+  banksImport: 'Import',
+  banksContinue: 'Continue',
+  banksSettingsBody: 'Turn one off to keep it out of your ledger.',
+  banksOff: 'Off',
+  banksNoTransactions: 'No transactions yet',
+  banksNoneFound: 'No bank or wallet messages yet.',
+  banksTurnOff: 'Turn off',
+  banksTurnOffTitle: _enTurnOffTitle,
+  banksTurnOffBody: 'Its transactions leave your ledger until you turn it '
+      'back on.',
+  messageCount: _enMessageCount,
+  transactionCount: _enTransactionCount,
+  cancel: 'Cancel',
   goodMorning: 'Good morning',
   goodAfternoon: 'Good afternoon',
   goodEvening: 'Good evening',
@@ -239,9 +257,10 @@ const enStrings = AppStrings(
   currentPlan: 'Current plan',
   transactions: 'Transactions',
   budgets: 'Budgets',
-  madeFor: 'Made with ❤️ for Ethiopia',
+  madeFor: 'Made for Ethiopia',
   net: 'Net',
   ownTransfers: 'Own transfers',
+  toCheck: 'to check',
   bankFees: 'Bank fees',
   awaitingReview: 'awaiting review',
   spendingBreakdown: 'Spending breakdown',
@@ -271,32 +290,32 @@ const amStrings = AppStrings(
   navBudget: 'በጀት',
   navReports: 'ሪፖርት',
   navProfile: 'መገለጫ',
-  onbSkip: 'ዝለል',
-  onbNext: 'ቀጣይ',
+  onbTitle: 'ሁሉም ባንኮችዎና ዋሌቶችዎ በአንድ ቦታ',
+  onbBody: 'ገንዘብ ባንኮችዎ ከሚልኩልዎ መልዕክቶች ወጪዎን ይከታተላል።',
   onbGetStarted: 'ጀምር',
-  onbSlide1Title: 'የእርስዎ SMS ራሱ\nመዝገብ ነው',
-  onbSlide1Body: 'ሲቢኢ፣ ቴሌብር፣ አዋሽ፣ ዳሽን፣ አቢሲኒያ እና ሌሎች የኢትዮጵያ ባንኮችና ዋሌቶች '
-      'እያንዳንዱን ብር በጽሑፍ መልዕክት ያረጋግጣሉ። ገንዘብ መልዕክቶቹን አንብቦ የገንዘብዎን ታሪክ '
-      'በራስ-ሰር ይገነባል።',
-  onbSlide2Title: 'እያንዳንዱ ብር የት\nእንደሚሄድ ይወቁ',
-  onbSlide2Body: 'ወጪ በምድብ፣ ወርሃዊ አዝማሚያዎች፣ እና ከመብዛቱ በፊት የሚያስጠነቅቁ በጀቶች።',
-  onbSlide3Title: 'የግል። ነፃ።\nመመዝገብ አያስፈልግም።',
-  onbSlide3Body: 'ሁሉም መረጃ በስልክዎ ላይ ይቀራል፤ መለያ አያስፈልግም። ክፍያ የለም፣ '
-      'ማስታወቂያ የለም።',
   authGoogle: 'በGoogle ይቀጥሉ',
-  smsTitle: 'SMSዎን ያገናኙ',
-  smsBody: 'የኢትዮጵያ ባንኮች እና ቴሌብር እያንዳንዱን ግብይት በSMS ያረጋግጣሉ። ገንዘብ እነዚህን '
-      'መልዕክቶች አንብቦ መዝገብዎን በራስ-ሰር ይገነባል።',
-  smsPoint1Title: 'የባንክና የዋሌት መልዕክቶች ብቻ',
-  smsPoint1Body: 'ከሰዎች የሚመጡ መልዕክቶች፣ የማረጋገጫ ኮዶች እና ማስታወቂያዎች ችላ ይባላሉ፤ '
-      'አይቀመጡም።',
-  smsPoint2Title: 'ምንም ከስልክዎ አይወጣም',
-  smsPoint2Body: 'መልዕክቶች በዚህ መሣሪያ ላይ ብቻ ይታያሉ እና ይቀመጣሉ።',
-  smsPoint3Title: 'ቁጥጥሩ የእርስዎ ነው',
-  smsPoint3Body: 'እርግጠኛ ያልሆኑ ግጥሚያዎች በግምገማ ውስጥ ፈቃድዎን ይጠብቃሉ።',
-  smsAllow: 'የSMS ፈቃድ ስጥ እና አስገባ',
-  smsDemo: 'በናሙና ውሂብ ይመልከቱ',
+  smsTitle: 'ገንዘብ የሚያነበው የባንክ መልዕክቶችዎን ብቻ ነው',
+  smsBody: 'ግብይቶችዎን ከእነሱ ይመዘግባል። የግል መልዕክቶችና ኮዶች ይዘለላሉ፤ ምንም ከዚህ '
+      'ስልክ አይወጣም።',
+  smsSkipped: 'ተዘሏል',
+  smsAllow: 'የSMS ፈቃድ ስጥ',
+  smsDemo: 'በናሙና ውሂብ ሞክር',
   smsLater: 'ኋላ ላይ',
+  banksTitle: 'ባንኮችና ዋሌቶች',
+  banksFoundTitle: 'ባንኮችዎ ተገኝተዋል',
+  banksFoundBody: 'የማይፈልጉትን ይንኩና ያስቀሩ። በኋላ በመገለጫ መቀየር ይችላሉ።',
+  banksImport: 'አስገባ',
+  banksContinue: 'ቀጥል',
+  banksSettingsBody: 'ከመዝገብዎ ለማስቀረት ያጥፉት።',
+  banksOff: 'ጠፍቷል',
+  banksNoTransactions: 'ገና ግብይት የለም',
+  banksNoneFound: 'ገና የባንክ ወይም የዋሌት መልዕክት የለም።',
+  banksTurnOff: 'አጥፋ',
+  banksTurnOffTitle: _amTurnOffTitle,
+  banksTurnOffBody: 'መልሰው እስኪያበሩት ድረስ ግብይቶቹ ከመዝገብዎ ይወጣሉ።',
+  messageCount: _amMessageCount,
+  transactionCount: _amTransactionCount,
+  cancel: 'ይቅር',
   goodMorning: 'እንደምን አደሩ',
   goodAfternoon: 'እንደምን ዋሉ',
   goodEvening: 'እንደምን አመሹ',
@@ -327,9 +346,10 @@ const amStrings = AppStrings(
   currentPlan: 'የአሁን እቅድ',
   transactions: 'ግብይቶች',
   budgets: 'በጀቶች',
-  madeFor: 'በ❤️ ለኢትዮጵያ የተሰራ',
+  madeFor: 'ለኢትዮጵያ የተሰራ',
   net: 'ተጣራ',
   ownTransfers: 'የራስ ዝውውሮች',
+  toCheck: 'ለማረጋገጥ',
   bankFees: 'የባንክ ክፍያዎች',
   awaitingReview: 'ግምገማ በመጠበቅ ላይ',
   spendingBreakdown: 'የወጪ ትንተና',

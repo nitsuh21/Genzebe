@@ -30,6 +30,12 @@ class SqfliteLedgerRepository implements LedgerRepository {
   }
 
   @override
+  Future<void> deleteAccount(String accountId) async {
+    final db = await _db;
+    await db.delete('accounts', where: 'id = ?', whereArgs: [accountId]);
+  }
+
+  @override
   Future<void> saveTransaction(TransactionRecord transaction) async {
     final db = await _db;
     await db.insert(
@@ -48,6 +54,9 @@ class SqfliteLedgerRepository implements LedgerRepository {
         'parserConfidence': transaction.parserConfidence,
         'reviewStatus': transaction.reviewStatus.name,
         'statementBalanceMinor': transaction.statementBalanceMinor,
+        'ownTransfer': transaction.ownTransfer == OwnTransferOverride.none
+            ? null
+            : transaction.ownTransfer.name,
       },
       conflictAlgorithm: ConflictAlgorithm.replace,
     );
@@ -164,6 +173,10 @@ class SqfliteLedgerRepository implements LedgerRepository {
       parserConfidence: (row['parserConfidence'] as num?)?.toDouble(),
       reviewStatus: _parseReviewStatus(row['reviewStatus'] as String),
       statementBalanceMinor: row['statementBalanceMinor'] as int?,
+      ownTransfer: OwnTransferOverride.values.firstWhere(
+        (value) => value.name == row['ownTransfer'],
+        orElse: () => OwnTransferOverride.none,
+      ),
     );
   }
 

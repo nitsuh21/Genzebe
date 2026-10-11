@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:genzeb/design_system/theme.dart';
 import 'package:genzeb/app/providers.dart';
 import 'package:genzeb/core/logging/app_logger.dart';
 import 'package:genzeb/core/utils/formatters.dart';
-import 'package:genzeb/design_system/institution_avatar.dart';
-import 'package:genzeb/features/sms_ingestion/domain/models/institutions.dart';
+import 'package:genzeb/features/account/presentation/banks_screen.dart';
 import 'package:genzeb/features/sms_ingestion/domain/models/sms_models.dart';
 import 'package:genzeb/features/sms_ingestion/domain/repositories/device_sms_source.dart';
 import 'package:genzeb/features/transactions/domain/models/categories.dart';
@@ -38,12 +38,11 @@ class _ReviewQueueScreenState extends ConsumerState<ReviewQueueScreen> {
       SnackBar(
         content: Text(
           result.newTransactions.isEmpty
-              ? 'Up to date — no new bank or wallet transactions.'
+              ? 'Up to date. No new bank or wallet transactions.'
               : '${result.newTransactions.length} new transaction'
                   '${result.newTransactions.length == 1 ? '' : 's'} from '
-                  '${result.institutionsFound.length} bank'
-                  '${result.institutionsFound.length == 1 ? '' : 's'}/wallets'
-                  '${result.pendingReview > 0 ? ' · ${result.pendingReview} to review' : ''}.',
+                  '${result.institutionsFound.length == 1 ? '1 bank or wallet' : '${result.institutionsFound.length} banks and wallets'}.'
+                  '${result.pendingReview > 0 ? ' ${result.pendingReview} to review.' : ''}',
         ),
       ),
     );
@@ -56,7 +55,7 @@ class _ReviewQueueScreenState extends ConsumerState<ReviewQueueScreen> {
         title: const Text('Re-check history?'),
         content: const Text(
           'Every saved message is read again with the latest rules and '
-          'your corrections — amounts, directions and categories are '
+          'your corrections, and amounts, directions and categories are '
           'recalculated. Category edits you made without teaching a rule '
           'may be recomputed.',
         ),
@@ -84,7 +83,7 @@ class _ReviewQueueScreenState extends ConsumerState<ReviewQueueScreen> {
         content: Text(
           changed == 0
               ? 'History already matches the latest parser.'
-              : 'Re-parsed history — $changed transaction'
+              : 'History checked again. $changed transaction'
                   '${changed == 1 ? '' : 's'} corrected.',
         ),
       ),
@@ -225,9 +224,9 @@ class _ReviewQueueScreenState extends ConsumerState<ReviewQueueScreen> {
           _CollapsibleCard(
             icon: Icons.account_balance_outlined,
             title: 'Banks & wallets found',
-            subtitle: 'Synced automatically from your inbox',
+            subtitle: 'Turn one off to keep it out of your ledger',
             initiallyExpanded: true,
-            child: const _InstitutionsFound(),
+            child: const InstitutionSwitchList(framed: false),
           ),
           const SizedBox(height: 12),
           _CollapsibleCard(
@@ -455,19 +454,13 @@ class _SyncCard extends StatelessWidget {
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(20),
-        gradient: const LinearGradient(
-          colors: [Color(0xFF4E5AE8), Color(0xFF7A5AE0)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
+        color: kBrandIndigoDeep,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              const Icon(Icons.bolt_rounded, color: Colors.white),
-              const SizedBox(width: 8),
               Text(
                 'Refresh from SMS',
                 style: theme.textTheme.titleMedium?.copyWith(
@@ -479,7 +472,7 @@ class _SyncCard extends StatelessWidget {
           ),
           const SizedBox(height: 6),
           Text(
-            'Read your inbox again and update the ledger — nothing is '
+            'Read your inbox again and update the ledger. Nothing is '
             'duplicated. You can also paste messages by hand.',
             style: theme.textTheme.bodySmall?.copyWith(color: Colors.white70),
           ),
@@ -519,71 +512,6 @@ class _SyncCard extends StatelessWidget {
           ),
         ],
       ),
-    );
-  }
-}
-
-/// Every bank and wallet Genzeb has seen in the inbox. Nothing to set up:
-/// a new institution appears here the first time one of its messages does.
-class _InstitutionsFound extends ConsumerWidget {
-  const _InstitutionsFound();
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final theme = Theme.of(context);
-    final found = ref.watch(institutionsSeenProvider).valueOrNull ?? const [];
-    if (found.isEmpty) {
-      return _InfoCard(
-        text: 'No bank or wallet messages yet. Genzeb recognises '
-            '${kInstitutions.length} Ethiopian banks and wallets — CBE, '
-            'telebirr, Awash, Dashen, Abyssinia, M-PESA and more.',
-      );
-    }
-    final quiet = found.where((f) => !f.hasTransactions).length;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Wrap(
-          spacing: 10,
-          runSpacing: 10,
-          children: [
-            for (final sighting in found)
-              Opacity(
-                opacity: sighting.hasTransactions ? 1 : 0.55,
-                child: Container(
-                  padding: const EdgeInsets.fromLTRB(6, 6, 12, 6),
-                  decoration: BoxDecoration(
-                    color: theme.colorScheme.surfaceContainerHighest
-                        .withValues(alpha: 0.5),
-                    borderRadius: BorderRadius.circular(999),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      InstitutionAvatar(info: sighting.info, size: 26),
-                      const SizedBox(width: 8),
-                      Text(
-                        sighting.info.shortName,
-                        style: theme.textTheme.labelLarge
-                            ?.copyWith(fontWeight: FontWeight.w700),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-          ],
-        ),
-        if (quiet > 0) ...[
-          const SizedBox(height: 10),
-          Text(
-            'Faded: messages found, but only notices or promotions so far — '
-            'their transactions will appear as soon as one arrives.',
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
-            ),
-          ),
-        ],
-      ],
     );
   }
 }
@@ -911,7 +839,9 @@ class _DiagnosticsPanel extends StatelessWidget {
               Row(
                 children: [
                   Text(
-                    '${recent.length} recent log(s)',
+                    recent.length == 1
+                        ? '1 recent log'
+                        : '${recent.length} recent logs',
                     style: theme.textTheme.labelMedium?.copyWith(
                       fontWeight: FontWeight.w700,
                     ),

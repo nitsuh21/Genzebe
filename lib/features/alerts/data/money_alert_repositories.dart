@@ -71,6 +71,7 @@ class SqfliteMoneyAlertRepository implements MoneyAlertRepository {
         'occurredAt': alert.occurredAt.toIso8601String(),
         'createdAt': alert.createdAt.toIso8601String(),
         'isRead': alert.isRead ? 1 : 0,
+        'budgetNote': alert.budgetNote,
       };
 
   MoneyAlert _fromRow(Map<String, Object?> row) => MoneyAlert(
@@ -85,6 +86,7 @@ class SqfliteMoneyAlertRepository implements MoneyAlertRepository {
         occurredAt: DateTime.parse(row['occurredAt'] as String),
         createdAt: DateTime.parse(row['createdAt'] as String),
         isRead: (row['isRead'] as int) == 1,
+        budgetNote: row['budgetNote'] as String?,
       );
 }
 

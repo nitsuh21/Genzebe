@@ -95,8 +95,22 @@
         "direction": "out",
         "amountMinor": 200000,
         "balanceMinor": 77746,
+        "category": "atm",
         "explicitDirection": true,
         "autoAccept": true
+      }
+    },
+    {
+      "id": "hibret-cash-withdrawal",
+      "source": "real",
+      "sender": "HibretBank",
+      "body": " Dear customer, Please be informed that ETB 2000 Cash Withdrawal is made from your account 474041*******013  . Available Balance : 1234.91 Current Balance : 1234.91  .For further queries please call 995. Hibret Bank - The Preferred Bank.",
+      "expect": {
+        "parsed": true,
+        "institution": "hibret",
+        "direction": "out",
+        "amountMinor": 200000,
+        "category": "atm"
       }
     },
     {
