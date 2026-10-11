@@ -1,11 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:genzeb/app/providers.dart';
+import 'package:genzeb/design_system/institution_avatar.dart';
+import 'package:genzeb/design_system/theme.dart';
+import 'package:genzeb/features/account/presentation/onboarding_widgets.dart';
 import 'package:genzeb/features/alerts/presentation/notification_permission.dart';
 import 'package:genzeb/features/sms_ingestion/domain/repositories/device_sms_source.dart';
 
-/// One-time onboarding step: explain the SMS permission in plain language,
-/// then run the first import so the dashboard isn't empty.
+/// One-time onboarding step and the SMS permission's prominent disclosure:
+/// say what is read and what is skipped, then run the first import so the
+/// dashboard isn't empty.
 class SmsSetupScreen extends ConsumerStatefulWidget {
   const SmsSetupScreen({super.key});
 
@@ -27,22 +31,24 @@ class _SmsSetupScreenState extends ConsumerState<SmsSetupScreen> {
         messenger.showSnackBar(
           const SnackBar(
             content: Text(
-              'SMS permission not granted — you can add transactions '
-              'manually, or enable it later from Profile.',
+              'SMS access is off. You can add transactions yourself, or '
+              'turn it on later in Profile.',
             ),
           ),
         );
       } else {
         final banks = result.institutionsFound.length;
+        final found = result.newTransactions.length;
+        final pending = result.pendingReview;
         messenger.showSnackBar(
           SnackBar(
             content: Text(
               banks == 0
-                  ? 'No bank or wallet messages found yet — new ones will '
-                      'appear automatically.'
-                  : 'Found $banks bank${banks == 1 ? '' : 's'}/wallets · '
-                      '${result.newTransactions.length} transactions'
-                      '${result.pendingReview > 0 ? ' · ${result.pendingReview} waiting for your review' : ''}.',
+                  ? 'No bank or wallet messages yet. New ones will show up '
+                      'here automatically.'
+                  : 'Found $found transaction${found == 1 ? '' : 's'} from '
+                      '${banks == 1 ? '1 bank or wallet' : '$banks banks and wallets'}.'
+                      '${pending > 0 ? ' $pending need${pending == 1 ? 's' : ''} your review.' : ''}',
             ),
           ),
         );
@@ -64,7 +70,7 @@ class _SmsSetupScreenState extends ConsumerState<SmsSetupScreen> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Loaded $seeded demo transactions. Enjoy the tour!'),
+          content: Text('Loaded $seeded sample transactions.'),
         ),
       );
       await ref.read(smsSetupDoneProvider.notifier).markDone();
@@ -75,181 +81,191 @@ class _SmsSetupScreenState extends ConsumerState<SmsSetupScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     final strings = ref.watch(stringsProvider);
-    return Scaffold(
-      // Scrolls on short screens; on tall ones the spacers keep the layout.
-      body: SafeArea(
-        child: LayoutBuilder(
-          builder: (context, constraints) => SingleChildScrollView(
-            padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
-            child: ConstrainedBox(
-              constraints: BoxConstraints(
-                minHeight: constraints.maxHeight - 40,
-              ),
-              child: IntrinsicHeight(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Spacer(),
-                    Container(
-                      width: 64,
-                      height: 64,
-                      decoration: BoxDecoration(
-                        color: theme.colorScheme.primaryContainer,
-                        borderRadius: BorderRadius.circular(18),
-                      ),
-                      child: Icon(
-                        Icons.sms_outlined,
-                        color: theme.colorScheme.primary,
-                        size: 30,
-                      ),
-                    ),
-                    const SizedBox(height: 24),
-                    Text(
-                      strings.smsTitle,
-                      style: theme.textTheme.headlineMedium?.copyWith(
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    Text(
-                      strings.smsBody,
-                      style: theme.textTheme.bodyLarge?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant,
-                        height: 1.5,
-                      ),
-                    ),
-                    const SizedBox(height: 24),
-                    _PrivacyPoint(
-                      icon: Icons.account_balance_outlined,
-                      title: strings.smsPoint1Title,
-                      body: strings.smsPoint1Body,
-                    ),
-                    _PrivacyPoint(
-                      icon: Icons.phonelink_lock_outlined,
-                      title: strings.smsPoint2Title,
-                      body: strings.smsPoint2Body,
-                    ),
-                    _PrivacyPoint(
-                      icon: Icons.fact_check_outlined,
-                      title: strings.smsPoint3Title,
-                      body: strings.smsPoint3Body,
-                    ),
-                    const Spacer(flex: 2),
-                    SizedBox(
-                      width: double.infinity,
-                      height: 54,
-                      child: FilledButton(
-                        onPressed: _importing ? null : _connectAndImport,
-                        style: FilledButton.styleFrom(
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(16),
-                          ),
-                        ),
-                        child: _importing
-                            ? const SizedBox(
-                                width: 22,
-                                height: 22,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2.4,
-                                  color: Colors.white,
-                                ),
-                              )
-                            : Text(
-                                strings.smsAllow,
-                                style: const TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-                    SizedBox(
-                      width: double.infinity,
-                      height: 50,
-                      child: OutlinedButton.icon(
-                        style: OutlinedButton.styleFrom(
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(16),
-                          ),
-                        ),
-                        onPressed: _importing ? null : _loadDemoData,
-                        icon: const Icon(Icons.auto_awesome_motion_rounded,
-                            size: 18),
-                        label: Text(
-                          strings.smsDemo,
-                          style: const TextStyle(fontWeight: FontWeight.w700),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Center(
-                      child: TextButton(
-                        onPressed: _importing
-                            ? null
-                            : () => ref
-                                .read(smsSetupDoneProvider.notifier)
-                                .markDone(),
-                        child: Text(strings.smsLater),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _PrivacyPoint extends StatelessWidget {
-  const _PrivacyPoint({
-    required this.icon,
-    required this.title,
-    required this.body,
-  });
-
-  final IconData icon;
-  final String title;
-  final String body;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 16),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
+    return OnboardingPage(
+      picture: _InboxSketch(skippedLabel: strings.smsSkipped),
+      title: strings.smsTitle,
+      body: strings.smsBody,
+      actions: Column(
         children: [
-          Icon(icon, size: 22, color: theme.colorScheme.primary),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: theme.textTheme.titleSmall?.copyWith(
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  body,
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
-                    height: 1.4,
-                  ),
-                ),
-              ],
-            ),
+          OnboardingButton(
+            label: strings.smsAllow,
+            busy: _importing,
+            onPressed: _connectAndImport,
+          ),
+          const SizedBox(height: 8),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              OnboardingTextButton(
+                label: strings.smsDemo,
+                onPressed: _importing ? null : _loadDemoData,
+              ),
+              const SizedBox(width: 12),
+              OnboardingTextButton(
+                label: strings.smsLater,
+                onPressed: _importing
+                    ? null
+                    : () => ref.read(smsSetupDoneProvider.notifier).markDone(),
+              ),
+            ],
           ),
         ],
       ),
     );
   }
 }
+
+enum _Sender { bank, person, code }
+
+/// An inbox drawn without words: bank and wallet texts get the gold check,
+/// a friend's message and a login code are passed over.
+class _InboxSketch extends StatefulWidget {
+  const _InboxSketch({required this.skippedLabel});
+
+  final String skippedLabel;
+
+  @override
+  State<_InboxSketch> createState() => _InboxSketchState();
+}
+
+class _InboxSketchState extends State<_InboxSketch>
+    with SingleTickerProviderStateMixin, OnboardingEntrance {
+  static const _rows = [
+    (_Sender.bank, 'cbe', 0.78, 0.46),
+    (_Sender.person, null, 0.52, 0.0),
+    (_Sender.bank, 'telebirr', 0.66, 0.4),
+    (_Sender.code, null, 0.6, 0.0),
+  ];
+
+  @override
+  Duration get entranceDuration => const Duration(milliseconds: 1300);
+
+  late final _arrive = [
+    for (var i = 0; i < _rows.length; i++) phase(i * 0.12, 0.4 + i * 0.12),
+  ];
+  late final _verdict = [
+    for (var i = 0; i < _rows.length; i++)
+      phase(0.42 + i * 0.12, 0.62 + i * 0.12, curve: Curves.easeOutBack),
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 340,
+      child: AnimatedBuilder(
+        animation: entrance,
+        builder: (context, _) => Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            for (var i = 0; i < _rows.length; i++)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 5),
+                child: Opacity(
+                  opacity: _arrive[i].value.clamp(0.0, 1.0),
+                  child: Transform.translate(
+                    offset: Offset(0, 16 * (1 - _arrive[i].value)),
+                    child: _row(i),
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _row(int i) {
+    final (sender, code, line1, line2) = _rows[i];
+    final isBank = sender == _Sender.bank;
+    final ink =
+        isBank ? const Color(0xFFDDE0F3) : Colors.white.withValues(alpha: 0.16);
+    final verdict = _verdict[i].value;
+
+    final Widget avatar = isBank
+        ? InstitutionAvatar.forCode(code, size: 36)
+        : Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(36 * 0.3),
+            ),
+            child: Icon(
+              sender == _Sender.person
+                  ? Icons.person_rounded
+                  : Icons.password_rounded,
+              size: 20,
+              color: Colors.white.withValues(alpha: 0.45),
+            ),
+          );
+
+    return Container(
+      height: 62,
+      padding: const EdgeInsets.symmetric(horizontal: 13),
+      decoration: BoxDecoration(
+        color: isBank ? Colors.white : Colors.white.withValues(alpha: 0.06),
+        borderRadius: BorderRadius.circular(18),
+      ),
+      child: Row(
+        children: [
+          avatar,
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _bar(line1, ink),
+                if (line2 > 0) ...[
+                  const SizedBox(height: 7),
+                  _bar(line2, ink),
+                ],
+              ],
+            ),
+          ),
+          const SizedBox(width: 12),
+          if (isBank)
+            Transform.scale(
+              scale: verdict.clamp(0.0, 1.2),
+              child: Container(
+                width: 26,
+                height: 26,
+                decoration: const BoxDecoration(
+                  color: kBrandGold,
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.check_rounded,
+                  size: 18,
+                  color: kBrandIndigoDeep,
+                ),
+              ),
+            )
+          else
+            Opacity(
+              opacity: verdict.clamp(0.0, 1.0),
+              child: Text(
+                widget.skippedLabel,
+                style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                      color: Colors.white.withValues(alpha: 0.5),
+                    ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _bar(double widthFactor, Color color) => FractionallySizedBox(
+        widthFactor: widthFactor,
+        child: Container(
+          height: 8,
+          decoration: BoxDecoration(
+            color: color,
+            borderRadius: BorderRadius.circular(4),
+          ),
+        ),
+      );
+}
+

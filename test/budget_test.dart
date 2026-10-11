@@ -455,7 +455,7 @@ void main() {
       expect(warnings.single.transactionId, 'new');
       expect(warnings.single.isOver, isFalse);
       expect(warnings.single.message,
-          'Food budget is 85% used · 17 days left');
+          'Food budget is 85% used, 17 days left');
     });
 
     test('already past 80% stays quiet until the limit', () async {

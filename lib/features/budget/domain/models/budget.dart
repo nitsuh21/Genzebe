@@ -85,8 +85,9 @@ class Budget {
   /// Whether this budget's scope includes everything [other] watches, so
   /// [other]'s spending is already part of this one.
   bool contains(Budget other) {
-    final categoriesCovered =
-        isGeneral || (!other.isGeneral && categoryIds.toSet().containsAll(other.categoryIds));
+    final categoriesCovered = isGeneral ||
+        (!other.isGeneral &&
+            categoryIds.toSet().containsAll(other.categoryIds));
     final institutionsCovered = isAllInstitutions ||
         (!other.isAllInstitutions &&
             institutionCodes.toSet().containsAll(other.institutionCodes));
@@ -397,12 +398,11 @@ class BudgetWarning {
   String get message {
     final raw = progress.budget.name.trim();
     // Older default names already end in "budget" ("Food budget").
-    final name =
-        raw.toLowerCase().endsWith('budget') ? raw : '$raw budget';
+    final name = raw.toLowerCase().endsWith('budget') ? raw : '$raw budget';
     if (isOver) return '$name is now over its limit';
     final percent = (progress.ratio * 100).floor();
     final days = progress.daysLeft;
     final dayText = days == 1 ? '1 day left' : '$days days left';
-    return '$name is $percent% used · $dayText';
+    return '$name is $percent% used, $dayText';
   }
 }

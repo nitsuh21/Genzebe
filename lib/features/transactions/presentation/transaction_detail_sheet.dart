@@ -106,7 +106,7 @@ class _DetailSheet extends ConsumerWidget {
               Padding(
                 padding: const EdgeInsets.only(top: 4),
                 child: Text(
-                  'Waiting for your review — not counted in totals yet.',
+                  'Waiting for your review. Not counted in totals yet.',
                   style: theme.textTheme.bodySmall?.copyWith(
                     color: const Color(0xFFE8833A),
                     fontWeight: FontWeight.w600,
@@ -247,7 +247,7 @@ class _OwnTransferPanel extends ConsumerWidget {
       return _Panel(
         color: kOwnTransferColor,
         icon: Icons.swap_horiz_rounded,
-        title: 'Own transfer — not counted as income or spending',
+        title: 'Own transfer, not counted as income or spending',
         body: _reasonText(ref, flows),
         actions: [
           TextButton(
@@ -278,7 +278,7 @@ class _OwnTransferPanel extends ConsumerWidget {
         actions: [
           TextButton(
             onPressed: () => _answer(context, ref, OwnTransferOverride.notOwn,
-                'Got it — it stays counted.'),
+                'Got it. It stays counted.'),
             child: const Text('No'),
           ),
           FilledButton.tonal(
@@ -358,7 +358,7 @@ class _OwnTransferPanel extends ConsumerWidget {
             ? 'Same recipient as a transfer you marked as your own.'
             : 'Same sender as a transfer you marked as your own.';
       case OwnTransferReason.savings:
-        return 'Categorized as savings — money you keep.';
+        return 'Categorized as savings: money you keep.';
       case null:
         return '';
     }

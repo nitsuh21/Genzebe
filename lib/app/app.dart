@@ -44,7 +44,11 @@ class GenzebApp extends ConsumerWidget {
         value: systemOverlayStyleFor(Theme.of(context).brightness),
         child: child ?? const SizedBox.shrink(),
       ),
-      home: home,
+      // First-run steps fade into each other instead of cutting.
+      home: AnimatedSwitcher(
+        duration: const Duration(milliseconds: 350),
+        child: KeyedSubtree(key: ValueKey(home.runtimeType), child: home),
+      ),
     );
   }
 }

@@ -79,29 +79,32 @@ String budgetStatusText({
   final forDays = daysLeft == null ? null : 'for ${daysLabel(daysLeft)}';
   switch (pace) {
     case BudgetPace.upcoming:
-      return start == null ? 'Not started yet' : 'Starts ${budgetDateLabel(start)}';
+      return start == null
+          ? 'Not started yet'
+          : 'Starts ${budgetDateLabel(start)}';
     case BudgetPace.over:
       final over = 'Over by ${money(-remainingMinor)}';
-      return isCurrent && toGo != null ? '$over · $toGo' : over;
+      return isCurrent && toGo != null ? '$over, $toGo' : over;
     case BudgetPace.finished:
-      return 'Stayed within budget · ${money(remainingMinor)} to spare';
+      return 'Stayed within budget, ${money(remainingMinor)} to spare';
     case BudgetPace.ahead:
       final left = '${money(remainingMinor)} left';
       return forDays == null
-          ? '$left · spending faster than planned'
-          : '$left $forDays · spending faster than planned';
+          ? '$left, spending faster than planned'
+          : '$left $forDays, spending faster than planned';
     case BudgetPace.onTrack:
     case null:
       final left = '${money(remainingMinor)} left';
       if (perDayMinor != null && daysLeft != null) {
-        return '$left · about ${money(perDayMinor)} a day for '
+        return '$left, about ${money(perDayMinor)} a day for '
             '${daysLabel(daysLeft)}';
       }
       return left;
   }
 }
 
-String budgetProgressStatus(BudgetProgress progress, {required bool showAmounts}) {
+String budgetProgressStatus(BudgetProgress progress,
+    {required bool showAmounts}) {
   return budgetStatusText(
     pace: progress.pace,
     remainingMinor: progress.remainingMinor,
@@ -162,8 +165,8 @@ class BudgetProgressBar extends StatelessWidget {
                     child: Container(
                       width: 2,
                       decoration: BoxDecoration(
-                        color: theme.colorScheme.onSurface
-                            .withValues(alpha: 0.55),
+                        color:
+                            theme.colorScheme.onSurface.withValues(alpha: 0.55),
                         borderRadius: BorderRadius.circular(1),
                       ),
                     ),

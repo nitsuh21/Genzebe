@@ -268,19 +268,8 @@ class _OverallCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            accent.withValues(alpha: 0.22),
-            theme.colorScheme.surfaceContainerHighest,
-            theme.colorScheme.surfaceContainer,
-          ],
-        ),
-        border: Border.all(
-          color: accent.withValues(alpha: 0.28),
-        ),
-        borderRadius: BorderRadius.circular(22),
+        color: theme.cardTheme.color,
+        borderRadius: BorderRadius.circular(20),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -328,8 +317,9 @@ class _OverallCard extends StatelessWidget {
             ratio: plan.ratio,
             color: barColor,
             height: 10,
-            todayFraction:
-                isCurrent && period != null ? period.elapsedFraction(plan.now) : null,
+            todayFraction: isCurrent && period != null
+                ? period.elapsedFraction(plan.now)
+                : null,
           ),
           const SizedBox(height: 8),
           Text(
@@ -442,7 +432,8 @@ class _BudgetCard extends StatelessWidget {
                         if (value == 'delete') onDelete();
                       },
                       itemBuilder: (_) => const [
-                        PopupMenuItem(value: 'edit', child: Text('Edit budget')),
+                        PopupMenuItem(
+                            value: 'edit', child: Text('Edit budget')),
                         PopupMenuItem(value: 'delete', child: Text('Delete')),
                       ],
                     ),
@@ -457,8 +448,9 @@ class _BudgetCard extends StatelessWidget {
                       BudgetProgressBar(
                         ratio: progress.ratio,
                         color: barColor,
-                        todayFraction:
-                            progress.isCurrent ? progress.elapsedFraction : null,
+                        todayFraction: progress.isCurrent
+                            ? progress.elapsedFraction
+                            : null,
                       ),
                       const SizedBox(height: 6),
                       Row(
@@ -484,7 +476,8 @@ class _BudgetCard extends StatelessWidget {
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        budgetProgressStatus(progress, showAmounts: showAmounts),
+                        budgetProgressStatus(progress,
+                            showAmounts: showAmounts),
                         style: theme.textTheme.bodySmall?.copyWith(
                           color: warn
                               ? barColor
@@ -553,7 +546,7 @@ class _UnbudgetedCard extends ConsumerWidget {
               Expanded(
                 child: Text(
                   'You spent $amount $when outside your budgets'
-                  '${top.isEmpty ? '' : ' — mostly ${top.join(' and ')}'}.',
+                  '${top.isEmpty ? '' : ', mostly ${top.join(' and ')}'}.',
                   style: theme.textTheme.bodySmall,
                 ),
               ),
@@ -635,9 +628,8 @@ class _SuggestionRowState extends ConsumerState<_SuggestionRow> {
     final usual = widget.showAmounts
         ? formatMinorEtb(suggestion.monthlyAverageMinor)
         : 'ETB ••••';
-    final limit = widget.showAmounts
-        ? formatMinorEtb(suggestion.limitMinor)
-        : 'ETB ••••';
+    final limit =
+        widget.showAmounts ? formatMinorEtb(suggestion.limitMinor) : 'ETB ••••';
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 6),
       child: Row(
@@ -791,7 +783,7 @@ class _EmptyBudgets extends ConsumerWidget {
             ),
             const SizedBox(height: 4),
             Text(
-              'Based on your last few months. Add one with a tap — you can '
+              'Based on your last few months. Add one with a tap; you can '
               'change the limit any time.',
               style: theme.textTheme.bodyMedium?.copyWith(
                 color: theme.colorScheme.onSurfaceVariant,
@@ -1099,8 +1091,7 @@ class _BudgetDetailPageState extends ConsumerState<BudgetDetailPage> {
                     ],
                   ),
                 ),
-                onDismissed: (_) =>
-                    _leaveOut(record, progress.budget.name),
+                onDismissed: (_) => _leaveOut(record, progress.budget.name),
                 child: TransactionTile(
                   record: record,
                   showDate: true,
@@ -1199,12 +1190,12 @@ class _DetailHeader extends StatelessWidget {
                 const SizedBox(width: 6),
                 Flexible(
                   child: Text(
-                  '· repeats monthly',
-                  overflow: TextOverflow.ellipsis,
-                  style: theme.textTheme.labelMedium?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
+                    '· repeats monthly',
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.labelMedium?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
                   ),
-                ),
                 ),
               ],
             ],
@@ -1412,19 +1403,21 @@ class _BudgetEditorSheetState extends ConsumerState<_BudgetEditorSheet> {
   String? get _amountError =>
       _submitted && _amountMinor == null ? 'Enter an amount above zero' : null;
 
-  String? get _categoryError => _submitted && !_isGeneral && _selectedCategories.isEmpty
-      ? 'Pick at least one category'
-      : null;
+  String? get _categoryError =>
+      _submitted && !_isGeneral && _selectedCategories.isEmpty
+          ? 'Pick at least one category'
+          : null;
 
   String? get _institutionError =>
       _submitted && !_allInstitutions && _selectedInstitutionCodes.isEmpty
           ? 'Pick at least one bank or wallet'
           : null;
 
-  String? get _datesError =>
-      _submitted && _periodKind == BudgetPeriodKind.custom && _customRange == null
-          ? 'Pick the first and last day'
-          : null;
+  String? get _datesError => _submitted &&
+          _periodKind == BudgetPeriodKind.custom &&
+          _customRange == null
+      ? 'Pick the first and last day'
+      : null;
 
   Future<void> _loadTypical() async {
     final request = ++_typicalRequest;
@@ -1631,19 +1624,19 @@ class _BudgetEditorSheetState extends ConsumerState<_BudgetEditorSheet> {
                     // would always read zero.
                     for (final id in kExpenseCategoryIds)
                       if (id != 'savings' || _selectedCategories.contains(id))
-                      FilterChip(
-                        label: Text(categoryInfoFor(id).label),
-                        avatar: Icon(categoryInfoFor(id).icon, size: 18),
-                        selected: _selectedCategories.contains(id),
-                        onSelected: (_) {
-                          setState(() {
-                            if (!_selectedCategories.remove(id)) {
-                              _selectedCategories.add(id);
-                            }
-                          });
-                          _loadTypical();
-                        },
-                      ),
+                        FilterChip(
+                          label: Text(categoryInfoFor(id).label),
+                          avatar: Icon(categoryInfoFor(id).icon, size: 18),
+                          selected: _selectedCategories.contains(id),
+                          onSelected: (_) {
+                            setState(() {
+                              if (!_selectedCategories.remove(id)) {
+                                _selectedCategories.add(id);
+                              }
+                            });
+                            _loadTypical();
+                          },
+                        ),
                   ],
                 ),
                 _errorText(theme, _categoryError),

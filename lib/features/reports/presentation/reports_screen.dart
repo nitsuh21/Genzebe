@@ -493,16 +493,18 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
               if (report.biggestSpends.isNotEmpty) ...[
                 const SizedBox(height: 20),
                 SectionHeader(title: strings.biggestTransactions),
-                for (final tx in report.biggestSpends)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 10),
-                    child: TransactionTile(
-                      showDate: true,
-                      record: tx,
-                      dense: true,
-                      onTap: () => showTransactionDetail(context, ref, tx),
-                    ),
-                  ),
+                TransactionGroup(
+                  children: [
+                    for (final tx in report.biggestSpends)
+                      TransactionTile(
+                        showDate: true,
+                        record: tx,
+                        dense: true,
+                        grouped: true,
+                        onTap: () => showTransactionDetail(context, ref, tx),
+                      ),
+                  ],
+                ),
               ],
               if (totals.incomeByCategoryMinor.isNotEmpty) ...[
                 const SizedBox(height: 20),
@@ -652,14 +654,14 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
     _showTransactionsSheet(
       context,
       title: ref.read(stringsProvider).ownTransfers,
-      subtitle: 'Money moving between your own accounts — excluded from '
-          'income and spending (only what a move cost counts, as a bank '
-          'fee). Tap one to see why, or to correct it.',
+      subtitle: 'Money moving between your own accounts. It is left out of '
+          'income and spending; only what a move cost counts, as a bank '
+          'fee. Tap one to see why, or to correct it.',
       rows: report.scopedTransactions
           .where((tx) => report.internalIds.contains(tx.id))
           .toList(growable: false),
       totalMinor: report.totals.internalMovedMinor,
-      checkTitle: 'Possibly yours — tap to answer',
+      checkTitle: 'Possibly yours? Tap to answer',
       checkRows: report.scopedTransactions
           .where((tx) => report.suggestedIds.contains(tx.id))
           .toList(growable: false),
@@ -1582,13 +1584,8 @@ class _AutomationCard extends StatelessWidget {
           ),
           const Divider(height: 20),
           _MetricRow(
-            label: 'Pending review',
+            label: 'Waiting for your review',
             value: insights.pendingReviewCount.toString(),
-          ),
-          const Divider(height: 20),
-          _MetricRow(
-            label: 'Parser health',
-            value: '${insights.parserHealthScore}%',
           ),
         ],
       ),

@@ -39,6 +39,8 @@ flutter:
     - env.json
     # Bank and wallet logos (see assets/logos/SOURCES.md).
     - assets/logos/
+    # Small coin mark from the app icon, for in-app branding.
+    - assets/brand/
 
 flutter_launcher_icons:
   android: true

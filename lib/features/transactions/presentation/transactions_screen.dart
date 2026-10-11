@@ -228,7 +228,9 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
                 child: Row(
                   children: [
                     Text(
-                      '${records.length} transaction(s)',
+                      records.length == 1
+                          ? '1 transaction'
+                          : '${records.length} transactions',
                       style: theme.textTheme.labelMedium?.copyWith(
                         color: theme.colorScheme.onSurfaceVariant,
                       ),
@@ -603,17 +605,18 @@ class _GroupedList extends ConsumerWidget {
           ),
         ),
       );
-      for (final item in items) {
-        children.add(
-          Padding(
-            padding: const EdgeInsets.only(bottom: 10),
-            child: TransactionTile(
-              record: item,
-              onTap: () => showTransactionDetail(context, ref, item),
-            ),
-          ),
-        );
-      }
+      children.add(
+        TransactionGroup(
+          children: [
+            for (final item in items)
+              TransactionTile(
+                record: item,
+                grouped: true,
+                onTap: () => showTransactionDetail(context, ref, item),
+              ),
+          ],
+        ),
+      );
     });
 
     return ListView(

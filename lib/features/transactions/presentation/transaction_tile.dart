@@ -43,6 +43,7 @@ class TransactionTile extends ConsumerWidget {
     this.onTap,
     this.dense = false,
     this.showDate = false,
+    this.grouped = false,
   });
 
   final TransactionRecord record;
@@ -52,6 +53,9 @@ class TransactionTile extends ConsumerWidget {
   /// Lists grouped by day already show the date in the header; standalone
   /// lists (Home, report drill-downs) turn this on.
   final bool showDate;
+
+  /// Inside a [TransactionGroup]: square edges, the group draws the shape.
+  final bool grouped;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -87,7 +91,7 @@ class TransactionTile extends ConsumerWidget {
       ),
       decoration: BoxDecoration(
         color: theme.cardTheme.color,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: grouped ? null : BorderRadius.circular(16),
       ),
       child: Row(
         children: [
@@ -133,6 +137,7 @@ class TransactionTile extends ConsumerWidget {
                 style: theme.textTheme.titleSmall?.copyWith(
                   fontWeight: FontWeight.w700,
                   color: amountColor,
+                  fontFeatures: const [FontFeature.tabularFigures()],
                 ),
               ),
               if (record.reviewStatus == TransactionReviewStatus.pendingReview)
@@ -154,7 +159,7 @@ class TransactionTile extends ConsumerWidget {
       color: Colors.transparent,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: grouped ? null : BorderRadius.circular(16),
         child: tile,
       ),
     );
@@ -176,5 +181,40 @@ class TransactionTile extends ConsumerWidget {
       case TransactionSource.sync:
         return 'Synced';
     }
+  }
+}
+
+/// Rows of one list on a single surface, split by hairlines: one card for
+/// the list instead of one card per row.
+class TransactionGroup extends StatelessWidget {
+  const TransactionGroup({super.key, required this.children});
+
+  /// [TransactionTile]s built with `grouped: true`.
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(16),
+      child: ColoredBox(
+        color: theme.cardTheme.color ?? theme.colorScheme.surface,
+        child: Column(
+          children: [
+            for (var i = 0; i < children.length; i++) ...[
+              if (i > 0)
+                Divider(
+                  height: 1,
+                  // Lines up with the text, past the category icon.
+                  indent: 70,
+                  color:
+                      theme.colorScheme.outlineVariant.withValues(alpha: 0.4),
+                ),
+              children[i],
+            ],
+          ],
+        ),
+      ),
+    );
   }
 }

@@ -14,17 +14,33 @@ SystemUiOverlayStyle systemOverlayStyleFor(Brightness pageBrightness) {
   );
 }
 
+/// The brand indigo from the app icon.
+const kBrandIndigo = Color(0xFF4E5AE8);
+
+/// The icon's deeper edge tone: full-bleed brand surfaces (onboarding, the
+/// balance panel), where white type and the gold coin need the contrast.
+const kBrandIndigoDeep = Color(0xFF2F37B0);
+
+/// The coin's gold, for small accents on [kBrandIndigoDeep].
+const kBrandGold = Color(0xFFE9B949);
+
 ThemeData buildLightTheme() => _buildTheme(Brightness.light);
 
 ThemeData buildDarkTheme() => _buildTheme(Brightness.dark);
 
 ThemeData _buildTheme(Brightness brightness) {
-  const seed = Color(0xFF4E5AE8);
+  const seed = kBrandIndigo;
   final isDark = brightness == Brightness.dark;
-  final colorScheme = ColorScheme.fromSeed(
+  final seeded = ColorScheme.fromSeed(
     seedColor: seed,
     brightness: brightness,
   );
+  // The seeded light primary is a muted grey-violet that reads as stock
+  // Material; buttons and links use the icon's indigo instead. Dark mode
+  // keeps the seeded pale primary, which holds contrast on navy.
+  final colorScheme = isDark
+      ? seeded
+      : seeded.copyWith(primary: kBrandIndigo, onPrimary: Colors.white);
 
   return ThemeData(
     useMaterial3: true,

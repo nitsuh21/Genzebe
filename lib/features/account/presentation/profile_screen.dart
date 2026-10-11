@@ -70,14 +70,12 @@ class ProfileScreen extends ConsumerWidget {
           children: [
             _SettingsTile(
               icon: Icons.palette_outlined,
-              iconColor: const Color(0xFF6C6CE5),
               title: strings.theme,
               trailingValue: themeValue,
               onTap: () => _showThemeSheet(context, ref, strings),
             ),
             _SettingsTile(
               icon: Icons.translate_rounded,
-              iconColor: const Color(0xFF3B8DD6),
               title: strings.language,
               trailingValue: languageValue,
               onTap: () => _showLanguageSheet(context, ref, strings),
@@ -93,7 +91,6 @@ class ProfileScreen extends ConsumerWidget {
               // never the assistant itself.
               _SettingsTile(
                 icon: Icons.auto_awesome_rounded,
-                iconColor: const Color(0xFF8E63D8),
                 title: 'AI assistant',
                 subtitle: aiEntitled
                     ? 'Ask about spending, budgets and plans'
@@ -114,7 +111,6 @@ class ProfileScreen extends ConsumerWidget {
           children: [
             _SettingsTile(
               icon: Icons.sms_outlined,
-              iconColor: const Color(0xFF2E9E6B),
               title: 'SMS sync & review',
               subtitle: 'Banks found, refresh and the review queue',
               trailingWidget: (pendingReview ?? 0) > 0
@@ -132,14 +128,12 @@ class ProfileScreen extends ConsumerWidget {
           children: [
             const _SettingsTile(
               icon: Icons.phonelink_lock_outlined,
-              iconColor: Color(0xFF4AA3B5),
               title: 'Private by design',
               subtitle: 'Your SMS and ledger never leave this device. No '
                   'account needed.',
             ),
             _SettingsTile(
               icon: Icons.policy_outlined,
-              iconColor: const Color(0xFF6B7280),
               title: 'Privacy policy',
               subtitle: 'What Genzeb reads, stores and never shares',
               onTap: () => Navigator.of(context).push(
@@ -151,8 +145,7 @@ class ProfileScreen extends ConsumerWidget {
             // only pollute a real ledger.
             if (!kReleaseMode)
               _SettingsTile(
-                icon: Icons.auto_awesome_motion_rounded,
-                iconColor: const Color(0xFFD8589E),
+                icon: Icons.dataset_outlined,
                 title: 'Load demo data',
                 subtitle: 'Fill the app with a realistic sample ledger',
                 onTap: () async {
@@ -178,7 +171,7 @@ class ProfileScreen extends ConsumerWidget {
           child: Column(
             children: [
               Text(
-                'Genzeb · v1.0.0',
+                'Genzeb 1.0.0',
                 style: theme.textTheme.bodySmall?.copyWith(
                   color: theme.colorScheme.onSurfaceVariant,
                 ),
@@ -211,149 +204,132 @@ class _ProfileHero extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
     final profile = account.profile;
     final signedIn = account.status == AuthStatus.signedIn && profile != null;
 
+    // Without an account there is no person to show, so the app introduces
+    // itself: the coin, the name, and the one promise that matters here.
     return Container(
-      padding: const EdgeInsets.fromLTRB(20, 26, 20, 24),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [Color(0xFF3D49D6), Color(0xFF6C3DD6)],
-        ),
-        borderRadius: BorderRadius.circular(26),
-        boxShadow: [
-          BoxShadow(
-            color: const Color(0xFF4E5AE8).withValues(alpha: 0.28),
-            blurRadius: 24,
-            offset: const Offset(0, 12),
-          ),
-        ],
+        color: theme.cardTheme.color,
+        borderRadius: BorderRadius.circular(20),
       ),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _RingedAvatar(profile: profile),
-          const SizedBox(height: 14),
-          Text(
-            signedIn ? (profile.displayName ?? profile.email) : 'Genzeb',
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            textAlign: TextAlign.center,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 21,
-              fontWeight: FontWeight.w800,
-              letterSpacing: -0.3,
-            ),
-          ),
-          const SizedBox(height: 3),
-          Text(
-            signedIn
-                ? profile.email
-                : AppConfig.accountsEnabled
-                    ? 'No account needed · sign in for Plus features'
-                    : 'Private by design · everything stays on this phone',
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              color: Colors.white.withValues(alpha: 0.82),
-              fontSize: 13.5,
-            ),
-          ),
-          const SizedBox(height: 14),
-          if (signedIn)
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
-              decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.18),
-                borderRadius: BorderRadius.circular(999),
-                border: Border.all(
-                  color: Colors.white.withValues(alpha: 0.25),
+          Row(
+            children: [
+              if (signedIn)
+                _Avatar(profile: profile)
+              else
+                ClipOval(
+                  child: Image.asset(
+                    'assets/brand/coin.png',
+                    width: 52,
+                    height: 52,
+                    filterQuality: FilterQuality.medium,
+                  ),
+                ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      signedIn
+                          ? (profile.displayName ?? profile.email)
+                          : 'Genzeb',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: -0.3,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      signedIn
+                          ? profile.email
+                          : AppConfig.accountsEnabled
+                              ? 'No account needed. Sign in for Plus features.'
+                              : 'Everything stays on this phone.',
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
                 ),
               ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Icon(Icons.workspace_premium_rounded,
-                      color: Colors.white, size: 14),
-                  const SizedBox(width: 6),
-                  Text(
+              if (signedIn)
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.primaryContainer,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
                     account.backendConfigured
                         ? account.plan.name
-                        : '${account.plan.name} · demo',
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 12.5,
-                      fontWeight: FontWeight.w700,
+                        : '${account.plan.name} (demo)',
+                    style: theme.textTheme.labelMedium?.copyWith(
+                      color: theme.colorScheme.onPrimaryContainer,
+                      fontWeight: FontWeight.w600,
                     ),
                   ),
-                ],
+                ),
+            ],
+          ),
+          if (!signedIn && AppConfig.accountsEnabled) ...[
+            const SizedBox(height: 14),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton(
+                onPressed: account.busy
+                    ? null
+                    : () => ref
+                        .read(accountControllerProvider.notifier)
+                        .signInWithGoogle(),
+                child: account.busy
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2.2),
+                      )
+                    : Text(strings.authGoogle),
               ),
-            )
-          else if (AppConfig.accountsEnabled)
-            FilledButton(
-              style: FilledButton.styleFrom(
-                backgroundColor: Colors.white,
-                foregroundColor: const Color(0xFF1B2050),
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 22, vertical: 10),
-              ),
-              onPressed: account.busy
-                  ? null
-                  : () => ref
-                      .read(accountControllerProvider.notifier)
-                      .signInWithGoogle(),
-              child: account.busy
-                  ? const SizedBox(
-                      width: 18,
-                      height: 18,
-                      child: CircularProgressIndicator(strokeWidth: 2.2),
-                    )
-                  : Text(
-                      strings.authGoogle,
-                      style: const TextStyle(fontWeight: FontWeight.w700),
-                    ),
             ),
+          ],
         ],
       ),
     );
   }
 }
 
-class _RingedAvatar extends StatelessWidget {
-  const _RingedAvatar({required this.profile});
+class _Avatar extends StatelessWidget {
+  const _Avatar({required this.profile});
 
-  final UserProfile? profile;
+  final UserProfile profile;
 
   @override
   Widget build(BuildContext context) {
-    final photo = profile?.photoUrl;
-    return Container(
-      padding: const EdgeInsets.all(3),
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        border: Border.all(
-          color: Colors.white.withValues(alpha: 0.55),
-          width: 2,
+    final theme = Theme.of(context);
+    final photo = profile.photoUrl;
+    return CircleAvatar(
+      radius: 26,
+      backgroundColor: theme.colorScheme.primaryContainer,
+      foregroundImage: photo == null ? null : NetworkImage(photo),
+      child: Text(
+        profile.initials,
+        style: TextStyle(
+          color: theme.colorScheme.onPrimaryContainer,
+          fontWeight: FontWeight.w700,
+          fontSize: 18,
         ),
-      ),
-      child: CircleAvatar(
-        radius: 34,
-        backgroundColor: Colors.white,
-        foregroundImage: photo == null ? null : NetworkImage(photo),
-        child: profile == null
-            ? const Icon(Icons.person_rounded,
-                color: Color(0xFF4E5AE8), size: 34)
-            : Text(
-                profile!.initials,
-                style: const TextStyle(
-                  color: Color(0xFF4E5AE8),
-                  fontWeight: FontWeight.w800,
-                  fontSize: 22,
-                ),
-              ),
       ),
     );
   }
@@ -370,85 +346,66 @@ class _StatsStrip extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
     final transactions = ref.watch(allTransactionsProvider).valueOrNull?.length;
     final accounts = ref.watch(accountsProvider).valueOrNull?.length;
     final budgets = ref.watch(budgetOverviewProvider).valueOrNull?.items.length;
+    final rule = Container(
+      width: 1,
+      height: 32,
+      color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5),
+    );
 
-    return Row(
-      children: [
-        Expanded(
-          child: _StatTile(
-            value: transactions,
-            label: strings.transactions,
-            icon: Icons.receipt_long_rounded,
-            color: const Color(0xFF4E5AE8),
+    // Label over number reads "Budgets: 1", never "1 Budgets".
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 14),
+      decoration: BoxDecoration(
+        color: theme.cardTheme.color,
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: _StatTile(value: transactions, label: strings.transactions),
           ),
-        ),
-        const SizedBox(width: 10),
-        Expanded(
-          child: _StatTile(
-            value: accounts,
-            label: strings.accounts,
-            icon: Icons.account_balance_rounded,
-            color: const Color(0xFF2E9E6B),
-          ),
-        ),
-        const SizedBox(width: 10),
-        Expanded(
-          child: _StatTile(
-            value: budgets,
-            label: strings.budgets,
-            icon: Icons.savings_rounded,
-            color: const Color(0xFFD08A3E),
-          ),
-        ),
-      ],
+          rule,
+          Expanded(child: _StatTile(value: accounts, label: strings.accounts)),
+          rule,
+          Expanded(child: _StatTile(value: budgets, label: strings.budgets)),
+        ],
+      ),
     );
   }
 }
 
 class _StatTile extends StatelessWidget {
-  const _StatTile({
-    required this.value,
-    required this.label,
-    required this.icon,
-    required this.color,
-  });
+  const _StatTile({required this.value, required this.label});
 
   final int? value;
   final String label;
-  final IconData icon;
-  final Color color;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 8),
-      decoration: BoxDecoration(
-        color: theme.cardTheme.color,
-        borderRadius: BorderRadius.circular(18),
-      ),
-      child: Column(
-        children: [
-          Icon(icon, color: color, size: 19),
-          const SizedBox(height: 6),
-          Text(
-            value?.toString() ?? '—',
-            style: theme.textTheme.titleMedium?.copyWith(
-              fontWeight: FontWeight.w800,
-            ),
+    return Column(
+      children: [
+        Text(
+          label,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: theme.textTheme.labelMedium?.copyWith(
+            color: theme.colorScheme.onSurfaceVariant,
           ),
-          Text(
-            label,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: theme.textTheme.labelSmall?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
-            ),
+        ),
+        const SizedBox(height: 2),
+        Text(
+          value?.toString() ?? '-',
+          style: theme.textTheme.titleLarge?.copyWith(
+            fontWeight: FontWeight.w600,
+            fontFeatures: const [FontFeature.tabularFigures()],
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }
@@ -854,7 +811,7 @@ class _SettingsCard extends StatelessWidget {
       child: Column(
         children: [
           for (var i = 0; i < children.length; i++) ...[
-            if (i > 0) const Divider(height: 1, indent: 66),
+            if (i > 0) const Divider(height: 1, indent: 56),
             children[i],
           ],
         ],
@@ -866,7 +823,6 @@ class _SettingsCard extends StatelessWidget {
 class _SettingsTile extends StatelessWidget {
   const _SettingsTile({
     required this.icon,
-    required this.iconColor,
     required this.title,
     this.subtitle,
     this.trailingValue,
@@ -876,7 +832,6 @@ class _SettingsTile extends StatelessWidget {
   });
 
   final IconData icon;
-  final Color iconColor;
   final String title;
   final String? subtitle;
   final String? trailingValue;
@@ -890,19 +845,18 @@ class _SettingsTile extends StatelessWidget {
     return ListTile(
       onTap: onTap,
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
-      leading: Container(
-        width: 38,
-        height: 38,
-        decoration: BoxDecoration(
-          color: iconColor.withValues(alpha: 0.13),
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Icon(icon, color: iconColor, size: 20),
+      leading: Icon(
+        icon,
+        size: 22,
+        color: destructive
+            ? const Color(0xFFE25555)
+            : theme.colorScheme.onSurfaceVariant,
       ),
+      minLeadingWidth: 24,
       title: Text(
         title,
         style: theme.textTheme.titleSmall?.copyWith(
-          fontWeight: FontWeight.w700,
+          fontWeight: FontWeight.w600,
           color: destructive ? const Color(0xFFE25555) : null,
         ),
       ),
@@ -920,9 +874,8 @@ class _SettingsTile extends StatelessWidget {
           if (trailingValue != null)
             Text(
               trailingValue!,
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: theme.colorScheme.primary,
-                fontWeight: FontWeight.w700,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
               ),
             ),
           if (trailingWidget != null) trailingWidget!,
@@ -953,9 +906,6 @@ class _StatusDot extends StatelessWidget {
       decoration: BoxDecoration(
         color: color,
         shape: BoxShape.circle,
-        boxShadow: [
-          BoxShadow(color: color.withValues(alpha: 0.5), blurRadius: 6),
-        ],
       ),
     );
   }
@@ -1026,7 +976,6 @@ class _AccountActions extends ConsumerWidget {
       children: [
         _SettingsTile(
           icon: Icons.logout_rounded,
-          iconColor: const Color(0xFFE25555),
           title: strings.signOut,
           subtitle: 'Your on-device data stays on this phone',
           destructive: true,
@@ -1046,7 +995,6 @@ class _AccountActions extends ConsumerWidget {
         ),
         _SettingsTile(
           icon: Icons.person_remove_outlined,
-          iconColor: const Color(0xFFE25555),
           title: 'Delete account',
           subtitle: 'Removes your Genzeb account and plan',
           destructive: true,
@@ -1059,7 +1007,7 @@ class _AccountActions extends ConsumerWidget {
                     title: 'Delete your account?',
                     body: 'Your Genzeb account, profile and plan are '
                         'permanently deleted. Transactions on this phone '
-                        'are not affected — they never left it — and the '
+                        'are not affected, since they never left it, and the '
                         'app keeps working without an account.',
                     confirmLabel: 'Delete account',
                   );
@@ -1167,11 +1115,10 @@ class _SectionLabel extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.only(left: 4, bottom: 8),
       child: Text(
-        text.toUpperCase(),
-        style: theme.textTheme.labelSmall?.copyWith(
+        text,
+        style: theme.textTheme.titleSmall?.copyWith(
           color: theme.colorScheme.onSurfaceVariant,
-          fontWeight: FontWeight.w700,
-          letterSpacing: 0.8,
+          fontWeight: FontWeight.w600,
         ),
       ),
     );

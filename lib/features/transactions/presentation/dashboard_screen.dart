@@ -4,6 +4,7 @@ import 'package:genzeb/app/providers.dart';
 import 'package:genzeb/core/l10n/app_strings.dart';
 import 'package:genzeb/core/utils/formatters.dart';
 import 'package:genzeb/design_system/institution_avatar.dart';
+import 'package:genzeb/design_system/theme.dart';
 import 'package:genzeb/design_system/widgets.dart';
 import 'package:genzeb/features/account/presentation/profile_screen.dart';
 import 'package:genzeb/features/alerts/presentation/alert_widgets.dart';
@@ -44,8 +45,8 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
           permission != SmsPermissionState.granted
               ? 'Allow SMS access to sync your bank messages.'
               : pending > 0
-                  ? 'Up to date · $pending waiting for your review'
-                  : 'Up to date',
+                  ? 'Up to date. $pending waiting for your review.'
+                  : 'Up to date.',
         ),
       ),
     );
@@ -169,7 +170,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
               if (insights.incomeMinor == 0 && insights.expenseMinor == 0)
                 const _QuietMonthCard()
               else
-                _InsightsGrid(insights: insights),
+                _MonthNotes(insights: insights, showAmounts: showAmounts),
               const SizedBox(height: 20),
               SectionHeader(
                 title: strings.recentActivity,
@@ -181,18 +182,19 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
               if (recent.isEmpty)
                 _EmptyState(onAdd: () => showAddTransactionSheet(context, ref))
               else
-                ...recent.take(6).map(
-                      (record) => Padding(
-                        padding: const EdgeInsets.only(bottom: 10),
-                        child: TransactionTile(
-                          record: record,
-                          dense: true,
-                          showDate: true,
-                          onTap: () =>
-                              showTransactionDetail(context, ref, record),
-                        ),
+                TransactionGroup(
+                  children: [
+                    for (final record in recent.take(6))
+                      TransactionTile(
+                        record: record,
+                        dense: true,
+                        showDate: true,
+                        grouped: true,
+                        onTap: () =>
+                            showTransactionDetail(context, ref, record),
                       ),
-                    ),
+                  ],
+                ),
             ],
           );
         },
@@ -233,7 +235,8 @@ class _Header extends ConsumerWidget {
               Text(
                 hasName ? name : greeting,
                 style: theme.textTheme.headlineSmall?.copyWith(
-                  fontWeight: FontWeight.w800,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: -0.4,
                 ),
               ),
             ],
@@ -260,41 +263,25 @@ class _BalanceHero extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     final strings = ref.watch(stringsProvider);
+    final quiet = insights.incomeMinor == 0 && insights.expenseMinor == 0;
+    // Same deep indigo as onboarding: one flat brand surface, so the total
+    // is the only thing that stands out.
     return Container(
-      padding: const EdgeInsets.all(22),
+      padding: const EdgeInsets.fromLTRB(20, 6, 6, 20),
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(26),
-        // Fixed stops: colorScheme.secondary washes out to near-white in dark
-        // mode, killing the contrast of the white text on this card.
-        gradient: const LinearGradient(
-          colors: [
-            Color(0xFF4E5AE8),
-            Color(0xFF6E5AE0),
-            Color(0xFF9A66E0),
-          ],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: const Color(0xFF4E5AE8).withValues(alpha: 0.3),
-            blurRadius: 24,
-            offset: const Offset(0, 12),
-          ),
-        ],
+        color: kBrandIndigoDeep,
+        borderRadius: BorderRadius.circular(24),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              const Icon(Icons.account_balance_wallet_rounded,
-                  color: Colors.white, size: 20),
-              const SizedBox(width: 8),
               Text(
                 strings.totalBalance,
-                style:
-                    theme.textTheme.bodyMedium?.copyWith(color: Colors.white70),
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: Colors.white.withValues(alpha: 0.7),
+                ),
               ),
               const Spacer(),
               IconButton(
@@ -302,55 +289,66 @@ class _BalanceHero extends ConsumerWidget {
                 onPressed: onToggleAmounts,
                 icon: Icon(
                   showAmounts
-                      ? Icons.visibility_off_rounded
-                      : Icons.visibility_rounded,
-                  color: Colors.white,
+                      ? Icons.visibility_off_outlined
+                      : Icons.visibility_outlined,
+                  color: Colors.white.withValues(alpha: 0.7),
+                  size: 22,
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 14),
-          Text(
-            showAmounts
-                ? formatMinorEtb(insights.totalBalanceMinor)
-                : 'ETB ••••••',
-            style: theme.textTheme.headlineMedium?.copyWith(
-              color: Colors.white,
-              fontWeight: FontWeight.w800,
+          Text.rich(
+            TextSpan(
+              children: [
+                TextSpan(
+                  text: 'ETB ',
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    color: Colors.white.withValues(alpha: 0.6),
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                TextSpan(
+                  text: showAmounts
+                      ? formatMinorPlain(insights.totalBalanceMinor)
+                      : '••••••',
+                  style: theme.textTheme.displaySmall?.copyWith(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w600,
+                    letterSpacing: -1,
+                    fontFeatures: const [FontFeature.tabularFigures()],
+                  ),
+                ),
+              ],
             ),
+            maxLines: 1,
           ),
           const SizedBox(height: 18),
-          if (insights.incomeMinor == 0 && insights.expenseMinor == 0)
+          if (quiet)
             Text(
               'No activity yet this month',
-              style:
-                  theme.textTheme.bodyMedium?.copyWith(color: Colors.white70),
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: Colors.white.withValues(alpha: 0.7),
+              ),
             )
           else
             Row(
               children: [
                 Expanded(
                   child: _HeroStat(
-                    icon: Icons.south_west_rounded,
+                    color: const Color(0xFF5FD39A),
                     label: strings.income,
                     value: showAmounts
                         ? formatCompactEtb(insights.incomeMinor)
-                        : 'ETB ••••••',
+                        : 'ETB ••••',
                   ),
-                ),
-                Container(
-                  width: 1,
-                  height: 34,
-                  color: Colors.white24,
                 ),
                 Expanded(
                   child: _HeroStat(
-                    icon: Icons.north_east_rounded,
+                    color: const Color(0xFFFF8A78),
                     label: strings.expense,
                     value: showAmounts
                         ? formatCompactEtb(insights.expenseMinor)
-                        : 'ETB ••••••',
-                    alignEnd: true,
+                        : 'ETB ••••',
                   ),
                 ),
               ],
@@ -361,34 +359,38 @@ class _BalanceHero extends ConsumerWidget {
   }
 }
 
+/// This month's money in or out; the dot matches the cash-flow chart.
 class _HeroStat extends StatelessWidget {
   const _HeroStat({
-    required this.icon,
+    required this.color,
     required this.label,
     required this.value,
-    this.alignEnd = false,
   });
 
-  final IconData icon;
+  final Color color;
   final String label;
   final String value;
-  final bool alignEnd;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Column(
-      crossAxisAlignment:
-          alignEnd ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
-          mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, color: Colors.white70, size: 16),
-            const SizedBox(width: 6),
-            Text(label,
-                style:
-                    theme.textTheme.bodySmall?.copyWith(color: Colors.white70)),
+            Container(
+              width: 7,
+              height: 7,
+              decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+            ),
+            const SizedBox(width: 7),
+            Text(
+              label,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: Colors.white.withValues(alpha: 0.7),
+              ),
+            ),
           ],
         ),
         const SizedBox(height: 4),
@@ -396,7 +398,8 @@ class _HeroStat extends StatelessWidget {
           value,
           style: theme.textTheme.titleMedium?.copyWith(
             color: Colors.white,
-            fontWeight: FontWeight.w700,
+            fontWeight: FontWeight.w600,
+            fontFeatures: const [FontFeature.tabularFigures()],
           ),
         ),
       ],
@@ -445,10 +448,10 @@ class _QuickActions extends ConsumerWidget {
             busy
                 ? 'Checking your bank messages…'
                 : (auto?.smsAccessOff ?? false)
-                    ? 'SMS access is off — tap Sync SMS to allow it'
+                    ? 'SMS access is off. Tap Sync SMS to allow it.'
                     : last == null
                         ? 'Syncs automatically when bank messages arrive'
-                        : 'Synced automatically · ${relativeDayLabel(last)} ${formatTime(last)}',
+                        : _syncedLabel(last),
             style: Theme.of(context).textTheme.labelSmall?.copyWith(
                   color: Theme.of(context).colorScheme.onSurfaceVariant,
                 ),
@@ -456,6 +459,14 @@ class _QuickActions extends ConsumerWidget {
         ),
       ],
     );
+  }
+
+  /// "Synced today at 9:41 AM", "Synced on Fri, Oct 2 at 6:05 PM".
+  String _syncedLabel(DateTime last) {
+    final day = relativeDayLabel(last);
+    final when =
+        day == 'Today' || day == 'Yesterday' ? day.toLowerCase() : 'on $day';
+    return 'Synced $when at ${formatTime(last)}';
   }
 
   Widget _buildAdd(AppStrings strings) {
@@ -503,15 +514,26 @@ class _ActionButton extends StatelessWidget {
               child: CircularProgressIndicator(strokeWidth: 2),
             )
           else if (icon != null)
-            Icon(icon),
+            Icon(icon, size: 20),
           const SizedBox(width: 8),
           Text(label, style: const TextStyle(fontWeight: FontWeight.w600)),
         ],
       ),
     );
+    final shape = RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(14),
+    );
     return filled
-        ? FilledButton(onPressed: onPressed, child: child)
-        : FilledButton.tonal(onPressed: onPressed, child: child);
+        ? FilledButton(
+            onPressed: onPressed,
+            style: FilledButton.styleFrom(shape: shape),
+            child: child,
+          )
+        : FilledButton.tonal(
+            onPressed: onPressed,
+            style: FilledButton.styleFrom(shape: shape),
+            child: child,
+          );
   }
 }
 
@@ -540,14 +562,7 @@ class _AccountCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              InstitutionAvatar.forCode(card.institutionCode, size: 34),
-              const Spacer(),
-              Icon(Icons.contactless_rounded,
-                  color: theme.colorScheme.onSurfaceVariant, size: 18),
-            ],
-          ),
+          InstitutionAvatar.forCode(card.institutionCode, size: 34),
           const Spacer(),
           Text(
             card.title,
@@ -559,8 +574,10 @@ class _AccountCard extends StatelessWidget {
           const SizedBox(height: 2),
           Text(
             showAmounts ? formatMinorEtb(card.balanceMinor) : 'ETB ••••••',
-            style: theme.textTheme.titleMedium
-                ?.copyWith(fontWeight: FontWeight.w800),
+            style: theme.textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.w700,
+              fontFeatures: const [FontFeature.tabularFigures()],
+            ),
           ),
         ],
       ),
@@ -614,131 +631,74 @@ class _CashflowCard extends ConsumerWidget {
   }
 }
 
-class _InsightsGrid extends StatelessWidget {
-  const _InsightsGrid({required this.insights});
+/// This month in plain sentences: what was kept, where most of it went,
+/// and what the banks charged. Only lines that have something to say.
+class _MonthNotes extends StatelessWidget {
+  const _MonthNotes({required this.insights, required this.showAmounts});
 
   final DashboardInsights insights;
-
-  @override
-  Widget build(BuildContext context) {
-    final cards = [
-      _InsightData(
-        title: 'Savings rate',
-        value: '${insights.savingsRate.toStringAsFixed(0)}%',
-        icon: Icons.savings_rounded,
-        tint: const Color(0xFF2E9E6B),
-        progress: (insights.savingsRate / 100).clamp(0.0, 1.0),
-      ),
-      _InsightData(
-        title: 'Top category',
-        value: insights.topExpenseCategory == 'No data'
-            ? '—'
-            : categoryInfoFor(insights.topExpenseCategory).label,
-        icon: Icons.category_rounded,
-        tint: const Color(0xFFE8833A),
-        progress: (insights.topExpenseShare / 100).clamp(0.0, 1.0),
-      ),
-      _InsightData(
-        title: 'Parser health',
-        value: '${insights.parserHealthScore}%',
-        icon: Icons.health_and_safety_rounded,
-        tint: const Color(0xFF3B8DD6),
-        progress: (insights.parserHealthScore / 100).clamp(0.0, 1.0),
-      ),
-      _InsightData(
-        title: 'Month trend',
-        value: '${insights.monthNetDeltaPercent.toStringAsFixed(0)}%',
-        icon: Icons.trending_up_rounded,
-        tint: const Color(0xFF8E63D8),
-        progress: (insights.monthNetDeltaPercent.abs() / 100).clamp(0.0, 1.0),
-      ),
-    ];
-    return GridView.count(
-      crossAxisCount: 2,
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      mainAxisSpacing: 12,
-      crossAxisSpacing: 12,
-      childAspectRatio: 1.55,
-      children: cards.map((c) => _InsightCard(data: c)).toList(growable: false),
-    );
-  }
-}
-
-class _InsightData {
-  const _InsightData({
-    required this.title,
-    required this.value,
-    required this.icon,
-    required this.tint,
-    required this.progress,
-  });
-
-  final String title;
-  final String value;
-  final IconData icon;
-  final Color tint;
-  final double progress;
-}
-
-class _InsightCard extends StatelessWidget {
-  const _InsightCard({required this.data});
-
-  final _InsightData data;
+  final bool showAmounts;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final rows = <(String, String)>[
+      if (insights.incomeMinor > 0)
+        insights.savingsRate >= 0
+            ? ('Kept', '${insights.savingsRate.toStringAsFixed(0)}% of income')
+            : (
+                'Spent more than earned',
+                'by ${(-insights.savingsRate).toStringAsFixed(0)}%'
+              ),
+      if (insights.topExpenseCategory != 'No data')
+        (
+          'Spent most on',
+          '${categoryInfoFor(insights.topExpenseCategory).label}, '
+              '${insights.topExpenseShare.toStringAsFixed(0)}%',
+        ),
+      if (insights.feesMinor > 0)
+        (
+          'Bank fees',
+          showAmounts ? formatMinorEtb(insights.feesMinor) : 'ETB ••••',
+        ),
+    ];
+    if (rows.isEmpty) return const _QuietMonthCard();
     return Container(
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.symmetric(horizontal: 16),
       decoration: BoxDecoration(
         color: theme.cardTheme.color,
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(16),
       ),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(7),
-                decoration: BoxDecoration(
-                  color: data.tint.withValues(alpha: 0.15),
-                  borderRadius: BorderRadius.circular(9),
-                ),
-                child: Icon(data.icon, color: data.tint, size: 18),
+          for (var i = 0; i < rows.length; i++) ...[
+            if (i > 0)
+              Divider(
+                height: 1,
+                color: theme.colorScheme.outlineVariant.withValues(alpha: 0.4),
               ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  data.title,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 14),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      rows[i].$1,
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
                   ),
-                ),
+                  Text(
+                    rows[i].$2,
+                    style: theme.textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
               ),
-            ],
-          ),
-          const Spacer(),
-          Text(
-            data.value,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: theme.textTheme.titleLarge
-                ?.copyWith(fontWeight: FontWeight.w800),
-          ),
-          const SizedBox(height: 8),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(999),
-            child: LinearProgressIndicator(
-              value: data.progress,
-              minHeight: 6,
-              backgroundColor: data.tint.withValues(alpha: 0.15),
-              valueColor: AlwaysStoppedAnimation(data.tint),
             ),
-          ),
+          ],
         ],
       ),
     );
@@ -825,8 +785,8 @@ class _BudgetGlance extends ConsumerWidget {
                   const SizedBox(width: 10),
                   Expanded(
                     child: Text(
-                      'Plan your month — Genzeb can suggest budgets from '
-                      'your spending',
+                      'Plan your month. Genzeb can suggest budgets from '
+                      'your spending.',
                       style: theme.textTheme.bodyMedium
                           ?.copyWith(fontWeight: FontWeight.w600),
                     ),
@@ -914,7 +874,7 @@ class _BudgetGlanceRow extends StatelessWidget {
       status = 'Over budget';
     } else if (progress.isCurrent) {
       status = pace == BudgetPace.ahead
-          ? 'Spending fast · ${daysLabel(progress.daysLeft)} left'
+          ? 'Spending fast, ${daysLabel(progress.daysLeft)} left'
           : '${daysLabel(progress.daysLeft)} left';
     } else {
       status = 'Ended';
@@ -967,7 +927,7 @@ class _BudgetGlanceRow extends StatelessWidget {
                   const SizedBox(height: 2),
                   Text(
                     showAmounts && progress.remainingMinor > 0
-                        ? '$status · ${formatMinorEtb(progress.remainingMinor)} '
+                        ? '$status, ${formatMinorEtb(progress.remainingMinor)} '
                             'to spend'
                         : status,
                     style: theme.textTheme.bodySmall?.copyWith(
