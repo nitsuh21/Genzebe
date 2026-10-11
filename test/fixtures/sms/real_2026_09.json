@@ -73,7 +73,7 @@
       "id": "cbe-a-debit-transaction-of-has-occurred",
       "source": "real",
       "sender": "CBE",
-      "body": "Dear Abebe A debit transaction of ETB 100.0. has occurred on your account 1********9722. Service charge of ETB 10.00 and VAT(15%) of ETB1.50 and Disaster Recovery(5%) of 0.50 with total of ETB112.00 .Your current balance is ETB835.25. Thanks for Banking with CBE. https://mbreciept.cbe.com.et/v2-XXXXXXXX  for feedback: https://forms.gle/XXXXXXXX",
+      "body": "Dear Abebe A debit transaction of ETB 100.0. has occurred on your account 1********2468. Service charge of ETB 10.00 and VAT(15%) of ETB1.50 and Disaster Recovery(5%) of 0.50 with total of ETB112.00 .Your current balance is ETB835.25. Thanks for Banking with CBE. https://mbreciept.cbe.com.et/v2-XXXXXXXX  for feedback: https://forms.gle/XXXXXXXX",
       "expect": {
         "parsed": true,
         "institution": "cbe",
@@ -88,7 +88,7 @@
       "id": "telebirr-atm-withdrawal-request-successful",
       "source": "real",
       "sender": "127",
-      "body": "Dear Abebe The request to withdraw ETB 2,000.00 from your telebirr account 2519******69  via secret code ****** on  2026-08-15 19:50:48 using Awash International Bank S C ATM with transaction number  DHF9TE0367 is successfully completed. The service fee (including 15% VAT) is ETB 11.50. Your current Account balance is ETB 777.46.To download your payment information please click this link: https://transactioninfo.ethiotelecom.et/receipt/XXXXXXXX Thank you for using telebirr Ethio telecom",
+      "body": "Dear Abebe The request to withdraw ETB 2,000.00 from your telebirr account 2519******69  via secret code ****** on  2026-08-15 19:50:48 using Awash International Bank S C ATM with transaction number  DHF9XR4512 is successfully completed. The service fee (including 15% VAT) is ETB 11.50. Your current Account balance is ETB 777.46.To download your payment information please click this link: https://transactioninfo.ethiotelecom.et/receipt/XXXXXXXX Thank you for using telebirr Ethio telecom",
       "expect": {
         "parsed": true,
         "institution": "telebirr",
@@ -264,7 +264,7 @@
       "id": "telebirr-cancelled-request-is-ignored",
       "source": "real",
       "sender": "127",
-      "body": "Dear Customer  Your request for transaction number DCD7PTW4VL with amount ETB 150.00 is cancelled.  Your current E-Money Account  balance is  ETB 2,923.74.  Thank you for using telebirr Ethio telecom",
+      "body": "Dear Customer  Your request for transaction number DCD7MZQ8HN with amount ETB 150.00 is cancelled.  Your current E-Money Account  balance is  ETB 2,923.74.  Thank you for using telebirr Ethio telecom",
       "expect": {
         "parsed": false
       }
@@ -273,7 +273,7 @@
       "id": "cbe-credited-from-name-keeps-the-sender",
       "source": "real",
       "sender": "CBE",
-      "body": "Dear Abebe your Account 1*********9722 has been Credited with ETB 1,000.00 from Elias Y., on 11/06/2026 at 21:30:35 with Ref No FT26163VM0LY Your Current Balance is ETB 259,981.06. Thank you for Banking with CBE!",
+      "body": "Dear Abebe your Account 1*********2468 has been Credited with ETB 1,000.00 from Elias Y., on 11/06/2026 at 21:30:35 with Ref No FT26163H5W1N Your Current Balance is ETB 259,981.06. Thank you for Banking with CBE!",
       "expect": {
         "parsed": true,
         "institution": "cbe",
@@ -288,7 +288,7 @@
       "id": "cbe-transferred-to-account-name-in-brackets",
       "source": "real",
       "sender": "CBE",
-      "body": "Dear  Abebe You have successfully transferred ETB400.00 from account 1********9722 to account 1********6766 (Hanna S. M.). Service charge of ETB 0.50 and VAT(15%) of ETB0.08 with a total of ETB400.58. Your Current Balance is ETB 11,420.67. Thank you for Banking with CBE!",
+      "body": "Dear  Abebe You have successfully transferred ETB400.00 from account 1********2468 to account 1********6766 (Hanna S. M.). Service charge of ETB 0.50 and VAT(15%) of ETB0.08 with a total of ETB400.58. Your Current Balance is ETB 11,420.67. Thank you for Banking with CBE!",
       "expect": {
         "parsed": true,
         "institution": "cbe",
@@ -303,7 +303,7 @@
       "id": "cbe-transfered-misspelling-is-a-transfer-not-fees",
       "source": "real",
       "sender": "CBE",
-      "body": "Dear Abebe, You have transfered ETB 1,000.00 to Mr Dagim on 22/05/2026 at 18:49:22 from your account 1*********9722. Your account has been debited with a S.charge of ETB 0.50 and VAT(15%) of ETB0.08 and a total of ETB1000.58. Your Current Balance is ETB 5,210.40. Thank you for Banking with CBE!",
+      "body": "Dear Abebe, You have transfered ETB 1,000.00 to Mr Dagim on 22/05/2026 at 18:49:22 from your account 1*********2468. Your account has been debited with a S.charge of ETB 0.50 and VAT(15%) of ETB0.08 and a total of ETB1000.58. Your Current Balance is ETB 5,210.40. Thank you for Banking with CBE!",
       "expect": {
         "parsed": true,
         "institution": "cbe",

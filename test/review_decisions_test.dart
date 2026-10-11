@@ -47,9 +47,9 @@ void main() {
     final sms = SmsMessage(
       id: 'cbe-old-1',
       sender: 'CBE',
-      body: 'Dear Nitsuh Demissew Mekonnen You have successfully '
-          'transferred ETB1100.00 from account 1**9722 to account 1**4607 '
-          '(Nebyou Elias Zewde). Service charge of ETB 1.00 and VAT(15%) of '
+      body: 'Dear Abebe Kebede Tesfaye You have successfully '
+          'transferred ETB1100.00 from account 1**2468 to account 1**4607 '
+          '(Yonas Tadesse Bekele). Service charge of ETB 1.00 and VAT(15%) of '
           'ETB0.15 and Disaster Recovery(5%) of 0.05 with total of '
           'ETB1101.20 .Your current balance is ETB89,468.32. Thanks for '
           'Banking with CBE.',

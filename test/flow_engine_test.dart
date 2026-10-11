@@ -11,8 +11,8 @@ import 'package:genzeb/features/transactions/domain/models/transaction_models.da
 import 'package:shared_preferences/shared_preferences.dart';
 
 const _cbeTransferBody =
-    'Dear Nitsuh Demissew Mekonnen You have successfully transferred '
-    'ETB1100.00 from account 1**9722 to account 1**4607. Service charge of '
+    'Dear Abebe Kebede Tesfaye You have successfully transferred '
+    'ETB1100.00 from account 1**2468 to account 1**4607. Service charge of '
     'ETB 1.00 and VAT(15%) of ETB0.15 and Disaster Recovery(5%) of 0.05 '
     'with total of ETB1101.20 .Your current balance is ETB89,468.32.';
 
@@ -221,7 +221,7 @@ void main() {
       at: t,
       categoryId: 'transfer_out',
       snippet: 'You have successfully transferred ETB1000.00 from account '
-          '1**9722 to account 1**4607.',
+          '1**2468 to account 1**4607.',
     ));
     await ledger.saveTransaction(_tx(
       id: 'slow-in',
