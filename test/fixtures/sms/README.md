@@ -16,7 +16,7 @@ then fix the parser. Never edit an existing `real` case to match the parser.
   "id": "cbe-debit-with-fees",
   "source": "real",
   "sender": "CBE",
-  "body": "Dear Nitsuh your Account 1*****9722 has been debited with ETB5,000.00. ...",
+  "body": "Dear Abebe your Account 1*****2468 has been debited with ETB5,000.00. ...",
   "expect": {
     "parsed": true,
     "institution": "cbe",
@@ -24,7 +24,7 @@ then fix the parser. Never edit an existing `real` case to match the parser.
     "amountMinor": 501200,
     "category": "fees",
     "balanceMinor": 28376067,
-    "referenceContains": "FT26140YL4N417459722",
+    "referenceContains": "FT26140R3T8P13572468",
     "merchant": null,
     "explicitDirection": true,
     "autoAccept": true

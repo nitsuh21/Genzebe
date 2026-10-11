@@ -62,12 +62,12 @@ void main() {
       SmsMessage(
         id: 'cbe-real-1',
         sender: 'CBE',
-        body: 'Dear  Nitsuh Demissew Mekonnen You have successfully '
-            'transferred ETB1100.00 from account 1**9722 to account 1**4607 '
-            '(Nebyou Elias Zewde). Service charge of ETB 1.00 and VAT(15%) '
+        body: 'Dear  Abebe Kebede Tesfaye You have successfully '
+            'transferred ETB1100.00 from account 1**2468 to account 1**4607 '
+            '(Yonas Tadesse Bekele). Service charge of ETB 1.00 and VAT(15%) '
             'of ETB0.15 and Disaster Recovery(5%) of 0.05 with total of '
             'ETB1101.20 .Your current balance is ETB89,468.32. Thanks for '
-            'Banking with CBE. https://mbreciept.cbe.com.et/v2-hfHCxzVQsJzR5',
+            'Banking with CBE. https://mbreciept.cbe.com.et/v2-Qm4TzW8rLp2Xk',
         receivedAt: DateTime(2026, 7, 9, 12, 0),
       ),
     );

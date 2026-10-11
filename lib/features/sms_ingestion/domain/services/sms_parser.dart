@@ -325,7 +325,7 @@ int? extractBalanceMinor(String body) {
 }
 
 /// "Ref AXE1234", "Transaction number ABC123", "Your transaction number is
-/// DF24JC2U3S". A real reference always carries a digit, so prose after the
+/// DF24QK7M1Z". A real reference always carries a digit, so prose after the
 /// keyword ("transaction with CBE") is never mistaken for one.
 String? extractReference(String body) {
   final amharic = RegExp(
@@ -778,7 +778,7 @@ String? extractMerchant(String body, {required bool isExpense}) {
 
 String? _cleanMerchant(String raw) {
   var value = raw
-      // "Mekuria Solomon(2519****4846)" — the masked phone in parentheses is
+      // "Selam Girma(2519****4846)" — the masked phone in parentheses is
       // not part of the name.
       .replaceAll(RegExp(r'\([^)]*\)'), ' ')
       .replaceAll(RegExp(r'''["'“”]'''), '')
